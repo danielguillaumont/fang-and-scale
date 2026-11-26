@@ -194,6 +194,48 @@ def record(
     )
 
 
+@app.command()
+def mutate(
+    contract: Annotated[Path, typer.Option(help="Contract file (*.fns.yaml).")],
+    snapshot: Annotated[Path, typer.Option(help="Snapshot JSON written by `fns scout`.")],
+    lab: Annotated[
+        Path | None,
+        typer.Option(help="Terraform directory: render each mutant as a diff against it."),
+    ] = None,
+    harden_first: Annotated[
+        bool,
+        typer.Option("--harden", help="Apply the `fns harden` proposal (in the model) first."),
+    ] = False,
+    max_survivors: Annotated[int, typer.Option(min=0, help="Survivors allowed.")] = 0,
+    diff: Annotated[bool, typer.Option(help="Print the Terraform diff of each survivor.")] = False,
+    json_out: Annotated[Path | None, typer.Option("--json", help="Write the report here.")] = None,
+) -> None:
+    """Weaken the defence one grant at a time; the contract must notice each (M5)."""
+    from pydantic import ValidationError
+
+    from fns import mutate_cli
+    from fns.console import FixtureConsole
+    from fns.contain_run import load_snapshot
+    from fns.models.contract import load_contract
+    from fns.mutate import MutateError
+    from fns.yamlio import YamlError
+
+    err = make_console(stderr=True)
+    try:
+        c = load_contract(contract)
+        s = load_snapshot(snapshot)
+        report = mutate_cli.run(c, s, lab, harden=harden_first)
+    except (MutateError, OSError, ValidationError, YamlError) as exc:
+        err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    con = FixtureConsole(make_console()) if s.mode == "FIXTURE" else make_console()
+    mutate_cli.render(report, con, diffs=diff, max_survivors=max_survivors)
+    if json_out is not None:
+        mutate_cli.write(report, json_out)
+        con.print(f"wrote {json_out.as_posix()}", style="fns.muted", markup=False)
+    raise typer.Exit(mutate_cli.exit_code(report, max_survivors))
+
+
 detections_app = typer.Typer(help="Detection rules as code (M4).", no_args_is_help=True)
 app.add_typer(detections_app, name="detections")
 
@@ -499,6 +541,75 @@ def demo_contain(
     path = write_report(report, json_out, out)
     con.print(f"wrote {path.as_posix()}", style="fns.muted", markup=False)
     raise typer.Exit(report.summary.exit_code)
+
+
+@demo_app.command("mutate")
+def demo_mutate(
+    fixture: Annotated[
+        Path, typer.Option(help="Recorded fixture set (uses its contract.fns.yaml).")
+    ] = Path("fixtures/lab-run-1"),
+    lab: Annotated[Path, typer.Option(help="The lab Terraform the fixture was recorded from.")] = (
+        Path("lab")
+    ),
+    out: Annotated[Path, typer.Option(help="Directory for the journal and snapshot.")] = Path(
+        ".fns"
+    ),
+    diff: Annotated[bool, typer.Option(help="Print the Terraform diff of each survivor.")] = False,
+    json_out: Annotated[Path | None, typer.Option("--json", help="Write the report here.")] = None,
+) -> None:
+    """Harden the lab fixture in the model, then mutate it (labelled FIXTURE).
+
+    Needs a repository checkout: the lab fixture and lab/*.tf. Survivors are
+    contract gaps, so exit 1 is the expected result.
+    """
+    from pydantic import ValidationError
+
+    from fns import mutate_cli
+    from fns.console import FixtureConsole
+    from fns.contain_run import demo_contract, run_demo_contain
+    from fns.fixtures.replay import FixtureError
+    from fns.journal.sqlite import JournalError
+    from fns.models.scope import ScopeExpiredError
+    from fns.mutate import MutateError
+    from fns.yamlio import YamlError
+
+    con = FixtureConsole(make_console())
+    err = FixtureConsole(make_console(stderr=True))
+    if not fixture.is_dir() or not lab.is_dir():
+        err.print(
+            f"needs {fixture.as_posix()} and {lab.as_posix()}/ (run from a repository checkout)",
+            style="fns.fail",
+            markup=False,
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT)
+    try:
+        scout, _ = run_demo_contain(out, fixture)
+        report = mutate_cli.run(
+            demo_contract(fixture),
+            scout.snapshot,
+            lab,
+            harden=True,
+            now=scout.snapshot.collected_at,
+        )
+    except (
+        FixtureError,
+        JournalError,
+        MutateError,
+        ScopeExpiredError,
+        ValidationError,
+        YamlError,
+        OSError,
+    ) as exc:
+        err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    con.print(
+        f"Replaying fixture {fixture.as_posix()!r}; no network calls are made.", style="fns.muted"
+    )
+    mutate_cli.render(report, con, diffs=diff, max_survivors=0)
+    if json_out is not None:
+        mutate_cli.write(report, json_out)
+        con.print(f"wrote {json_out.as_posix()}", style="fns.muted", markup=False)
+    raise typer.Exit(mutate_cli.exit_code(report, 0))
 
 
 @demo_app.command("prove")
