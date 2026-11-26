@@ -316,11 +316,15 @@ call and time budget, and only until `expires_at`.
 Works on Windows, macOS and Linux. CI runs on ubuntu and windows.
 
 ```
-uv run poe setup      # install deps and pre-commit hooks
+uv run poe setup      # uv sync --all-groups --all-extras, then pre-commit hooks
 uv run poe check      # ruff + mypy --strict + import boundaries + schema drift + pytest
 uv run poe lab-check  # terraform fmt -check + validate (no credentials needed)
 uv run poe schema     # regenerate the committed JSON Schemas in schemas/
 ```
+
+Sync with `--all-extras` as well as `--all-groups` (`poe setup` does): `sigstore`
+is an extra, because `fns prove --sign sigstore` is part of the installed tool,
+and a plain `uv sync --all-groups` uninstalls it.
 
 ## License
 

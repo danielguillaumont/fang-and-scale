@@ -60,7 +60,7 @@ The 6 `prove` operations:
 ```powershell
 git switch main
 git pull
-uv sync --all-groups
+uv sync --all-groups --all-extras
 uv run poe check
 ```
 
