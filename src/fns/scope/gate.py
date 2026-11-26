@@ -12,15 +12,28 @@ Order of checks (first failure wins):
  2. not expired (every call)           EXPIRED
  3. signed-in tenant == manifest == call tenant   TENANT_MISMATCH
  4. verb allowed                       VERB_NOT_ALLOWED
- 5. operation well formed / listed     MALFORMED_OPERATION / OPERATION_NOT_ALLOWED
+ 5. operation well formed / listed     MALFORMED_OPERATION / DATA_PLANE_VERB_NOT_ALLOWED /
+                                       OPERATION_NOT_ALLOWED
  6. read-only verb never writes        WRITE_BY_READ_ONLY_VERB
  7. no writes at all in M1             WRITE_NOT_AVAILABLE_IN_M1
  8. target well formed and in scope    MALFORMED_TARGET / TARGET_KIND_MISMATCH /
                                        TENANT_LEVEL_NOT_ALLOWED / MG_NOT_ALLOWED /
                                        SUBSCRIPTION_NOT_ALLOWED / RG_NOT_ALLOWED
- 9. request URL on the right host/path BAD_URL
-10. strike acts only as a test identity PRINCIPAL_NOT_ALLOWED
-11. budget                             BUDGET_CALLS / BUDGET_TIME
+ 9. data plane: a vault or storage account, and a listed object
+                                       TARGET_KIND_MISMATCH / DATA_OBJECT_NOT_ALLOWED
+10. request URL on the right host/path BAD_URL (data plane: exact host, path, query)
+11. prove and strike act only as a test identity
+                                       PRINCIPAL_NOT_ALLOWED / PRINCIPAL_MISMATCH
+12. budget                             BUDGET_CALLS / BUDGET_TIME
+
+Data plane (``kv:``, ``blob:``; M3 P5.1): only the verb ``prove`` may use it, even
+if a forged manifest lists it elsewhere. The URL is required and must be exactly
+``https://<resource name>.vault.azure.net<path>?api-version=7.4`` or
+``https://<resource name>.blob.core.windows.net<path>``; there is no paging.
+
+Principal pinning (decision V4): a ``prove`` call is allowed only when the gate was
+built with the signed-in principal (the token's ``oid``) and that principal is a
+test identity. A caller-supplied ``principal_id`` that differs is denied.
 """
 
 from __future__ import annotations
@@ -33,14 +46,15 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Final, Literal, Protocol, TypeVar
 
-from fns.models.armid import GUID_RE
+from fns.models.armid import GUID_RE, parse_arm_id
 from fns.models.operations import Operation, OperationError, parse_operation
-from fns.models.scope import READ_ONLY_VERBS, ScopeManifest
+from fns.models.scope import DATA_PLANE_VERB, READ_ONLY_VERBS, ScopeManifest, data_resource
 from fns.scope.targets import (
     ArmTarget,
     DirectoryTarget,
     Target,
     TargetError,
+    check_data_url,
     check_next_link,
     check_url,
 )
@@ -56,6 +70,7 @@ class DenyReason(enum.StrEnum):
     TENANT_MISMATCH = "tenant-mismatch"
     VERB_NOT_ALLOWED = "verb-not-allowed"
     MALFORMED_OPERATION = "malformed-operation"
+    DATA_PLANE_VERB_NOT_ALLOWED = "data-plane-verb-not-allowed"
     OPERATION_NOT_ALLOWED = "operation-not-allowed"
     WRITE_BY_READ_ONLY_VERB = "write-by-read-only-verb"
     WRITE_NOT_AVAILABLE_IN_M1 = "write-not-available-in-m1"
@@ -65,8 +80,10 @@ class DenyReason(enum.StrEnum):
     MG_NOT_ALLOWED = "management-group-not-allowed"
     SUBSCRIPTION_NOT_ALLOWED = "subscription-not-allowed"
     RG_NOT_ALLOWED = "resource-group-not-allowed"
+    DATA_OBJECT_NOT_ALLOWED = "data-object-not-allowed"
     BAD_URL = "bad-url"
     PRINCIPAL_NOT_ALLOWED = "principal-not-allowed"
+    PRINCIPAL_MISMATCH = "principal-mismatch"
     BUDGET_CALLS = "budget-calls-exhausted"
     BUDGET_TIME = "budget-time-exhausted"
     JOURNAL_FAILED = "journal-failed"
@@ -204,6 +221,8 @@ class _Policy:
     resource_groups: frozenset[str]
     test_identities: frozenset[uuid.UUID]
     operations: dict[str, frozenset[str]]
+    data_objects: frozenset[tuple[str, str]]
+    """(resource ID, operation key) pairs from ``data_objects``."""
     max_api_calls: int
     max_seconds: float
     expires_at: datetime
@@ -238,6 +257,10 @@ def _policy_from(manifest: object) -> _Policy | None:
                 u for i in manifest.test_identities if (u := _as_uuid(i.object_id))
             ),
             operations=ops,
+            data_objects=frozenset(
+                (parse_arm_id(d.resource).format(), parse_operation(d.operation).key)
+                for d in manifest.data_objects
+            ),
             max_api_calls=int(manifest.budget.max_api_calls),
             max_seconds=float(manifest.budget.max_minutes) * 60.0,
             expires_at=expires,
@@ -257,9 +280,11 @@ class Gate:
         journal: JournalSink,
         clock: Clock | None = None,
         run_id: str | None = None,
+        signed_in_principal: uuid.UUID | str | None = None,
     ) -> None:
         self._policy = _policy_from(manifest)
         self._signed_in = _as_uuid(signed_in_tenant)
+        self._principal = _as_uuid(signed_in_principal)
         self._journal = journal
         self._clock: Clock = clock or SystemClock()
         self._started = self._clock.monotonic()
@@ -318,6 +343,10 @@ class Gate:
             op = parse_operation(operation)
         except OperationError:
             return Denied(DenyReason.MALFORMED_OPERATION, "operation outside the grammar")
+        if op.is_data_plane and verb != DATA_PLANE_VERB:
+            return Denied(
+                DenyReason.DATA_PLANE_VERB_NOT_ALLOWED, f"{op.api} data plane is for prove only"
+            )
         if op.key not in p.operations[verb]:
             return Denied(DenyReason.OPERATION_NOT_ALLOWED, f"{op.raw} not allowed for {verb}")
         if not op.is_read and verb in READ_ONLY_VERBS:
@@ -336,7 +365,7 @@ class Gate:
         else:
             return Denied(DenyReason.MALFORMED_TARGET, "target must be an ARM ID or directory")
 
-        if (op.api == "arm") != isinstance(resolved, ArmTarget):
+        if (op.api != "graph") != isinstance(resolved, ArmTarget):
             return Denied(DenyReason.TARGET_KIND_MISMATCH, f"{op.api} operation on {resolved}")
 
         if isinstance(resolved, ArmTarget):
@@ -344,7 +373,11 @@ class Gate:
             if denied is not None:
                 return denied
 
-        if url is not None or page_of is not None:
+        if op.is_data_plane and isinstance(resolved, ArmTarget):  # kind checked above
+            denied = self._check_data_plane(op, resolved, p, url, page_of)
+            if denied is not None:
+                return denied
+        elif url is not None or page_of is not None:
             if not isinstance(url, str):
                 return Denied(DenyReason.BAD_URL, "page_of given without url")
             try:
@@ -362,6 +395,16 @@ class Gate:
                 return Denied(
                     DenyReason.PRINCIPAL_NOT_ALLOWED, "strike must act as a test identity"
                 )
+            if self._principal is not None and principal != self._principal:
+                return Denied(DenyReason.PRINCIPAL_MISMATCH, "principal differs from the token")
+        if verb == "prove":
+            if self._principal is None or self._principal not in p.test_identities:
+                return Denied(
+                    DenyReason.PRINCIPAL_NOT_ALLOWED,
+                    "prove must be signed in as a test identity (token oid)",
+                )
+            if principal_id is not None and _as_uuid(principal_id) != self._principal:
+                return Denied(DenyReason.PRINCIPAL_MISMATCH, "principal differs from the token")
 
         if self._calls >= p.max_api_calls:
             return Denied(DenyReason.BUDGET_CALLS, f"{p.max_api_calls} API calls used")
@@ -369,6 +412,35 @@ class Gate:
             return Denied(DenyReason.BUDGET_TIME, "run time budget used")
 
         return Allowed(op, str(resolved))
+
+    @staticmethod
+    def _check_data_plane(
+        op: Operation, target: ArmTarget, p: _Policy, url: object, page_of: object
+    ) -> Denied | None:
+        found = data_resource(str(target))
+        if found is None or found[0] != op.api:
+            return Denied(
+                DenyReason.TARGET_KIND_MISMATCH, f"{op.api} operation on a non-{op.api} resource"
+            )
+        _, name = found
+        resource = str(target)
+        if op.path == "/secrets":
+            bound = any(r == resource and k.startswith("kv:") for r, k in p.data_objects)
+        else:
+            bound = (resource, op.key) in p.data_objects
+        if not bound:
+            return Denied(
+                DenyReason.DATA_OBJECT_NOT_ALLOWED, f"{op.raw} is not a data object of the target"
+            )
+        if not isinstance(url, str):
+            return Denied(DenyReason.BAD_URL, "a data-plane call needs its exact URL")
+        if page_of is not None:
+            return Denied(DenyReason.BAD_URL, "no paging on the data plane")
+        try:
+            check_data_url(op.api, url, name, op.path)
+        except TargetError as exc:
+            return Denied(DenyReason.BAD_URL, str(exc))
+        return None
 
     @staticmethod
     def _check_arm_scope(target: ArmTarget, p: _Policy) -> Denied | None:

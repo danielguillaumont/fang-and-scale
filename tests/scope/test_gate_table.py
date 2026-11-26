@@ -36,6 +36,7 @@ from tests.scope.gatekit import (
     make_gate,
     manifest,
 )
+from tests.scope.test_gate_data_plane import DATA_REASONS
 
 D = DirectoryTarget()
 KV_ROLE_DEF = f"/subscriptions/{SUB}/providers/Microsoft.Authorization/roleDefinitions/x"
@@ -186,11 +187,15 @@ def test_denied(name: str, reason: DenyReason, kw: dict[str, Any]) -> None:
 def test_every_deny_reason_has_a_test() -> None:
     # Covered outside the table: JOURNAL_FAILED (test_gate_call), INTERNAL_ERROR (below),
     # WRITE_BY_READ_ONLY_VERB (forged manifests only; validation rejects it otherwise).
-    covered = {r[1] for r in DENY_ROWS} | {
-        DenyReason.JOURNAL_FAILED,
-        DenyReason.INTERNAL_ERROR,
-        DenyReason.WRITE_BY_READ_ONLY_VERB,
-    }
+    covered = (
+        {r[1] for r in DENY_ROWS}
+        | DATA_REASONS
+        | {
+            DenyReason.JOURNAL_FAILED,
+            DenyReason.INTERNAL_ERROR,
+            DenyReason.WRITE_BY_READ_ONLY_VERB,
+        }
+    )
     assert covered == set(DenyReason)
 
 

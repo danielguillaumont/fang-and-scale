@@ -1,5 +1,29 @@
 {
   "$defs": {
+    "DataObject": {
+      "additionalProperties": false,
+      "description": "One data-plane object ``prove`` may read, bound to the resource that holds it.\n\nA data-plane call is allowed only if its operation is listed under ``prove`` *and*\nits (resource, path) pair is listed here, so a scope cannot read the payroll blob\npath from the invoices account, or a secret from another vault.",
+      "properties": {
+        "operation": {
+          "description": "arm:<Namespace>/<type>/<read|write|delete|action>, graph:<METHOD> /<path>, kv:GET /secrets[/<name>] or blob:HEAD /<container>/<blob>",
+          "title": "Operation",
+          "type": "string"
+        },
+        "resource": {
+          "description": "The vault or storage account (full ARM ID).",
+          "minLength": 2,
+          "pattern": "^/(subscriptions|providers)/",
+          "title": "Resource",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource",
+        "operation"
+      ],
+      "title": "DataObject",
+      "type": "object"
+    },
     "ScopeBudget": {
       "additionalProperties": false,
       "description": "Per-run limits enforced by the gate.",
@@ -63,7 +87,7 @@
     "allowed_operations": {
       "additionalProperties": {
         "items": {
-          "description": "arm:<Namespace>/<type>/<read|write|delete|action> or graph:<METHOD> /<path>",
+          "description": "arm:<Namespace>/<type>/<read|write|delete|action>, graph:<METHOD> /<path>, kv:GET /secrets[/<name>] or blob:HEAD /<container>/<blob>",
           "type": "string"
         },
         "type": "array"
@@ -95,6 +119,15 @@
     },
     "budget": {
       "$ref": "#/$defs/ScopeBudget"
+    },
+    "data_objects": {
+      "default": [],
+      "description": "Data-plane objects ``prove`` may read. Empty means no data-plane call at all.",
+      "items": {
+        "$ref": "#/$defs/DataObject"
+      },
+      "title": "Data Objects",
+      "type": "array"
     },
     "expires_at": {
       "description": "After this instant the manifest allows nothing.",

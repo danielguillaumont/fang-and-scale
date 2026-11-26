@@ -6,7 +6,7 @@ from typing import Any
 
 from fns.models.scope import ScopeManifest
 from fns.scope.gate import FrozenClock, Gate, InMemoryJournal
-from tests.factories import NOW, RG, SUB, TENANT, scope_dict
+from tests.factories import NOW, RG, SP_AGENT, SUB, TENANT, scope_dict
 
 ARM_READ = "arm:Microsoft.Authorization/roleAssignments/read"
 ARM_READ2 = "arm:Microsoft.Authorization/roleDefinitions/read"
@@ -36,7 +36,9 @@ def make_gate(
     signed_in: str = TENANT,
     clock: FrozenClock | None = None,
     journal: InMemoryJournal | None = None,
+    principal: str | None = SP_AGENT,
 ) -> tuple[Gate, InMemoryJournal, FrozenClock]:
+    """``principal`` is the signed-in principal (the token's oid); prove needs one."""
     clock = clock or FrozenClock(NOW)
     journal = journal or InMemoryJournal()
     gate = Gate(
@@ -45,5 +47,6 @@ def make_gate(
         journal=journal,
         clock=clock,
         run_id="run-test",
+        signed_in_principal=principal,
     )
     return gate, journal, clock

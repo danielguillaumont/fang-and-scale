@@ -20,13 +20,16 @@ import json
 import time
 import uuid
 from collections.abc import Callable
-from typing import Any, Final, Literal, Protocol
+from typing import Any, Final, Protocol
 
-Api = Literal["arm", "graph"]
+from fns.models.operations import Api
 
 SCOPES: Final[dict[Api, str]] = {
     "arm": "https://management.azure.com/.default",
     "graph": "https://graph.microsoft.com/.default",
+    # Data plane (M3 P5): only `fns prove` sends these, as the test identity.
+    "kv": "https://vault.azure.net/.default",
+    "blob": "https://storage.azure.com/.default",
 }
 
 

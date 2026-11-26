@@ -77,10 +77,12 @@ def test_refreshed_token_is_pinned_again() -> None:
         tokens.token("arm")
 
 
-def test_scopes_are_dot_default_for_both_apis() -> None:
+def test_scopes_are_dot_default_for_every_api() -> None:
     assert SCOPES == {
         "arm": "https://management.azure.com/.default",
         "graph": "https://graph.microsoft.com/.default",
+        "kv": "https://vault.azure.net/.default",
+        "blob": "https://storage.azure.com/.default",
     }
 
 

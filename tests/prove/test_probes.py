@@ -67,13 +67,16 @@ def _spec(action: str, *, data: bool = False) -> ProbeSpec:
     )
 
 
-def _probe(resp: ApiResponse, ops: list[str] | None = None) -> tuple[ArmPermissionsProbe, Fake]:
+def _probe(
+    resp: ApiResponse, ops: list[str] | None = None, *, signed_in: str | None = AGENT
+) -> tuple[ArmPermissionsProbe, Fake]:
     clock = FrozenClock(NOW)
     gate = Gate(
         _manifest([OPERATION] if ops is None else ops),
         signed_in_tenant=TENANT,
         journal=InMemoryJournal(),
         clock=clock,
+        signed_in_principal=signed_in,
     )
     fake = Fake(resp)
     return (
@@ -197,3 +200,14 @@ def test_crashing_probe_leaves_a_failed_step_and_no_evidence(tmp_path: Path) -> 
     assert got.observations == {}
     assert len(got.unfinished) == total
     assert isinstance(aset, AssertionSet)
+
+
+@pytest.mark.parametrize("signed_in", [None, "00000000-0000-4000-8000-000000000999"])
+def test_permissions_probe_refuses_unless_signed_in_as_the_test_identity(
+    signed_in: str | None,
+) -> None:
+    """Principal pinning (V4): without the agent's own token the probe never runs."""
+    probe, fake = _probe(ApiResponse(200, CONTRIBUTOR), signed_in=signed_in)
+    with pytest.raises(ProbeUnavailableError, match="principal-not-allowed"):
+        probe.observe(_spec("Microsoft.KeyVault/vaults/write"), FID)
+    assert fake.seen == []

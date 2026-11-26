@@ -157,3 +157,18 @@ def test_parse_retry_after() -> None:
     assert parse_retry_after("soon") is None
     assert parse_retry_after(None) is None
     assert parse_retry_after("-5") is None
+
+
+@pytest.mark.parametrize("api", ["kv", "blob"])
+def test_refuses_data_plane_requests(api: str) -> None:
+    """The ARM/Graph transport never carries a data-plane request (M3 P5.1)."""
+    opener = FakeOpener(default=Canned())
+    req = ApiRequest(
+        api=api,  # type: ignore[arg-type]
+        operation="kv:GET /secrets",
+        target=ARM_REQ.target,
+        url="https://kv.vault.azure.net/secrets?api-version=7.4",
+    )
+    with pytest.raises(TransportError, match="ARM and Graph only"):
+        _transport(opener).fetch(req)
+    assert opener.requests == []

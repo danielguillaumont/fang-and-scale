@@ -68,6 +68,8 @@ def parse_retry_after(value: str | None, *, now: datetime | None = None) -> floa
 
 
 def _check_url(request: ApiRequest) -> None:
+    if request.api not in API_HOSTS:
+        raise TransportError(f"this transport sends ARM and Graph only, not {request.api}")
     parts = urlsplit(request.url)
     if parts.scheme != "https" or parts.hostname != API_HOSTS[request.api]:
         raise TransportError(f"refusing to send a {request.api} request to {parts.hostname!r}")
