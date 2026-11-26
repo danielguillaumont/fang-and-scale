@@ -6,19 +6,22 @@ import json
 import sqlite3
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from fns.cli import app
+from fns.fixtures.replay import bundled
 from fns.models.snapshot import Snapshot
 
 ROOT = Path(__file__).resolve().parent
+DEMO_SCOUT = str(bundled("demo-scout"))  # hand-written, for tests
 GOLDEN = (ROOT / "golden" / "demo-scout.digest").read_text(encoding="utf-8").strip()
 
 runner = CliRunner()
 
 
 def _run(out: Path) -> tuple[str, str]:
-    result = runner.invoke(app, ["demo", "scout", "--out", str(out)])
+    result = runner.invoke(app, ["demo", "scout", "--out", str(out), "--fixture", DEMO_SCOUT])
     assert result.exit_code == 0, result.output
     digest_line = next(line for line in result.output.splitlines() if "digest sha256:" in line)
     return result.output, digest_line.rsplit("sha256:", 1)[1].strip()
@@ -74,3 +77,18 @@ def test_demo_failure_is_labelled_on_stderr(tmp_path: Path) -> None:
     assert lines
     assert all(line.startswith("FIXTURE ") for line in lines)
     assert "demo failed" in result.output
+
+
+@pytest.mark.parametrize("command", ["scout", "contain", "prove", "report"])
+def test_demo_commands_default_to_the_recorded_lab_run(command: str, tmp_path: Path) -> None:
+    result = runner.invoke(app, ["demo", command, "--out", str(tmp_path)])
+    assert "Replaying fixture 'fixtures/lab-run-1'" in result.output, result.output
+    assert "demo-scout" not in result.output
+
+
+def test_demo_outside_a_checkout_exits_2(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["demo", "contain", "--out", str(tmp_path / "o")])
+    assert result.exit_code == 2, result.output
+    assert "run from a repository checkout" in result.output
+    assert all(line.startswith("FIXTURE ") for line in result.output.splitlines() if line.strip())
