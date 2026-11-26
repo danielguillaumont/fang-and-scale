@@ -7,6 +7,8 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from fns.adapters.azure import arm, graph
 from fns.adapters.azure.http import ApiResponse
@@ -33,25 +35,26 @@ NO_LICENCE = ApiResponse(
 )
 
 
-def _sku(part: str, *plans: tuple[str, str]) -> dict[str, Any]:
+def _sku(part: str, *plans: tuple[str, str], status: str = "Success") -> dict[str, Any]:
     return {
         "skuId": pid(6000),
         "skuPartNumber": part,
         "capabilityStatus": "Enabled",
         "servicePlans": [
-            {"servicePlanName": n, "servicePlanId": i, "provisioningStatus": "Success"}
+            {"servicePlanName": n, "servicePlanId": i, "provisioningStatus": status}
             for n, i in plans
         ],
     }
 
 
+P2_PLAN = "eec0eb4f-6444-4f95-aba0-50c24d67f998"
+EXCHANGE = pid(1)
+
+
 FREE = ApiResponse(
-    200, {"value": [_sku("O365_BUSINESS_ESSENTIALS", ("EXCHANGE_S_STANDARD", pid(1)))]}
+    200, {"value": [_sku("O365_BUSINESS_ESSENTIALS", ("EXCHANGE_S_STANDARD", EXCHANGE))]}
 )
-P2 = ApiResponse(
-    200,
-    {"value": [_sku("EMSPREMIUM", ("AAD_PREMIUM_P2", "eec0eb4f-6444-4f95-aba0-50c24d67f998"))]},
-)
+P2 = ApiResponse(200, {"value": [_sku("EMSPREMIUM", ("AAD_PREMIUM_P2", P2_PLAN))]})
 EMPTY = ApiResponse(200, {"value": []})
 
 
@@ -162,15 +165,33 @@ def test_empty_listings_close_the_surface_without_asking_for_licences() -> None:
     assert not snap.coverage.not_applicable
 
 
-def test_no_pim_licence_is_not_applicable_with_the_responses_as_evidence() -> None:
-    snap, _ = _run(_fixture({"dir": NO_LICENCE, "arm": EMPTY, "skus": FREE}))
+def test_no_licences_at_all_is_not_applicable_with_the_responses_as_evidence() -> None:
+    """The lab's case: Entra ID Free, 0 SKUs, and the listing says a licence is needed."""
+    snap, _ = _run(_fixture({"dir": NO_LICENCE, "arm": EMPTY, "skus": EMPTY}))
     assert _status(snap) == "not-applicable"
     assert _surface(snap)[0] == "not-applicable"
     (na,) = snap.coverage.not_applicable
     text = "\n".join(na.evidence)
     assert "roleEligibilitySchedules -> http-400 AadPremiumLicenseRequired" in text
     assert f"/subscriptions/{SUB} -> ok" in text
-    assert "O365_BUSINESS_ESSENTIALS" in text and "may carry PIM: none" in text
+    assert "GET /subscribedSkus -> ok: 0 SKU(s) [none]; plans that may carry PIM: none" in text
+    assert "not known to be PIM-free" not in text
+
+
+def test_plans_known_by_id_to_be_pim_free_are_not_applicable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(graph, "PIM_FREE_PLAN_IDS", frozenset({EXCHANGE}))
+    snap, _ = _run(_fixture({"dir": NO_LICENCE, "arm": EMPTY, "skus": FREE}))
+    assert _surface(snap)[0] == "not-applicable"
+    (na,) = snap.coverage.not_applicable
+    assert "O365_BUSINESS_ESSENTIALS" in "\n".join(na.evidence)
+    assert "no subscribed licence carries PIM" in na.reason
+
+
+def test_the_pim_free_list_starts_empty() -> None:
+    """Entries need a verified ID, plan name and source (graph.PIM_FREE_PLAN_IDS)."""
+    assert frozenset() == graph.PIM_FREE_PLAN_IDS
 
 
 @pytest.mark.parametrize(
@@ -178,6 +199,12 @@ def test_no_pim_licence_is_not_applicable_with_the_responses_as_evidence() -> No
     [
         # a licence that carries PIM: the failure is real, not 'no PIM here'
         ({"dir": NO_LICENCE, "arm": EMPTY, "skus": P2}, "EMSPREMIUM/AAD_PREMIUM_P2"),
+        # a plan not known (by ID) to be PIM-free: never assume
+        (
+            {"dir": NO_LICENCE, "arm": EMPTY, "skus": FREE},
+            "not known to be PIM-free, so PIM cannot be ruled out: "
+            "O365_BUSINESS_ESSENTIALS/EXCHANGE_S_STANDARD",
+        ),
         # licences unknown: never assume
         ({"dir": NO_LICENCE, "arm": EMPTY, "skus": ApiResponse(403, {})}, "cannot be ruled out"),
         # ARM returned a row: eligibility exists even without the licence we saw
@@ -209,17 +236,69 @@ def test_skus_not_in_scope_keeps_the_gap() -> None:
     assert state == "not-collected" and "cannot be ruled out" in reason
 
 
-def test_pim_licence_matcher_is_broad() -> None:
-    skus, pim = graph.pim_licences(
+def test_the_matcher_uses_plan_ids_never_names() -> None:
+    free = frozenset({EXCHANGE, pid(2)})
+    lic = graph.pim_licences(
         [
-            _sku("ENTRA_ID_GOVERNANCE"),
-            _sku("SPE_E5", ("SOMETHING", "eec0eb4f-6444-4f95-aba0-50c24d67f998")),
-            {**_sku("AAD_PREMIUM_P2"), "capabilityStatus": "Deleted"},
+            # named like P2, but its only plan is known PIM-free: names are ignored
+            _sku("AAD_PREMIUM_P2_LOOKALIKE", ("AAD_PREMIUM_P2", EXCHANGE)),
+            # P2's plan ID under another name is still P2
+            _sku("SPE_E5", ("SOMETHING", P2_PLAN)),
+            # a disabled plan still counts: skipping it would loosen not-applicable
+            _sku("EMS", ("AAD_PREMIUM_P2", P2_PLAN), status="Disabled"),
+            # a deleted SKU is gone
+            {**_sku("ENTRA_ID_GOVERNANCE", ("X", pid(9))), "capabilityStatus": "Deleted"},
             _sku("SPE_E3", ("AAD_PREMIUM", pid(2))),
-        ]
+        ],
+        pim_free=free,
     )
-    assert skus == ["ENTRA_ID_GOVERNANCE", "SPE_E3", "SPE_E5"]
-    assert pim == ["ENTRA_ID_GOVERNANCE", "SPE_E5/SOMETHING"]
+    assert lic.skus == ("AAD_PREMIUM_P2_LOOKALIKE", "EMS", "SPE_E3", "SPE_E5")
+    assert lic.pim == ("EMS/AAD_PREMIUM_P2", "SPE_E5/SOMETHING")
+    assert lic.unknown == ()
+    assert not lic.rules_out_pim
+
+
+@pytest.mark.parametrize(
+    ("sku", "unknown"),
+    [
+        (_sku("ENTRA_ID_GOVERNANCE"), "ENTRA_ID_GOVERNANCE/(no service plans)"),
+        (_sku("NEW_SKU", ("NEW_PLAN", pid(77))), "NEW_SKU/NEW_PLAN"),
+        (_sku("NO_ID", ("SOME_PLAN", "")), "NO_ID/SOME_PLAN"),
+        (_sku("BAD_ID", ("SOME_PLAN", "not-a-guid")), "BAD_ID/SOME_PLAN"),
+        (_sku("NAMELESS", ("", pid(78))), f"NAMELESS/{pid(78)}"),
+    ],
+)
+def test_unknown_skus_and_plans_never_rule_pim_out(sku: dict[str, Any], unknown: str) -> None:
+    lic = graph.pim_licences([sku], pim_free=frozenset({EXCHANGE}))
+    assert lic.unknown == (unknown,)
+    assert not lic.rules_out_pim
+
+
+PLAN_IDS = st.sampled_from([EXCHANGE, pid(2), pid(3), P2_PLAN, "", "not-a-guid"])
+PLANS = st.lists(st.tuples(st.sampled_from(["A", "B", ""]), PLAN_IDS), max_size=4)
+SKU = st.builds(
+    lambda part, plans, status, deleted: {
+        **_sku(part, *plans, status=status),
+        "capabilityStatus": "Deleted" if deleted else "Enabled",
+    },
+    st.sampled_from(["AAD_PREMIUM_P2", "SPE_E3", "FREE"]),
+    PLANS,
+    st.sampled_from(["Success", "Disabled", "PendingActivation"]),
+    st.booleans(),
+)
+
+
+@given(st.lists(SKU, max_size=5), st.sets(st.sampled_from([EXCHANGE, pid(2), pid(3)])))
+def test_pim_is_ruled_out_only_when_every_live_plan_is_known_free(
+    skus: list[dict[str, Any]], free: set[str]
+) -> None:
+    lic = graph.pim_licences(skus, pim_free=frozenset(free))
+    live = [s for s in skus if s["capabilityStatus"] != "Deleted"]
+    every_plan_known_free = all(
+        s["servicePlans"] and all(p["servicePlanId"] in free for p in s["servicePlans"])
+        for s in live
+    )
+    assert lic.rules_out_pim == every_plan_known_free
 
 
 def test_bad_eligibility_rows_are_errors_not_edges() -> None:
