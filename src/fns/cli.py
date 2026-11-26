@@ -263,6 +263,44 @@ def report(
     raise typer.Exit(report_cli.write(inputs, out, con, err))
 
 
+@app.command()
+def comment(
+    contain: Annotated[Path, typer.Option(help="Report JSON from `fns contain --json`.")],
+    baseline: Annotated[
+        Path | None, typer.Option(help="Contain report JSON from the base branch, for deltas.")
+    ] = None,
+    mutation: Annotated[
+        Path | None, typer.Option(help="Report JSON from `fns mutate --json`.")
+    ] = None,
+    prove_dir: Annotated[
+        Path | None, typer.Option("--prove", help="Run directory written by `fns prove`.")
+    ] = None,
+    out: Annotated[Path, typer.Option(help="Markdown file to write.")] = Path(".fns/comment.md"),
+) -> None:
+    """Write the pull-request comment (Markdown) used by the GitHub Action (M5)."""
+    from pydantic import ValidationError
+
+    from fns import report_cli
+    from fns.models.report import ContainReport
+    from fns.report.html import ReportInputError
+    from fns.report.markdown import render_comment
+
+    err = make_console(stderr=True)
+    try:
+        inputs = report_cli.load_inputs(contain, mutation, prove_dir)
+        base = ContainReport.model_validate_json(baseline.read_bytes()) if baseline else None
+        text = render_comment(inputs, base)
+    except ReportInputError as exc:
+        err.print(f"refusing to mix runs: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (OSError, ValidationError, ValueError) as exc:
+        err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8", newline="\n")
+    typer.echo(f"wrote {out.as_posix()}")
+
+
 detections_app = typer.Typer(help="Detection rules as code (M4).", no_args_is_help=True)
 app.add_typer(detections_app, name="detections")
 

@@ -1,0 +1,56 @@
+name: blast-radius
+
+# Runs this repository's own action against the recorded lab fixture and comments
+# on the pull request. Fixtures only: no Azure login and no secrets. The fixture
+# contract fails on purpose, so this job reports and does not gate the merge
+# (the `ci` workflow does).
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: blast-radius-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fixture:
+    name: blast radius (fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          python-version: "3.12"
+      - name: Snapshot from the lab fixture
+        id: snap
+        run: |
+          set -euo pipefail
+          uv sync --locked --no-dev
+          uv run --frozen fns demo scout --fixture fixtures/lab-run-1 --out "$RUNNER_TEMP/scout"
+          echo "snapshot=$(ls "$RUNNER_TEMP"/scout/snapshots/*.json | head -n 1)" >> "$GITHUB_OUTPUT"
+      - name: Baseline from the base branch
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -uo pipefail
+          git worktree add "$RUNNER_TEMP/base" "$BASE_SHA"
+          cd "$RUNNER_TEMP/base"
+          uv sync --locked --no-dev
+          uv run --frozen fns demo contain --fixture fixtures/lab-run-1 \
+            --out "$RUNNER_TEMP/base-fns" --json "$RUNNER_TEMP/baseline.json" || true
+          test -s "$RUNNER_TEMP/baseline.json"
+      - uses: ./
+        with:
+          contract: fixtures/lab-run-1/contract.fns.yaml
+          snapshot: ${{ steps.snap.outputs.snapshot }}
+          probes: fixtures/lab-run-1/probes.json
+          lab: lab
+          baseline: ${{ runner.temp }}/baseline.json
+          fail-on-contract: "false"
