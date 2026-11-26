@@ -3,7 +3,9 @@
 - ``offline-test``: an ephemeral Ed25519 key. Proves integrity against that key
   only; anyone can make another. Always labelled ``TEST SIGNATURE``.
 - ``sigstore``: keyless signing with sigstore-python 4.x and the ambient OIDC
-  token (GitHub Actions). Optional extra; not exercised offline (M3 E5).
+  token (GitHub Actions). Optional extra; Sigstore itself is only reached from
+  CI (M3 E5). **Staging only** (decision V3): ``FNS_SIGSTORE_INSTANCE`` selects
+  the instance, and production is refused until the owner approves it.
 - ``none``: the statement is written unsigned, and says so.
 """
 
@@ -13,6 +15,8 @@ import base64
 import hashlib
 import importlib
 import json
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
@@ -26,6 +30,17 @@ from fns.models.bundle import DSSE_PAYLOAD_TYPE, PREDICATE_TYPE, STATEMENT_TYPE,
 SignerName = Literal["offline-test", "sigstore", "none"]
 TEST_WARNING: Final = "TEST SIGNATURE: integrity only, not identity, not Sigstore"
 UNSIGNED_WARNING: Final = "UNSIGNED: the statement carries no signature"
+
+SigstoreInstance = Literal["staging", "production"]
+INSTANCE_ENV: Final = "FNS_SIGSTORE_INSTANCE"
+STAGING_WARNING: Final = (
+    "SIGSTORE STAGING: signed on Sigstore's test instance; proves the pipeline, "
+    "not a trusted public log"
+)
+PRODUCTION_APPROVED: Final = False
+"""V3: production Fulcio and Rekor only after the owner's explicit approval
+(docs/DECISIONS.md). Until then a production request is refused before any
+network contact, for signing and for verification alike."""
 
 
 class SignatureError(RuntimeError):
@@ -109,18 +124,50 @@ def _sigstore(module: str) -> Any:
         ) from exc
 
 
-def sign_sigstore(payload: bytes) -> Signed:  # pragma: no cover - needs OIDC (CI only)
-    """Keyless signing (sigstore-python 4.x). Not run offline; see M3 E5."""
+def sigstore_instance(env: Mapping[str, str] | None = None) -> SigstoreInstance:
+    """The Sigstore instance to use: ``staging`` unless set, production refused (V3)."""
+    value = (os.environ if env is None else env).get(INSTANCE_ENV, "staging")
+    if value == "staging":
+        return "staging"
+    if value == "production":
+        if PRODUCTION_APPROVED:  # pragma: no cover - not yet approved
+            return "production"
+        raise SignatureError(
+            "Sigstore production is not enabled: it needs the owner's explicit approval "
+            f"(decision V3, docs/DECISIONS.md). Use {INSTANCE_ENV}=staging"
+        )
+    raise SignatureError(f"unknown {INSTANCE_ENV} {value!r} (staging or production)")
+
+
+def sign_sigstore(payload: bytes, instance: SigstoreInstance | None = None) -> Signed:
+    """Keyless signing (sigstore-python 4.x) with the ambient OIDC token.
+
+    The instance is checked before sigstore is imported, so a refused instance
+    never reaches the network.
+    """
+    instance = sigstore_instance({INSTANCE_ENV: instance} if instance else None)
     sign, models, oidc, dsse = (
         _sigstore(m) for m in ("sigstore.sign", "sigstore.models", "sigstore.oidc", "sigstore.dsse")
     )
+    trust = (
+        models.ClientTrustConfig.staging()
+        if instance == "staging"
+        else models.ClientTrustConfig.production()
+    )
     token = oidc.IdentityToken(oidc.detect_credential())
-    ctx = sign.SigningContext.from_trust_config(models.ClientTrustConfig.production())
+    ctx = sign.SigningContext.from_trust_config(trust)
     with ctx.signer(token) as signer:
         bundle = signer.sign_dsse(dsse.Statement(payload))
     sigstore_bundle = json.loads(bundle.to_json())
     envelope = sigstore_bundle.get("dsseEnvelope", {})
-    return Signed(envelope, {"signer": "sigstore", "sigstore_bundle": sigstore_bundle})
+    signing: dict[str, Any] = {
+        "signer": "sigstore",
+        "sigstore_bundle": sigstore_bundle,
+        "sigstore_instance": instance,
+    }
+    if instance == "staging":
+        signing["warning"] = STAGING_WARNING
+    return Signed(envelope, signing)
 
 
 def sign(payload: bytes, signer: SignerName) -> Signed:
@@ -157,14 +204,24 @@ def verify_envelope(
         except (InvalidSignature, ValueError) as exc:
             raise SignatureError("signature does not verify") from exc
         return payload
-    if signer == "sigstore":  # pragma: no cover - needs network and a Sigstore bundle
+    if signer == "sigstore":
         if not (sigstore_identity and sigstore_issuer):
             raise SignatureError("sigstore verification needs --identity and --issuer")
+        instance = sigstore_instance()
+        recorded = signing.get("sigstore_instance")
+        if recorded != instance:
+            raise SignatureError(
+                f"the bundle says it was signed on Sigstore {recorded or 'unknown'}; "
+                f"this verifier is set to {instance}"
+            )
         verify, models, policy = (
             _sigstore(m) for m in ("sigstore.verify", "sigstore.models", "sigstore.verify.policy")
         )
+        verifier = (
+            verify.Verifier.staging() if instance == "staging" else verify.Verifier.production()
+        )
         bundle = models.Bundle.from_json(json.dumps(signing.get("sigstore_bundle")))
-        _, verified = verify.Verifier.production().verify_dsse(
+        _, verified = verifier.verify_dsse(
             bundle, policy.Identity(identity=sigstore_identity, issuer=sigstore_issuer)
         )
         if verified != payload:

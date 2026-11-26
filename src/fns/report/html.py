@@ -440,7 +440,10 @@ def render_html(inputs: Inputs) -> str:
             (m.score, "mutation score", "pass" if m.killed == m.total and m.total else "fail")
         )
     if inputs.bundle:
-        signer = (inputs.signing or {}).get("signer", "unknown")
+        signing = inputs.signing or {}
+        signer = signing.get("signer", "unknown")
+        if signer == "sigstore" and signing.get("sigstore_instance") == "staging":
+            signer = "sigstore staging"
         cards.append((signer, "bundle signer", "inconclusive" if signer != "sigstore" else ""))
     card_html = "".join(
         f'<div class="card"><b class="{cls}">{_e(v)}</b><span>{_e(label)}</span></div>'
