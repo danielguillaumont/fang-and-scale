@@ -27,6 +27,16 @@ def _world(s: sem.OperationSemantics, way: sem.Way | None) -> tuple[Snap, dict[s
     snap.sp(100, "sp-agent")
     if s.target == "directory":
         item: dict[str, Any] = {"directory": "tenant", "operations": [s.operation]}
+    elif s.target in sem.OBJECT_KINDS:
+        if s.target == "application":
+            target = snap.app(102, "target-object")
+            item = {"application": "target-object", "operations": [s.operation]}
+        else:
+            target = snap.sp(102, "target-object")
+            item = {"service_principal": "target-object", "operations": [s.operation]}
+        if way is not None and way.kind == "ownedObjectPerm":
+            snap.edge("owns", AGENT, target).graph_perm(AGENT, way.values[0])
+            return snap, item
     else:
         rtype = way.resource_types[0] if way and way.resource_types else sem.KEY_VAULT
         rid = KV if rtype == sem.KEY_VAULT else ST
@@ -78,7 +88,9 @@ def test_without_a_grant_nothing_is_reached(s: sem.OperationSemantics) -> None:
 
 def test_table_keys_are_unique_and_versioned() -> None:
     assert sem.SEMANTICS_VERSION == 2
-    assert len(sem.TABLE) == 10
+    assert len(sem.TABLE) == 14
+    assert sem.lookup("application", "credentials/update") is not None
+    assert sem.lookup("servicePrincipal", "OWNERS/UPDATE") is not None
     assert sem.lookup("resource", "SECRETS/GET") is sem.lookup("resource", "secrets/get")
     assert sem.lookup("resource", "certificates/get") is None
 

@@ -113,6 +113,14 @@ class _Probes:
         return pid
 
 
+_KINDS: dict[str, sem.TargetKind] = {
+    "directory": "directory",
+    "application": "application",
+    "service_principal": "servicePrincipal",
+}
+"""Finding target prefix -> semantics target kind. Only resources get probes in M3."""
+
+
 def _resource(snapshot: Snapshot, finding: Finding) -> Entity | None:
     kind, _, ref = finding.target.partition(":")
     if kind != "resource":
@@ -124,7 +132,9 @@ def _assertion(finding: Finding, paths: list[ReachPath], snapshot: Snapshot) -> 
     probes = _Probes(finding.id)
     target = _resource(snapshot, finding)
     direct: list[str] = []
-    semantics = sem.lookup("resource" if target else "directory", finding.operation)
+    semantics = sem.lookup(
+        _KINDS.get(finding.target.partition(":")[0], "resource"), finding.operation
+    )
     if target is not None and semantics is not None:
         rtype = str(target.properties.get("resourceType", ""))
         if finding.operation in DATA_READS:

@@ -21,7 +21,7 @@ STORAGE_ACCOUNT: Final = "microsoft.storage/storageaccounts"
 
 WayKind = Literal["action", "dataAction", "accessPolicy", "appPerm", "dirRole", "ownedObjectPerm"]
 Requirement = Literal["kv-rbac-mode", "kv-access-policy-mode", "shared-key"]
-TargetKind = Literal["resource", "directory"]
+TargetKind = Literal["resource", "directory", "application", "servicePrincipal"]
 
 # Graph application permissions the rules and the table care about.
 APP_READWRITE_ALL: Final = "Application.ReadWrite.All"
@@ -67,6 +67,44 @@ class OperationSemantics:
     def ways_for(self, resource_type: str | None) -> tuple[Way, ...]:
         rtype = (resource_type or "").lower()
         return tuple(w for w in self.ways if not w.resource_types or rtype in w.resource_types)
+
+
+OBJECT_KINDS: Final[tuple[TargetKind, ...]] = ("application", "servicePrincipal")
+OBJECT_OPERATIONS: Final = ("credentials/update", "owners/update")
+"""Operations on one named Entra object (contract version 2)."""
+
+
+def _object_op(kind: TargetKind, op: str) -> OperationSemantics:
+    """Adding a credential to, or an owner of, one application or service principal.
+
+    App-only callers need a Graph permission: Application.ReadWrite.All for any
+    object, or Application.ReadWrite.OwnedBy for objects they own (for a service
+    principal, owning its application counts too). Ownership without either
+    permission grants nothing to an app-only caller; the evaluator says so in the
+    finding's reasons. Directory roles count at tenant scope or scoped to the object.
+    """
+    return OperationSemantics(
+        kind,
+        op,
+        (
+            Way("graph-permission", "appPerm", (APP_READWRITE_ALL,)),
+            Way(
+                "owned-object-permission",
+                "ownedObjectPerm",
+                (APP_READWRITE_OWNEDBY, APP_READWRITE_ALL),
+                note="owner of this object",
+            ),
+            Way(
+                "directory-role",
+                "dirRole",
+                (
+                    wk.GLOBAL_ADMINISTRATOR,
+                    wk.APPLICATION_ADMINISTRATOR,
+                    wk.CLOUD_APPLICATION_ADMINISTRATOR,
+                ),
+            ),
+        ),
+    )
 
 
 def _kv_data(op: str, data_action: str, policy: str) -> OperationSemantics:
@@ -184,6 +222,7 @@ _TABLE: Final[tuple[OperationSemantics, ...]] = (
             ),
         ),
     ),
+    *(_object_op(kind, op) for kind in OBJECT_KINDS for op in OBJECT_OPERATIONS),
 )
 
 TABLE: Final[dict[tuple[str, str], OperationSemantics]] = {

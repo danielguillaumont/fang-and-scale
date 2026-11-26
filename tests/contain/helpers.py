@@ -201,9 +201,10 @@ def contract(
     who: str = "sp:sp-agent",
     **kw: Any,
 ) -> Contract:
+    v2 = any("application" in i or "service_principal" in i for i in must_not_reach)
     return Contract.model_validate(
         {
-            "version": 1,
+            "version": 2 if v2 else 1,
             "contract": "t",
             "assume_compromised": who,
             "must_not_reach": must_not_reach,
