@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../../schemas/contract.schema.json
+#
+# The seeded billing-agent contract, version 2, exactly as lab/contract.tf rendered
+# it for the M2 live run (2026-11-26, lab suffix tiin02). Names only, no IDs.
+# Together with this recording it is the M2 C4 regression test
+# (tests/fixtures/test_lab_run_2.py).
+version: 2
+contract: billing-agent-blast-radius
+assume_compromised: sp:sp-billing-agent
+
+must_not_reach:
+  - resource: kv-crown-tiin02
+    operations: [secrets/get, secrets/list]
+  - directory: tenant
+    operations: [roleAssignments/write, applications/credentials/update]
+  - resource: stpayrolltiin02
+    operations: [listKeys, blob/read]
+  - resource: stinvoicestiin02
+    operations: [listKeys]
+  - application: id-verifier
+    operations: [credentials/update, owners/update]
+  - application: sp-fns-scout
+    operations: [credentials/update, owners/update]
+
+must_still_do:
+  - resource: stinvoicestiin02
+    operations: [blob/read, blob/write]
+    source: declared
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 2
+on_inconclusive: fail

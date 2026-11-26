@@ -102,7 +102,7 @@ scout.cmd = "fns scout --scope scope.lab.yaml"
 scout.help = "Live read-only scout of the lab (needs az login, see README)"
 
 demo.cmd = "fns demo scout"
-demo.help = "Replay the recorded lab run fixtures/lab-run-1 through scout (no tenant needed)"
+demo.help = "Replay the recorded lab run fixtures/lab-run-2 through scout (no tenant needed)"
 
 # ---------------------------------------------------------------------------
 [tool.ruff]

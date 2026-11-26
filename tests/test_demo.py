@@ -79,10 +79,10 @@ def test_demo_failure_is_labelled_on_stderr(tmp_path: Path) -> None:
     assert "demo failed" in result.output
 
 
-@pytest.mark.parametrize("command", ["scout", "contain", "prove", "report"])
+@pytest.mark.parametrize("command", ["scout", "contain", "prove", "report", "mutate"])
 def test_demo_commands_default_to_the_recorded_lab_run(command: str, tmp_path: Path) -> None:
     result = runner.invoke(app, ["demo", command, "--out", str(tmp_path)])
-    assert "Replaying fixture 'fixtures/lab-run-1'" in result.output, result.output
+    assert "Replaying fixture 'fixtures/lab-run-2'" in result.output, result.output
     assert "demo-scout" not in result.output
 
 

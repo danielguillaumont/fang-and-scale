@@ -1,0 +1,103 @@
+{
+  "description": "Hand-written probe results for M3 offline development (copied from lab-run-1; the lab names are the same), shaped like what the lab should return. NOT recorded from Azure.",
+  "format": 1,
+  "label": "FIXTURE",
+  "results": [
+    {
+      "action": "secrets/get",
+      "detail": "Forbidden: caller lacks a Key Vault data role",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/secrets/getSecret/action",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "secrets/list",
+      "detail": "Forbidden: caller lacks a Key Vault data role",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/secrets/readMetadata/action",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/write",
+      "detail": "Contributor on the resource group lists */ write",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/listKeys/action",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stpayrolltiin02"
+    },
+    {
+      "action": "blob/read",
+      "detail": "AuthorizationPermissionMismatch with an Entra token",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "stpayrolltiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "stpayrolltiin02"
+    },
+    {
+      "action": "blob/read",
+      "detail": "read the synthetic invoice blob",
+      "http_status": 200,
+      "kind": "data-read",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/listKeys/action",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    }
+  ]
+}
