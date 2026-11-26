@@ -1,0 +1,1504 @@
+{
+ "demo-prove": {
+  "findings": {
+   "1484fe7b428f40426fb2d0443c219bb987570c44b76f81abe63cb25a5fcd0c4a": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "roleAssignments/write",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "1a108b7456b10b67ad5311dc89b82cc28f5fb10d89b1eebf64ccd160341e1211": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "488e85adbfa3891a2bc6e7fa0535613323b262a7bbaa68413b68e7819a3ca9da",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-jewels; Contributor on the resource group lists */ write",
+      "observed_at": "2026-11-25T12:00:01Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/list",
+    "reasons": [
+     "path assume-compromised -> managed-identity -> rbac-data-action: not refutable by a non-destructive probe",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "2 probe(s) did not run",
+     "model: reachable in the model: 2 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-jewels",
+    "verdict": "fail"
+   },
+   "24dba4d00dfb87ef87f6720f772c469baa2a676f0aefed094eb957ab0e7f0a72": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "applications/credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owned-object-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "4bba730054819ec8b0b73c3d3275b15c778e523d2b69f996ce8a29b2c5ecb4f0": {
+    "coverage": "not-assessed",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "unknown",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "needs an observed denial of the operation (rung 3)",
+     "1 probe(s) did not run",
+     "model: not reachable in the collected model, but it is incomplete"
+    ],
+    "target": "resource:stpayroll",
+    "verdict": "inconclusive"
+   },
+   "814cc6b7b4a3bf498aea9dabfddf99456db577c04bfd57c3666b53001b336959": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "03b97474fe5c9da31617047c566dc372e5b0406b14ac3f39cede43f8b746a1c6",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-jewels; Contributor on the resource group lists */ write",
+      "observed_at": "2026-11-25T12:00:01Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/get",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> managed-identity -> rbac-data-action: not refutable by a non-destructive probe",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 2 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-jewels",
+    "verdict": "fail"
+   },
+   "a30bf167ed3a1c297412c062de28a3d1b01e918a02847f89d61d0eb48b9795c6": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "70acc55e375b7c8e04fb0a81670441c8b2ec4eb862dcc207a556b4fdbfb36a70",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write on stinvoices; recorded allowed",
+      "observed_at": "2026-11-25T12:00:01Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/write",
+    "reasons": [
+     "allowed when evaluated; needs an observed success (rung 3)",
+     "2 probe(s) did not run",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoices",
+    "verdict": "inconclusive"
+   },
+   "a798838e2904abd6a0e290d75c2a8711bb2f468a9c5aa63ecc50c9dc734c859f": {
+    "coverage": "verified",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "62b7aa0bf5b7fa4ed38510fdb045f7c88ccbb0fe8cbc0da89e0fc5a883bb7307",
+      "notes": "direct: blob/read on stinvoices; read the synthetic invoice blob",
+      "observed_at": "2026-11-25T12:00:01Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "observed",
+      "source": "fns.probes/data-read"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/read",
+    "reasons": [
+     "succeeded when probed (observed)",
+     "2 probe(s) did not run",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoices",
+    "verdict": "pass"
+   },
+   "b73397538599fee00face6af5ca7c928f3a658103f28527469fb94518fa71ed4": {
+    "coverage": "verified",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "unknown",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "c64c36f686980b80834c2dd03d07d1765e7a246db9cda0c41a342ffa712a222d",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read on stpayroll; recorded denied",
+      "observed_at": "2026-11-25T12:00:01Z",
+      "outcome": "denied",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "5632c81e956fbcbdfc5be77c7b5f9db777ad0855c663eadb7568262f82754b3f",
+      "notes": "direct: blob/read on stpayroll; AuthorizationPermissionMismatch with an Entra token",
+      "observed_at": "2026-11-25T12:00:01Z",
+      "outcome": "denied",
+      "path_id": null,
+      "rung": "observed",
+      "source": "fns.probes/data-read"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "blob/read",
+    "reasons": [
+     "denied when probed, but not collected: collector:graph.directory-roles, pim-eligibility",
+     "model: not reachable in the collected model, but it is incomplete"
+    ],
+    "target": "resource:stpayroll",
+    "verdict": "inconclusive"
+   }
+  },
+  "summary": {
+   "critical": 4,
+   "exit_code": 1,
+   "inconclusive": 3,
+   "passed": 1,
+   "still_do_failed": 0,
+   "warning": null
+  }
+ },
+ "lab-run-1-prove": {
+  "findings": {
+   "1484fe7b428f40426fb2d0443c219bb987570c44b76f81abe63cb25a5fcd0c4a": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "roleAssignments/write",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "24dba4d00dfb87ef87f6720f772c469baa2a676f0aefed094eb957ab0e7f0a72": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "applications/credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owned-object-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "2b67c629fccd1f656c90e52dab45e959f20d6e8cb01c5a93f0bd05a249b15573": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:sp-fns-scout",
+    "verdict": "fail"
+   },
+   "50451df210dab24478265f4a375937e1a13b80903bbec0c88f54edc3bf007646": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "ab22b43c42eeb7b10523ced63cee9c56aa6c1ce568117a99f259f3638139d853",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-tiin02; Contributor on the resource group lists */ write",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/get",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-tiin02",
+    "verdict": "fail"
+   },
+   "51a797ef53d1e5fd620d6e9ed7e0bf60135438652cea156197cedd9f10bd6cca": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "owners/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:id-verifier",
+    "verdict": "fail"
+   },
+   "64d18e470a771adc8284fa925a721473517bb37fd179d7a430cd3c0e011558d3": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "8c81a0eeee8346aba91fa71e1b71cf542ce1643d1a6404454fa60a19045ad254",
+      "notes": "hop: Microsoft.Storage/storageAccounts/listKeys/action on stpayrolltiin02; recorded allowed",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "blob/read",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> listkeys-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> listkeys-data"
+    ],
+    "target": "resource:stpayrolltiin02",
+    "verdict": "fail"
+   },
+   "6804228c1eee682363e5361983c1a318227a4d3238b4b6b5afefc5b8c26a5862": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "dd8a74fc2c2fc77e7635ae62da264fc6516382e56769fdde3677cb325004c82f",
+      "notes": "direct: Microsoft.Storage/storageAccounts/listKeys/action on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "the platform lists a granting action for the identity (evaluated)",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> rbac-action"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "fail"
+   },
+   "9bab9e30d666e6f4f18c061b550590f051868286da8e4a8e3fb88ece34607372": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "cefb3c9711faeb4a1f6b2b83e6e028902fb487312f3420e9879f3571c26df364",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "d4adc1ad257b77997796b8ec59ea105c75cd1c71e118c2b0c143bf8e16f22706",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/write",
+    "reasons": [
+     "allowed when evaluated; needs an observed success (rung 3)",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "inconclusive"
+   },
+   "acef63d87b7222585ba61fadd2d8ec7cd99919077f108097da86f658d1a067a6": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "owners/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:sp-fns-scout",
+    "verdict": "fail"
+   },
+   "bfc396d5cf1acccdd156000d9a3e84d461f89081810a74956b297c5984e25acf": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "933c7573e5653c3088ea370e853b909079ab62c6c84dfea531ba9afa4433ac42",
+      "notes": "direct: Microsoft.Storage/storageAccounts/listKeys/action on stpayrolltiin02; recorded allowed",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "the platform lists a granting action for the identity (evaluated)",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> rbac-action"
+    ],
+    "target": "resource:stpayrolltiin02",
+    "verdict": "fail"
+   },
+   "c6557c87139976e621012acc748d306a49a025b94a9afb0b935d83ddbde48e8e": {
+    "coverage": "verified",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "531863ceaa13017fe45b9853277f3884a898c36967fafb203ffa98ee989804e7",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "cf8293adefcfb31eba47dfbd705fddc9479a7966defb0e309139c70aa15aee88",
+      "notes": "direct: blob/read on stinvoicestiin02; read the synthetic invoice blob",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "observed",
+      "source": "fns.probes/data-read"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/read",
+    "reasons": [
+     "succeeded when probed (observed)",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "pass"
+   },
+   "f196bda25e09a9cd3709c87e8ca69077148ae9f665239d4783236fd136c845c5": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "9ace3457de1d44dd03c8517ba526f72dae9d0a7b75972b041a9516d4b46c7671",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-tiin02; Contributor on the resource group lists */ write",
+      "observed_at": "2026-11-26T05:52:20.013591Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/list",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-tiin02",
+    "verdict": "fail"
+   },
+   "f81b42b5bc732cf3e7fa40b97b762f262170630fd28732467942875ed9336207": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:id-verifier",
+    "verdict": "fail"
+   }
+  },
+  "summary": {
+   "critical": 11,
+   "exit_code": 1,
+   "inconclusive": 1,
+   "passed": 1,
+   "still_do_failed": 0,
+   "warning": null
+  }
+ },
+ "lab-run-2-prove": {
+  "findings": {
+   "1484fe7b428f40426fb2d0443c219bb987570c44b76f81abe63cb25a5fcd0c4a": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "roleAssignments/write",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "24dba4d00dfb87ef87f6720f772c469baa2a676f0aefed094eb957ab0e7f0a72": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "applications/credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owned-object-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "2b67c629fccd1f656c90e52dab45e959f20d6e8cb01c5a93f0bd05a249b15573": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:sp-fns-scout",
+    "verdict": "fail"
+   },
+   "50451df210dab24478265f4a375937e1a13b80903bbec0c88f54edc3bf007646": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "b79ee460a9f5f79e81092e8f0485932e639e5dfd4c7c345d66550075eae2f2a3",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-tiin02; Contributor on the resource group lists */ write",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/get",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-tiin02",
+    "verdict": "fail"
+   },
+   "51a797ef53d1e5fd620d6e9ed7e0bf60135438652cea156197cedd9f10bd6cca": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "owners/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:id-verifier",
+    "verdict": "fail"
+   },
+   "64d18e470a771adc8284fa925a721473517bb37fd179d7a430cd3c0e011558d3": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "bdadfa2de956969a663b82c8a2cf7c7437fcb239081ae5641379618cfcc04bb9",
+      "notes": "hop: Microsoft.Storage/storageAccounts/listKeys/action on stpayrolltiin02; recorded allowed",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "blob/read",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> listkeys-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> listkeys-data"
+    ],
+    "target": "resource:stpayrolltiin02",
+    "verdict": "fail"
+   },
+   "6804228c1eee682363e5361983c1a318227a4d3238b4b6b5afefc5b8c26a5862": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "2fc06ae421e72d345cad44ba06cdf08961fb98051f0a0dc51ddae6feba9e43a3",
+      "notes": "direct: Microsoft.Storage/storageAccounts/listKeys/action on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "the platform lists a granting action for the identity (evaluated)",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> rbac-action"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "fail"
+   },
+   "9bab9e30d666e6f4f18c061b550590f051868286da8e4a8e3fb88ece34607372": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "3eec513dd828bb35360c284a97b3f1cd3a359eb1d07f8acda2603393eda8974f",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "8207439343bc425815cf7c44aed848ab0b3a131024dca3986a5c5baa0e2826f1",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/write",
+    "reasons": [
+     "allowed when evaluated; needs an observed success (rung 3)",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "inconclusive"
+   },
+   "acef63d87b7222585ba61fadd2d8ec7cd99919077f108097da86f658d1a067a6": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "owners/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:sp-fns-scout",
+    "verdict": "fail"
+   },
+   "bfc396d5cf1acccdd156000d9a3e84d461f89081810a74956b297c5984e25acf": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "ccb9ecf24fb684248cf30e6dd8df37ba6684ccb12ed581b6c0b4f100bd7df2ce",
+      "notes": "direct: Microsoft.Storage/storageAccounts/listKeys/action on stpayrolltiin02; recorded allowed",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "the platform lists a granting action for the identity (evaluated)",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> rbac-action"
+    ],
+    "target": "resource:stpayrolltiin02",
+    "verdict": "fail"
+   },
+   "c6557c87139976e621012acc748d306a49a025b94a9afb0b935d83ddbde48e8e": {
+    "coverage": "verified",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "dd87b09a9b9d34db17edc082792169dc6fdee8d88eebd16a351c4f0e1fc4b262",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read on stinvoicestiin02; recorded allowed",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "07de2cd40db87ee9ab995a2f2ea3c1be1d827de37e659d42c66385c9e88bc9a6",
+      "notes": "direct: blob/read on stinvoicestiin02; read the synthetic invoice blob",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "observed",
+      "source": "fns.probes/data-read"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/read",
+    "reasons": [
+     "succeeded when probed (observed)",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "pass"
+   },
+   "f196bda25e09a9cd3709c87e8ca69077148ae9f665239d4783236fd136c845c5": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "f4c9812103571cb02bb3bea30f895531a251b6c69406c6e15bec90e694ead3ba",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-tiin02; Contributor on the resource group lists */ write",
+      "observed_at": "2026-11-26T18:07:16.434629Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/list",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-tiin02",
+    "verdict": "fail"
+   },
+   "f81b42b5bc732cf3e7fa40b97b762f262170630fd28732467942875ed9336207": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:id-verifier",
+    "verdict": "fail"
+   }
+  },
+  "summary": {
+   "critical": 11,
+   "exit_code": 1,
+   "inconclusive": 1,
+   "passed": 1,
+   "still_do_failed": 0,
+   "warning": null
+  }
+ },
+ "lab-run-3-prove": {
+  "findings": {
+   "1484fe7b428f40426fb2d0443c219bb987570c44b76f81abe63cb25a5fcd0c4a": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "roleAssignments/write",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "24dba4d00dfb87ef87f6720f772c469baa2a676f0aefed094eb957ab0e7f0a72": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "applications/credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> owned-object-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owned-object-permission"
+    ],
+    "target": "directory:tenant",
+    "verdict": "fail"
+   },
+   "2b67c629fccd1f656c90e52dab45e959f20d6e8cb01c5a93f0bd05a249b15573": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:sp-fns-scout",
+    "verdict": "fail"
+   },
+   "50451df210dab24478265f4a375937e1a13b80903bbec0c88f54edc3bf007646": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "15fc6ff90632553f6164b4d9a5ea78810863fb4c01517e0e01195a9191450212",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-tiin02; Microsoft.KeyVault/vaults/write listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/get",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-tiin02",
+    "verdict": "fail"
+   },
+   "51a797ef53d1e5fd620d6e9ed7e0bf60135438652cea156197cedd9f10bd6cca": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "owners/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:id-verifier",
+    "verdict": "fail"
+   },
+   "64d18e470a771adc8284fa925a721473517bb37fd179d7a430cd3c0e011558d3": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "2709a2502eb0f145609a9179cce82372c08729ea17422932aa0a9ce5eaf3f76e",
+      "notes": "hop: Microsoft.Storage/storageAccounts/listKeys/action on stpayrolltiin02; Microsoft.Storage/storageAccounts/listKeys/action listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "blob/read",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> listkeys-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> listkeys-data"
+    ],
+    "target": "resource:stpayrolltiin02",
+    "verdict": "fail"
+   },
+   "6804228c1eee682363e5361983c1a318227a4d3238b4b6b5afefc5b8c26a5862": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "253a8a98525b9a34ac32ee9d1f5b1b78753aaceb350d19dddc7a3fe21b964ab1",
+      "notes": "direct: Microsoft.Storage/storageAccounts/listKeys/action on stinvoicestiin02; Microsoft.Storage/storageAccounts/listKeys/action listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "the platform lists a granting action for the identity (evaluated)",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> rbac-action"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "fail"
+   },
+   "9bab9e30d666e6f4f18c061b550590f051868286da8e4a8e3fb88ece34607372": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "63db3b64bb273467980ad4bd76c8e9b1717dd83b3f0c87c3fd5448e487cc9208",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write on stinvoicestiin02; Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "795df62634d58003d2ac989b328a715cf866d875dc6c23d7ca1fe4895438062d",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action on stinvoicestiin02; Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/write",
+    "reasons": [
+     "allowed when evaluated; needs an observed success (rung 3)",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "inconclusive"
+   },
+   "acef63d87b7222585ba61fadd2d8ec7cd99919077f108097da86f658d1a067a6": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "owners/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:sp-fns-scout",
+    "verdict": "fail"
+   },
+   "bfc396d5cf1acccdd156000d9a3e84d461f89081810a74956b297c5984e25acf": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "319bbc60e4d6b935110fb6ca7b21ccf47e645bf933b47619c18760daf8c04346",
+      "notes": "direct: Microsoft.Storage/storageAccounts/listKeys/action on stpayrolltiin02; Microsoft.Storage/storageAccounts/listKeys/action listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "listKeys",
+    "reasons": [
+     "the platform lists a granting action for the identity (evaluated)",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> rbac-action"
+    ],
+    "target": "resource:stpayrolltiin02",
+    "verdict": "fail"
+   },
+   "c6557c87139976e621012acc748d306a49a025b94a9afb0b935d83ddbde48e8e": {
+    "coverage": "verified",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "c5a0641c7cb8ccd239b7aaefb01b44d27ca1f3b905b5e48b4c3d2e0fecb190d9",
+      "notes": "direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read on stinvoicestiin02; Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     },
+     {
+      "artifact_digest": "45e1ddf6d0dab276a1c12f58af9583df9b97459d759a92f80f429638fe4f6691",
+      "notes": "direct: blob/read on stinvoicestiin02; HTTP 200",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "observed",
+      "source": "fns.probes/data-read"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_still_do",
+    "operation": "blob/read",
+    "reasons": [
+     "succeeded when probed (observed)",
+     "model: allowed in the model; needs an observed success (M3)"
+    ],
+    "target": "resource:stinvoicestiin02",
+    "verdict": "pass"
+   },
+   "f196bda25e09a9cd3709c87e8ca69077148ae9f665239d4783236fd136c845c5": {
+    "coverage": "evaluated-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     },
+     {
+      "artifact_digest": "1b133f3d648bbbb3162fe15ab78b8bc4f6009a3c4b8bc4c2f5e689d37b2704e1",
+      "notes": "hop: Microsoft.KeyVault/vaults/write on kv-crown-tiin02; Microsoft.KeyVault/vaults/write listed in permissions at the scope",
+      "observed_at": "2026-11-26T20:48:11.988660Z",
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "evaluated",
+      "source": "fns.probes/arm-permissions"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "secrets/list",
+    "reasons": [
+     "the operation itself was denied when probed, but escalation paths remain",
+     "path assume-compromised -> kv-control-to-data: its probes did not refute it",
+     "model: reachable in the model: 1 path(s); shortest: assume-compromised -> kv-control-to-data"
+    ],
+    "target": "resource:kv-crown-tiin02",
+    "verdict": "fail"
+   },
+   "f81b42b5bc732cf3e7fa40b97b762f262170630fd28732467942875ed9336207": {
+    "coverage": "modeled-only",
+    "evidence": [
+     {
+      "artifact_digest": null,
+      "notes": null,
+      "observed_at": null,
+      "outcome": "allowed",
+      "path_id": null,
+      "rung": "modeled",
+      "source": "frozen-assertions/fns.contain"
+     }
+    ],
+    "gap": null,
+    "item_kind": "must_not_reach",
+    "operation": "credentials/update",
+    "reasons": [
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> rolemanagement-write -> directory-role: not refutable by a non-destructive probe",
+     "path assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission: not refutable by a non-destructive probe",
+     "model: reachable in the model: 4 path(s); shortest: assume-compromised -> owner-adds-credential -> approle-self-grant -> graph-permission"
+    ],
+    "target": "application:id-verifier",
+    "verdict": "fail"
+   }
+  },
+  "summary": {
+   "critical": 11,
+   "exit_code": 1,
+   "inconclusive": 1,
+   "passed": 1,
+   "still_do_failed": 0,
+   "warning": null
+  }
+ }
+}

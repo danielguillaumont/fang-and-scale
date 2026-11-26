@@ -100,7 +100,7 @@ def check(inputs: Inputs) -> list[str]:
 
 
 def _max_rung(f: Finding) -> str:
-    rungs = [e.rung for e in f.evidence if e.outcome in {"allowed", "denied"}]
+    rungs = [e.rung for e in f.supporting if e.outcome in {"allowed", "denied"}]
     return max(rungs, key=lambda r: RUNG_ORDER[r]) if rungs else "none"
 
 

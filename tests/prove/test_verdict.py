@@ -157,11 +157,27 @@ def test_must_not_reach_rules(
     assert (f.verdict, f.coverage, f.gap) == (verdict, coverage, gap), f.reasons
 
 
-def test_direct_denial_is_reported_but_not_attached_when_a_path_remains() -> None:
+def test_direct_denial_is_attached_as_context_when_a_path_remains() -> None:
+    """Approved 2026-11-26: the denial is in the finding, but it settles nothing."""
     a, specs = _world(path="indirect")
     f = _judge(a, specs, read="denied", hop="allowed")
-    assert not any(e.rung == "observed" for e in f.evidence)
+    assert (f.verdict, f.coverage) == ("fail", "evaluated-only")
     assert "denied when probed" in f.reasons[0]
+    assert not any(e.rung == "observed" for e in f.supporting)
+    (denial,) = [e for e in f.context if e.rung == "observed"]
+    assert denial.outcome == "denied" and denial.artifact_digest
+    assert {e.rung for e in f.supporting} == {"modeled", "evaluated"}
+
+
+def test_every_probe_result_ends_up_in_the_finding() -> None:
+    a, specs = _world(path="indirect")
+    f = _judge(a, specs, read="denied", hop="allowed")
+    probed = [e for e in f.evidence if e.rung != "modeled"]
+    assert len(probed) == 2  # the denied read and the allowed hop
+    assert {(e.rung, e.outcome, e.role) for e in probed} == {
+        ("observed", "denied", "context"),
+        ("evaluated", "allowed", None),
+    }
 
 
 def test_unreachable_in_model_with_observed_denial_passes_without_gap() -> None:

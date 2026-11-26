@@ -28,7 +28,8 @@ Tests: 1128 before these PRs, 1152 after.
 
 ## Decisions waiting for you
 
-1. **Denied probes are not linked to their finding.** For Key Vault
+1. **Done (approved 2026-11-26): denied probes are now linked to their finding as context.** See FINDINGS, "Denied probes are attached to their findings". The text below is the original question.
+   **Denied probes were not linked to their finding.** For Key Vault
    `secrets/get` and `secrets/list` and payroll `blob/read`, the finding's reason
    says "the operation itself was denied when probed, but escalation paths
    remain". Its evidence lists only the modeled path and the *allowed* hop.
