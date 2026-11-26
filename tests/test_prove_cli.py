@@ -161,3 +161,24 @@ def test_prove_needs_probes_or_live(tmp_path: Path, extra: list[str], message: s
     )
     assert result.exit_code == 2, result.output
     assert message in result.output
+
+
+@pytest.mark.parametrize(
+    ("fixture", "phrase"),
+    [
+        ("fixtures/lab-run-3", "with recorded live probe results"),
+        ("fixtures/lab-run-2", "with hand-written probe results"),
+        ("fixtures/lab-run-1", "with hand-written probe results"),
+    ],
+)
+def test_replay_banner_says_where_the_probe_results_came_from(
+    tmp_path: Path, fixture: str, phrase: str
+) -> None:
+    result = runner.invoke(
+        app, ["demo", "prove", "--out", str(tmp_path), "--fixture", str(ROOT.parent / fixture)]
+    )
+    assert result.exit_code == 1, result.output
+    banner = next(line for line in result.output.splitlines() if "Replaying fixture" in line)
+    assert phrase in banner
+    other = "hand-written" if "recorded" in phrase else "recorded live"
+    assert other not in banner

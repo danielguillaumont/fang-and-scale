@@ -37,7 +37,7 @@ from fns.models.scope import ScopeManifest, load_scope
 from fns.models.snapshot import Snapshot
 from fns.probes.base import Probe, ProbeUnavailableError, observation
 from fns.probes.data_read import DataReadProbe, DataTransport, RoutedProbe
-from fns.probes.mock import RESULTS_FILE, MockResult, MockResults
+from fns.probes.mock import RECORDED_PREFIX, RESULTS_FILE, MockResult, MockResults
 from fns.probes.permissions import ArmPermissionsProbe
 from fns.prove.run import ProveResult, Signer, prove
 from fns.scope.credentials import PinnedTokens, SignedInIdentity, TokenProvider
@@ -237,8 +237,9 @@ def write_recording(
     doc = MockResults(
         format=1,
         label="FIXTURE",
+        source="recorded-live",
         description=(
-            f"Recorded from the lab by fns prove --live on {at.date().isoformat()}, sanitized: "
+            f"{RECORDED_PREFIX} on {at.date().isoformat()}, sanitized: "
             "status and allowlisted error codes only; no request IDs, bodies or principals."
         ),
         results=tuple(results),
