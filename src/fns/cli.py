@@ -396,8 +396,17 @@ def _run_prove(c: Any, snap: Any, probe: Any, out: Path, sign: str, identity: st
 def verify(
     run: Annotated[Path, typer.Argument(help="A run directory written by `fns prove`.")],
 ) -> None:
-    """Re-verify a prove run: signature, subject digests, and re-derived verdicts."""
+    """Re-verify a prove run: signature, subject digests, and re-derived verdicts.
+
+    Exit 5 if the evidence is invalid; 2 if RUN is not a directory.
+    """
     from fns.prove.run import check_run
+
+    if not run.is_dir():
+        make_console(stderr=True).print(
+            f"not a run directory: {run.as_posix()}", style="fns.fail", markup=False
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT)
 
     code, output = check_run(run)
     for line in output.splitlines():
@@ -431,7 +440,7 @@ def schema(
             for path in stale:
                 err.print(f"[fns.fail]stale[/] {path.as_posix()}")
             err.print("Run `uv run poe schema` and commit the result.", style="fns.muted")
-            raise typer.Exit(ExitCode.CONTRACT_FAILED)
+            raise typer.Exit(ExitCode.CHECK_FAILED)
         con.print(f"[fns.pass]ok[/] schemas in {out.as_posix()} are up to date")
         return
     for path in schema_mod.write_all(out):
@@ -446,7 +455,7 @@ app.add_typer(scope_app, name="scope")
 def scope_check(
     path: Annotated[Path, typer.Argument(help="Path to scope.yaml.")],
 ) -> None:
-    """Validate scope.yaml and print what it allows. Exit 1 if invalid or expired."""
+    """Validate scope.yaml and print what it allows. Exit 2 if invalid or expired."""
     from datetime import UTC, datetime
 
     from pydantic import ValidationError
@@ -824,4 +833,14 @@ def _human(seconds: float) -> str:
 
 
 def main() -> None:
-    app()
+    """Entry point. An unexpected exception exits 2, never 1: a crash must not look
+    like a failed contract to CI."""
+    import sys
+    import traceback
+
+    try:
+        app()
+    except Exception:  # noqa: BLE001 - the last line of defence for the exit code contract
+        traceback.print_exc()
+        sys.stderr.write(f"fns: internal error (exit {int(ExitCode.INTERNAL_ERROR)})\n")
+        raise SystemExit(int(ExitCode.INTERNAL_ERROR)) from None
