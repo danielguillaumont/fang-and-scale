@@ -516,9 +516,24 @@ def scope_check(
 
 
 demo_app = typer.Typer(
-    help="Replay bundled fixtures (output is labelled FIXTURE).", no_args_is_help=True
+    help="Replay recorded fixtures (output is labelled FIXTURE).", no_args_is_help=True
 )
 app.add_typer(demo_app, name="demo")
+
+LAB_RUN = Path("fixtures/lab-run-1")
+"""The live lab run recorded in M1. The demo commands replay it by default, so they
+need a repository checkout; the hand-written demo-scout set is for tests."""
+
+
+def _need_fixture(fixture: Path, err: Any) -> None:
+    if not fixture.joinpath("manifest.json").is_file():
+        err.print(
+            f"no fixture set at {fixture.as_posix()}: run from a repository checkout, "
+            "or pass --fixture <recorded set>",
+            style="fns.fail",
+            markup=False,
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT)
 
 
 @demo_app.command("scout")
@@ -526,16 +541,13 @@ def demo_scout(
     out: Annotated[Path, typer.Option(help="Directory for the journal and snapshots.")] = Path(
         ".fns"
     ),
-    fixture: Annotated[
-        Path | None,
-        typer.Option(help="Replay a recorded fixture set instead of the bundled one."),
-    ] = None,
+    fixture: Annotated[Path, typer.Option(help="Recorded fixture set to replay.")] = LAB_RUN,
 ) -> None:
-    """Replay the bundled demo tenant through the scope gate and collector."""
+    """Replay a recorded lab run through the scope gate and collector (labelled FIXTURE)."""
     from pydantic import ValidationError
 
     from fns.console import FixtureConsole
-    from fns.demo import DEMO_FIXTURE, render, run_demo_scout
+    from fns.demo import render, run_demo_scout
     from fns.fixtures.replay import FixtureError
     from fns.journal.sqlite import JournalError
     from fns.models.scope import ScopeExpiredError
@@ -543,6 +555,7 @@ def demo_scout(
 
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
+    _need_fixture(fixture, err)
     try:
         result = run_demo_scout(out, fixture)
     except (
@@ -555,7 +568,7 @@ def demo_scout(
     ) as exc:
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
-    render(result, con, fixture.as_posix() if fixture else DEMO_FIXTURE)
+    render(result, con, fixture.as_posix())
 
 
 @demo_app.command("contain")
@@ -564,9 +577,8 @@ def demo_contain(
         Path, typer.Option(help="Directory for the journal, snapshot and report.")
     ] = Path(".fns"),
     fixture: Annotated[
-        Path | None,
-        typer.Option(help="Replay a recorded fixture set (uses its contract.fns.yaml)."),
-    ] = None,
+        Path, typer.Option(help="Recorded fixture set to replay (uses its contract.fns.yaml).")
+    ] = LAB_RUN,
     contract: Annotated[
         Path | None, typer.Option(help="Evaluate this contract instead of the fixture's.")
     ] = None,
@@ -580,13 +592,12 @@ def demo_contain(
 ) -> None:
     """Replay a fixture through scout, then run `fns contain` on it (labelled FIXTURE).
 
-    The bundled demo contract fails on purpose: exit 1 is the expected result.
+    The seeded lab contract fails on purpose: exit 1 is the expected result.
     """
     from pydantic import ValidationError
 
     from fns.console import FixtureConsole
     from fns.contain_run import run_demo_contain, write_report
-    from fns.demo import DEMO_FIXTURE
     from fns.fixtures.replay import FixtureError
     from fns.journal.sqlite import JournalError
     from fns.models.contract import load_contract
@@ -596,6 +607,7 @@ def demo_contain(
 
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
+    _need_fixture(fixture, err)
     try:
         c = load_contract(contract) if contract is not None else None
         _scout, report = run_demo_contain(out, fixture, c)
@@ -609,8 +621,9 @@ def demo_contain(
     ) as exc:
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
-    source = fixture.as_posix() if fixture else DEMO_FIXTURE
-    con.print(f"Replaying fixture {source!r}; no network calls are made.", style="fns.muted")
+    con.print(
+        f"Replaying fixture {fixture.as_posix()!r}; no network calls are made.", style="fns.muted"
+    )
     render_contain(report, con, max_alternatives=alternatives)
     path = write_report(report, json_out, out)
     con.print(f"wrote {path.as_posix()}", style="fns.muted", markup=False)
@@ -621,7 +634,7 @@ def demo_contain(
 def demo_mutate(
     fixture: Annotated[
         Path, typer.Option(help="Recorded fixture set (uses its contract.fns.yaml).")
-    ] = Path("fixtures/lab-run-1"),
+    ] = LAB_RUN,
     lab: Annotated[Path, typer.Option(help="The lab Terraform the fixture was recorded from.")] = (
         Path("lab")
     ),
@@ -691,11 +704,9 @@ def demo_report(
     out: Annotated[Path, typer.Option(help="Directory for the journal, runs and report.")] = Path(
         ".fns"
     ),
-    fixture: Annotated[
-        Path | None, typer.Option(help="Replay a recorded fixture set instead of the bundled one.")
-    ] = None,
+    fixture: Annotated[Path, typer.Option(help="Recorded fixture set to replay.")] = LAB_RUN,
     lab: Annotated[
-        Path, typer.Option(help="Lab Terraform, for the mutation section (fixture runs only).")
+        Path, typer.Option(help="Lab Terraform, for the mutation section (skipped if missing).")
     ] = Path("lab"),
 ) -> None:
     """Run contain and prove (and mutate, for a lab fixture) on a fixture; write the HTML report.
@@ -707,8 +718,7 @@ def demo_report(
     from fns import mutate_cli, report_cli
     from fns.console import FixtureConsole
     from fns.contain_run import demo_contract, run_demo_contain
-    from fns.demo import DEMO_FIXTURE
-    from fns.fixtures.replay import FixtureError, bundled
+    from fns.fixtures.replay import FixtureError
     from fns.journal.sqlite import JournalError
     from fns.models.scope import ScopeExpiredError
     from fns.mutate import MutateError
@@ -718,11 +728,12 @@ def demo_report(
 
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
+    _need_fixture(fixture, err)
     try:
         scout, contain_report = run_demo_contain(out, fixture)
         snap = scout.snapshot
         c = demo_contract(fixture)
-        root = fixture if fixture is not None else bundled(DEMO_FIXTURE)
+        root = fixture
         results = MockResults.model_validate_json(
             root.joinpath(RESULTS_FILE).read_text(encoding="utf-8")
         )
@@ -736,7 +747,7 @@ def demo_report(
             identity="fixture-replay",
         )
         mutation = None
-        if fixture is not None and lab.is_dir():
+        if lab.is_dir() and fixture.joinpath("contract.fns.yaml").is_file():
             mutation = mutate_cli.run(c, snap, lab, harden=True, now=snap.collected_at)
         inputs = report_cli.load_inputs_from(contain_report, mutation, proved.run_dir)
     except (
@@ -750,8 +761,9 @@ def demo_report(
     ) as exc:
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
-    source = fixture.as_posix() if fixture else DEMO_FIXTURE
-    con.print(f"Replaying fixture {source!r}; no network calls are made.", style="fns.muted")
+    con.print(
+        f"Replaying fixture {fixture.as_posix()!r}; no network calls are made.", style="fns.muted"
+    )
     raise typer.Exit(
         report_cli.write(inputs, out / f"report.{snap.mode}.html", con, make_console(stderr=True))
     )
@@ -763,9 +775,9 @@ def demo_prove(
         ".fns"
     ),
     fixture: Annotated[
-        Path | None,
-        typer.Option(help="Replay a recorded fixture set (uses its contract and probes.json)."),
-    ] = None,
+        Path,
+        typer.Option(help="Recorded fixture set to replay (uses its contract and probes.json)."),
+    ] = LAB_RUN,
     sign: Annotated[str, typer.Option(help="offline-test or none.")] = "offline-test",
 ) -> None:
     """Replay a fixture, freeze assertions, replay probe results, verify (FIXTURE).
@@ -776,8 +788,8 @@ def demo_prove(
 
     from fns.console import FixtureConsole
     from fns.contain_run import demo_contract
-    from fns.demo import DEMO_FIXTURE, run_demo_scout
-    from fns.fixtures.replay import FixtureError, bundled
+    from fns.demo import run_demo_scout
+    from fns.fixtures.replay import FixtureError
     from fns.journal.sqlite import JournalError
     from fns.models.scope import ScopeExpiredError
     from fns.probes.mock import RESULTS_FILE, MockProbe, MockResults
@@ -787,10 +799,11 @@ def demo_prove(
     if sign not in {"offline-test", "none"}:
         err.print("the demo signs offline only (offline-test or none)", style="fns.fail")
         raise typer.Exit(ExitCode.USAGE)
+    _need_fixture(fixture, err)
     try:
         scout_result = run_demo_scout(out, fixture)
         c = demo_contract(fixture)
-        root = fixture if fixture is not None else bundled(DEMO_FIXTURE)
+        root = fixture
         results = MockResults.model_validate_json(
             root.joinpath(RESULTS_FILE).read_text(encoding="utf-8")
         )
@@ -804,9 +817,9 @@ def demo_prove(
     ) as exc:
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
-    source = fixture.as_posix() if fixture else DEMO_FIXTURE
     FixtureConsole(make_console()).print(
-        f"Replaying fixture {source!r} with hand-written probe results; no network calls.",
+        f"Replaying fixture {fixture.as_posix()!r} with hand-written probe results; "
+        "no network calls.",
         style="fns.muted",
         markup=False,
     )
