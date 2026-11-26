@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=../../schemas/contract.schema.json
+#
+# The seeded billing-agent contract (docs/PLAN.md section 3) with the names of
+# the lab resources recorded in this fixture set (lab suffix tiin02).
+version: 1
+contract: billing-agent-blast-radius
+assume_compromised: sp:sp-billing-agent
+
+must_not_reach:
+  - resource: kv-crown-tiin02
+    operations: [secrets/get, secrets/list]
+  - directory: tenant
+    operations: [roleAssignments/write, applications/credentials/update]
+  - resource: stpayrolltiin02
+    operations: [listKeys, blob/read]
+
+must_still_do:
+  - resource: stinvoicestiin02
+    operations: [blob/read, blob/write]
+    source: declared
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 2
+on_inconclusive: fail
