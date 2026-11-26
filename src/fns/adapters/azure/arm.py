@@ -21,6 +21,10 @@ OP_ROLE_ASSIGNMENTS: Final = "arm:Microsoft.Authorization/roleAssignments/read"
 OP_ROLE_DEFINITIONS: Final = "arm:Microsoft.Authorization/roleDefinitions/read"
 OP_DENY_ASSIGNMENTS: Final = "arm:Microsoft.Authorization/denyAssignments/read"
 OP_RG_RESOURCES: Final = "arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read"
+OP_KEY_VAULT: Final = "arm:Microsoft.KeyVault/vaults/read"
+OP_STORAGE_ACCOUNT: Final = "arm:Microsoft.Storage/storageAccounts/read"
+KEY_VAULT_API: Final = "2023-07-01"
+STORAGE_API: Final = "2023-05-01"
 
 ARM_OPERATIONS: Final = (
     OP_ROLE_ASSIGNMENTS,
@@ -28,6 +32,15 @@ ARM_OPERATIONS: Final = (
     OP_DENY_ASSIGNMENTS,
     OP_RG_RESOURCES,
 )
+
+SETTINGS_OPERATIONS: Final = (OP_KEY_VAULT, OP_STORAGE_ACCOUNT)
+"""Per-resource reads for settings the reach model needs (M2 C1). Optional: a scope
+that does not allow them leaves those settings uncollected (and says so)."""
+
+SETTINGS_TYPES: Final[dict[str, str]] = {
+    "microsoft.keyvault/vaults": OP_KEY_VAULT,
+    "microsoft.storage/storageaccounts": OP_STORAGE_ACCOUNT,
+}
 
 PRINCIPAL_TYPES: Final[dict[str, EntityType]] = {
     "User": "user",
@@ -91,6 +104,13 @@ def deny_assignments_request(subscription_id: str) -> ApiRequest:
 
 def resources_request(resource_group_id: str) -> ApiRequest:
     return _req(OP_RG_RESOURCES, resource_group_id, f"{resource_group_id}/resources", RESOURCES_API)
+
+
+def resource_settings_request(resource_id: str, resource_type: str) -> ApiRequest:
+    """GET one Key Vault or storage account (``resource_type`` lowercased ARM type)."""
+    op = SETTINGS_TYPES[resource_type]
+    api = KEY_VAULT_API if op == OP_KEY_VAULT else STORAGE_API
+    return _req(op, resource_id, resource_id, api)
 
 
 # --- parsers ----------------------------------------------------------------------------
@@ -266,3 +286,61 @@ def parse_resources(
         except (ParseError, ArmIdError, ValueError):
             errors.append("bad-item")
     return errors
+
+
+def _optional_bool(p: dict[str, Any], key: str) -> bool | None:
+    value = p.get(key)
+    if value is None or isinstance(value, bool):
+        return value
+    raise ParseError(f"{key} must be a boolean")
+
+
+def parse_key_vault(
+    b: SnapshotBuilder, vault_id: str, body: dict[str, Any], tenant_id: str, prov: Provenance
+) -> list[str]:
+    """Permission model plus one hasAccessPolicy edge per access policy entry.
+
+    Policies for another tenant's principals are skipped (``foreign-tenant-policy``).
+    A policy principal that no Graph listing returns is dropped at build time and
+    reported under ``edges`` in coverage.
+    """
+    if parse_arm_id(_str(body, "id")).format() != parse_arm_id(vault_id).format():
+        raise ParseError("vault response does not match the requested vault")
+    p = _props(body)
+    b.annotate(vault_id, {"enableRbacAuthorization": _optional_bool(p, "enableRbacAuthorization")})
+    errors: list[str] = []
+    policies = p.get("accessPolicies") or []
+    if not isinstance(policies, list):
+        raise ParseError("accessPolicies must be a list")
+    for policy in policies:
+        try:
+            if str(policy.get("tenantId", "")).lower() != tenant_id.lower():
+                errors.append("foreign-tenant-policy")
+                continue
+            perms = policy.get("permissions") or {}
+
+            def names(key: str, perms: dict[str, Any] = perms) -> list[str]:
+                return [str(x) for x in perms.get(key) or []]
+
+            b.edge(
+                {
+                    "type": "hasAccessPolicy",
+                    "src": _str(policy, "objectId"),
+                    "dst": vault_id,
+                    "secrets": names("secrets"),
+                    "keys": names("keys"),
+                    "certificates": names("certificates"),
+                },
+                prov,
+            )
+        except (ParseError, ValueError, AttributeError):
+            errors.append("bad-item")
+    return errors
+
+
+def parse_storage_account(b: SnapshotBuilder, account_id: str, body: dict[str, Any]) -> None:
+    """``allowSharedKeyAccess``: null or absent means Azure's default (allowed)."""
+    if parse_arm_id(_str(body, "id")).format() != parse_arm_id(account_id).format():
+        raise ParseError("storage response does not match the requested account")
+    p = _props(body)
+    b.annotate(account_id, {"allowSharedKeyAccess": _optional_bool(p, "allowSharedKeyAccess")})

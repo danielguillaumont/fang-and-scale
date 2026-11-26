@@ -42,7 +42,11 @@ def _render(operations: list[str]) -> str:
 
 
 def test_lab_operations_match_the_collector_catalogue() -> None:
-    assert _scope_tf_operations() == [*arm.ARM_OPERATIONS, *graph.GRAPH_OPERATIONS]
+    assert _scope_tf_operations() == [
+        *arm.ARM_OPERATIONS,
+        *arm.SETTINGS_OPERATIONS,
+        *graph.GRAPH_OPERATIONS,
+    ]
 
 
 def test_rendered_scope_is_a_valid_read_only_manifest() -> None:
@@ -80,3 +84,33 @@ def test_everything_is_tagged() -> None:
     assert len(taggable) >= 12
     for kind, name, body in taggable:
         assert re.search(r"\btags\s*=", body), f"{kind}.{name} is not tagged"
+
+
+def test_rendered_lab_contract_matches_the_example_and_validates() -> None:
+    """D5: the lab contract is the example contract with the lab's real names."""
+    from fns.models.contract import Contract, load_contract
+    from fns.yamlio import loads_yaml
+
+    text = (LAB / "contract.lab.fns.yaml.tftpl").read_text(encoding="utf-8")
+    names = {
+        "agent": "sp-billing-agent",
+        "vault": "kv-crown-jewels",
+        "payroll": "st-payroll",
+        "invoices": "st-invoices",
+    }
+    for key, value in names.items():
+        text = text.replace("${" + key + "}", value)
+    assert "${" not in text
+    rendered = Contract.model_validate(loads_yaml(text))
+    example = load_contract(LAB.parent / "contracts" / "examples" / "billing-agent.fns.yaml")
+    assert rendered == example
+
+
+def test_lab_contract_tf_references_real_resources() -> None:
+    tf = (LAB / "contract.tf").read_text(encoding="utf-8")
+    resources = (LAB / "resources.tf").read_text(encoding="utf-8")
+    identities = (LAB / "identities.tf").read_text(encoding="utf-8")
+    for ref in ("crown_jewels", "payroll", "invoices"):
+        assert f'"{ref}"' in resources, ref
+        assert ref in tf
+    assert 'resource "azuread_application" "billing_agent"' in identities

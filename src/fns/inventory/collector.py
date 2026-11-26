@@ -33,11 +33,12 @@ MAX_PAGES: Final = 1000
 RETRY_STATUSES: Final = frozenset({429, 500, 502, 503, 504})
 MAX_BACKOFF_SECONDS: Final = 60.0
 
+KV_ACCESS_POLICIES: Final = "key-vault-access-policies"
 NOT_COLLECTED: Final = (
     NotCollected(surface="pim-eligibility", reason="eligible assignments not collected in M1"),
     NotCollected(surface="conditional-access", reason="not collected in M1"),
     NotCollected(
-        surface="key-vault-access-policies",
+        surface=KV_ACCESS_POLICIES,
         reason="vault access policies (non-RBAC) not collected in M1",
     ),
     NotCollected(
@@ -225,11 +226,18 @@ class Collector:
             b.entity(f"/subscriptions/{sub}", "scope", priority=PRIORITY_PRIMARY)
 
         # ARM: resources per allowed resource group.
-        t = collector("arm.resources")
+        t = res_t = collector("arm.resources")
+        settings_targets: list[tuple[str, str]] = []
         for rg in self.manifest.allowed_resource_groups:
 
             def resources(rg: str = rg) -> int:
                 items, prov = self._list(arm.resources_request(rg))
+                settings_targets.extend(
+                    (str(i["id"]), str(i["type"]).lower())
+                    for i in items
+                    if isinstance(i.get("id"), str)
+                    and str(i.get("type", "")).lower() in arm.SETTINGS_TYPES
+                )
                 sub = rg.split("/resourcegroups/")[0]
                 b.entity(rg, "scope", priority=PRIORITY_PRIMARY)
                 b.edge({"type": "contains", "src": sub, "dst": rg}, prov)
@@ -238,6 +246,34 @@ class Collector:
 
             self._attempt(t, resources)
         t.ended = self.clock.monotonic()
+
+        # ARM: per-resource settings the reach model needs, when the scope allows them.
+        not_collected = list(NOT_COLLECTED)
+        allowed = set(self.manifest.allowed_operations.get("scout", ()))
+        settings_ops = allowed & set(arm.SETTINGS_OPERATIONS)
+        if settings_ops:
+            t = collector("arm.resource-settings", res_t)
+            for rid, rtype in sorted(set(settings_targets)):
+                if arm.SETTINGS_TYPES[rtype] not in settings_ops:
+                    continue
+
+                def settings(rid: str = rid, rtype: str = rtype) -> int:
+                    req = arm.resource_settings_request(rid, rtype)
+                    resp = self._exchange(req, None)
+                    if arm.SETTINGS_TYPES[rtype] == arm.OP_KEY_VAULT:
+                        t.errors.update(
+                            arm.parse_key_vault(
+                                b, rid, resp.body, self.tenant, self._prov(req, resp)
+                            )
+                        )
+                    else:
+                        arm.parse_storage_account(b, rid, resp.body)
+                    return 1
+
+                self._attempt(t, settings)
+            t.ended = self.clock.monotonic()
+            if arm.OP_KEY_VAULT in settings_ops and t.run().status == "complete":
+                not_collected = [n for n in not_collected if n.surface != KV_ACCESS_POLICIES]
 
         # ARM: role assignments, then each referenced role definition.
         role_defs: dict[str, str] = {}  # referenced definition id -> subscription listed in
@@ -376,7 +412,7 @@ class Collector:
         t.ended = self.clock.monotonic()
 
         coverage = SnapshotCoverage(
-            collectors=tuple(x.run() for x in tallies), not_collected=NOT_COLLECTED
+            collectors=tuple(x.run() for x in tallies), not_collected=tuple(not_collected)
         )
         return b.build(
             mode=self.mode,

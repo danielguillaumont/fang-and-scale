@@ -244,6 +244,63 @@
       "title": "Entity",
       "type": "object"
     },
+    "HasAccessPolicy": {
+      "additionalProperties": false,
+      "description": "principal -> Key Vault: a vault access policy (applies in access-policy mode only).",
+      "properties": {
+        "certificates": {
+          "default": [],
+          "description": "Permission names as ARM returns them, lowercased (e.g. get, list, all).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Certificates",
+          "type": "array"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "keys": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Keys",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "secrets": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Secrets",
+          "type": "array"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "hasAccessPolicy",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "HasAccessPolicy",
+      "type": "object"
+    },
     "HasAppRole": {
       "additionalProperties": false,
       "description": "principal -> resource service principal (e.g. Microsoft Graph).",
@@ -649,6 +706,7 @@
           "mapping": {
             "contains": "#/$defs/Contains",
             "denyAssignment": "#/$defs/DenyAssignment",
+            "hasAccessPolicy": "#/$defs/HasAccessPolicy",
             "hasAppRole": "#/$defs/HasAppRole",
             "hasDirectoryRole": "#/$defs/HasDirectoryRole",
             "hasIdentity": "#/$defs/HasIdentity",
@@ -686,6 +744,9 @@
           },
           {
             "$ref": "#/$defs/DenyAssignment"
+          },
+          {
+            "$ref": "#/$defs/HasAccessPolicy"
           }
         ]
       },

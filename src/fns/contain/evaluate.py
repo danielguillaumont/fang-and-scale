@@ -107,13 +107,16 @@ class Evaluation:
 def _requirements(way: sem.Way, target: Entity) -> tuple[bool, tuple[str, ...]]:
     """Does ``target``'s configuration allow ``way``? Unknown means assumed default."""
     notes: list[str] = []
+    props = target.properties
     for req in way.requires:
-        if req == "kv-rbac-mode":
-            value = target.properties.get("enableRbacAuthorization")
-            if value is False:
+        if req in {"kv-rbac-mode", "kv-access-policy-mode"}:
+            if "enableRbacAuthorization" not in props:
+                notes.append("the vault's permission model was not collected; assumes either")
+                continue
+            # Collected but null means Azure's default: access-policy mode.
+            rbac_mode = props["enableRbacAuthorization"] is True
+            if rbac_mode != (req == "kv-rbac-mode"):
                 return False, ()
-            if value is None:
-                notes.append("the vault's permission model was not collected; assumes RBAC mode")
         elif req == "shared-key":
             value = target.properties.get("allowSharedKeyAccess")
             if value is False:
@@ -137,6 +140,9 @@ def _resource_hits(
         for way in semantics.ways_for(rtype):
             ok, assumptions = _requirements(way, target)
             if not ok:
+                continue
+            if way.kind == "accessPolicy":
+                hits.extend(_policy_hits(closure, p, eff, way, semantics, target, assumptions))
                 continue
             data = way.kind == "dataAction"
             for grant in closure.facts_of("rbac", eff):
@@ -169,6 +175,35 @@ def _resource_hits(
                     )
                 )
     return hits
+
+
+def _policy_hits(
+    closure: Closure,
+    p: str,
+    eff: frozenset[str],
+    way: sem.Way,
+    semantics: sem.OperationSemantics,
+    target: Entity,
+    assumptions: tuple[str, ...],
+) -> list[_Hit]:
+    ix = closure.index
+    out: list[_Hit] = []
+    for edge in ix.access_policies.get(target.id, ()):
+        granted = next((v for v in way.values if v in edge.secrets), None)
+        if edge.src not in eff or granted is None:
+            continue
+        out.append(
+            _Hit(
+                p,
+                way,
+                (controls(p), *closure.membership(p, edge.src)),
+                f"an access policy gives {ix.name(edge.src)} secrets/{granted} on "
+                f"{ix.name(target.id)} ({semantics.operation})",
+                sources=(ix.source(edge),),
+                assumptions=assumptions,
+            )
+        )
+    return out
 
 
 def _directory_hits(closure: Closure, semantics: sem.OperationSemantics) -> list[_Hit]:

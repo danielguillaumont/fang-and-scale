@@ -14,13 +14,13 @@ from typing import Final, Literal
 
 from fns.fixtures import wellknown as wk
 
-SEMANTICS_VERSION: Final = 1
+SEMANTICS_VERSION: Final = 2
 
 KEY_VAULT: Final = "microsoft.keyvault/vaults"
 STORAGE_ACCOUNT: Final = "microsoft.storage/storageaccounts"
 
-WayKind = Literal["action", "dataAction", "appPerm", "dirRole", "ownedObjectPerm"]
-Requirement = Literal["kv-rbac-mode", "shared-key"]
+WayKind = Literal["action", "dataAction", "accessPolicy", "appPerm", "dirRole", "ownedObjectPerm"]
+Requirement = Literal["kv-rbac-mode", "kv-access-policy-mode", "shared-key"]
 TargetKind = Literal["resource", "directory"]
 
 # Graph application permissions the rules and the table care about.
@@ -69,7 +69,7 @@ class OperationSemantics:
         return tuple(w for w in self.ways if not w.resource_types or rtype in w.resource_types)
 
 
-def _kv_data(op: str, data_action: str) -> OperationSemantics:
+def _kv_data(op: str, data_action: str, policy: str) -> OperationSemantics:
     return OperationSemantics(
         "resource",
         op,
@@ -81,6 +81,14 @@ def _kv_data(op: str, data_action: str) -> OperationSemantics:
                 (KEY_VAULT,),
                 ("kv-rbac-mode",),
                 "data actions apply only to vaults in RBAC mode",
+            ),
+            Way(
+                "access-policy",
+                "accessPolicy",
+                (policy, "all"),
+                (KEY_VAULT,),
+                ("kv-access-policy-mode",),
+                "access policies apply only to vaults in access-policy mode",
             ),
             Way(
                 "kv-control-to-data",
@@ -117,9 +125,9 @@ def _blob(op: str, data_actions: tuple[str, ...]) -> OperationSemantics:
 
 
 _TABLE: Final[tuple[OperationSemantics, ...]] = (
-    _kv_data("secrets/get", f"{_SECRETS}/getSecret/action"),
-    _kv_data("secrets/list", f"{_SECRETS}/readMetadata/action"),
-    _kv_data("secrets/set", f"{_SECRETS}/setSecret/action"),
+    _kv_data("secrets/get", f"{_SECRETS}/getSecret/action", "get"),
+    _kv_data("secrets/list", f"{_SECRETS}/readMetadata/action", "list"),
+    _kv_data("secrets/set", f"{_SECRETS}/setSecret/action", "set"),
     OperationSemantics(
         "resource", "listKeys", (Way("rbac-action", "action", (LIST_KEYS,), (STORAGE_ACCOUNT,)),)
     ),

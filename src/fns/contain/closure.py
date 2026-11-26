@@ -30,6 +30,7 @@ from fns.models.snapshot import (
     TENANT_ROOT_SCOPE,
     DenyAssignment,
     Entity,
+    HasAccessPolicy,
     HasAppRole,
     HasDirectoryRole,
     HasIdentity,
@@ -115,6 +116,7 @@ class SnapshotIndex:
         self.dir_roles: list[HasDirectoryRole] = []
         self.rbac_roles: list[HasRbacRole] = []
         self.denies: list[DenyAssignment] = []
+        self.access_policies: dict[str, list[HasAccessPolicy]] = defaultdict(list)
         for edge in snapshot.edges:
             if isinstance(edge, Owns):
                 self.owns[edge.src].append(edge)
@@ -132,6 +134,8 @@ class SnapshotIndex:
                 self.rbac_roles.append(edge)
             elif isinstance(edge, DenyAssignment):
                 self.denies.append(edge)
+            elif isinstance(edge, HasAccessPolicy):
+                self.access_policies[edge.dst].append(edge)
 
     def name(self, entity_id: str) -> str:
         e = self.entities.get(entity_id)

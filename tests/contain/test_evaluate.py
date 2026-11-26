@@ -438,3 +438,56 @@ def test_every_path_hop_is_a_snapshot_fact_or_a_rule(gs: list[tuple[str, ...]]) 
                     assert step.sources, step.text
         lengths = [len(p.steps) for p in o.paths]
         assert lengths == sorted(lengths)
+
+
+# -- Key Vault permission model (C1) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("props", "policy_reaches", "data_action_reaches"),
+    [
+        ({"enableRbacAuthorization": False}, True, False),
+        ({"enableRbacAuthorization": None}, True, False),  # collected null: Azure default
+        ({"enableRbacAuthorization": True}, False, True),
+        ({}, True, True),  # not collected: either could apply
+    ],
+)
+def test_vault_permission_model_selects_policies_or_data_actions(
+    props: dict[str, Any], policy_reaches: bool, data_action_reaches: bool
+) -> None:
+    pol = _agent()
+    pol.kv(**props)
+    pol.access_policy(AGENT, KV, ("get", "list"))
+    assert (
+        _one(evaluate(contract([KV_SECRETS]), pol.build()), "secrets/get").verdict == "fail"
+    ) is policy_reaches
+    data = _agent()
+    data.kv(**props)
+    data.rbac(AGENT, "Key Vault Secrets Officer", KV)
+    got = _one(evaluate(contract([KV_SECRETS]), data.build()), "secrets/get").verdict == "fail"
+    assert got is data_action_reaches
+
+
+def test_access_policy_all_and_group_policies() -> None:
+    s = _agent()
+    s.kv(enableRbacAuthorization=False)
+    s.entity(pid(110), "group", "vault-readers")
+    s.edge("memberOf", AGENT, pid(110))
+    s.access_policy(pid(110), KV, ("all",))
+    o = next(o for o in evaluate(contract([KV_SECRETS]), s.build()).outcomes)
+    assert o.finding.verdict == "fail"
+    assert [st.rule for st in o.paths[0].steps] == [
+        "assume-compromised",
+        "member-of",
+        "access-policy",
+    ]
+    assert "hasAccessPolicy" in o.paths[0].steps[-1].sources[0]
+
+
+def test_policy_for_another_secret_permission_does_not_reach() -> None:
+    s = _agent()
+    s.kv(enableRbacAuthorization=False)
+    s.access_policy(AGENT, KV, ("set",))
+    assert (
+        _one(evaluate(contract([KV_SECRETS]), s.build()), "secrets/get").verdict == "inconclusive"
+    )
