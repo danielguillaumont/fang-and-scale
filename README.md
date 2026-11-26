@@ -70,7 +70,7 @@ can write:
 
 | Grant | Scope | Used for |
 | --- | --- | --- |
-| Azure RBAC **Reader** | lab subscription | `roleAssignments/read`, `roleDefinitions/read`, `denyAssignments/read`, `resourceGroups/resources/read` |
+| Azure RBAC **Reader** | lab subscription | `roleAssignments/read`, `roleDefinitions/read`, `denyAssignments/read`, `resourceGroups/resources/read`, and (M2) `Microsoft.KeyVault/vaults/read` and `Microsoft.Storage/storageAccounts/read` for vault access policies, permission model and shared-key setting |
 | Graph **Application.Read.All** (application) | tenant | `/servicePrincipals`, `/applications`, their `/owners`, `/servicePrincipals/{id}/appRoleAssignments` |
 | Graph **RoleManagement.Read.Directory** (application) | tenant | `/roleManagement/directory/roleDefinitions` and `/roleAssignments` |
 | Graph **Directory.Read.All** (application) | tenant | `/servicePrincipals/{id}/memberOf`, and resolving owners and members that are users or groups |
@@ -92,7 +92,7 @@ Why this set:
   collected in M1), audit or sign-in logs, and Key Vault or Storage data roles.
 
 The scope manifest narrows this further: the gate allows only the 12 read
-operations listed in `scope.lab.yaml`, only within the lab subscription and
+operations listed in `scope.lab.yaml` (14 since M2), only within the lab subscription and
 resource group, within a call and time budget, and only until `expires_at`.
 
 ## License
