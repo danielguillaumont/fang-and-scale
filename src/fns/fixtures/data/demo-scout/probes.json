@@ -1,0 +1,60 @@
+{
+  "description": "Hand-written probe results for the bundled demo (M3). Not recorded from Azure.",
+  "format": 1,
+  "label": "FIXTURE",
+  "results": [
+    {
+      "action": "secrets/get",
+      "detail": "Forbidden: caller lacks a Key Vault data role",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "kv-crown-jewels"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/secrets/getSecret/action",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "kv-crown-jewels"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/write",
+      "detail": "Contributor on the resource group lists */ write",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "kv-crown-jewels"
+    },
+    {
+      "action": "blob/read",
+      "detail": "AuthorizationPermissionMismatch with an Entra token",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "stpayroll"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "stpayroll"
+    },
+    {
+      "action": "blob/read",
+      "detail": "read the synthetic invoice blob",
+      "http_status": 200,
+      "kind": "data-read",
+      "outcome": "allowed",
+      "resource": "stinvoices"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoices"
+    }
+  ]
+}
