@@ -93,6 +93,41 @@ def check_url(api: Api, url: str, target: Target) -> None:
             raise TargetError("Graph URL must start with /v1.0/ or /beta/")
 
 
+DATA_HOST_SUFFIXES: Final[dict[str, str]] = {
+    "kv": ".vault.azure.net",
+    "blob": ".blob.core.windows.net",
+}
+KV_API_VERSION: Final = "7.4"
+"""The one Key Vault data-plane API version the gate accepts (pinned)."""
+
+
+def check_data_url(api: str, url: str, resource_name: str, op_path: str) -> None:
+    """Raise :class:`TargetError` unless ``url`` is exactly the data-plane request.
+
+    The host must be the target's own endpoint (``<name>.vault.azure.net`` or
+    ``<name>.blob.core.windows.net``), the path must be the operation's path, and
+    the query must be ``api-version=<pinned>`` for Key Vault and empty for blobs:
+    no ``comp=``, ``restype=``, SAS or version parameters.
+    """
+    if api not in DATA_HOST_SUFFIXES:
+        raise TargetError(f"{api} is not a data-plane API")
+    _split(url)
+    parts = urlsplit(url)
+    expected = f"{resource_name}{DATA_HOST_SUFFIXES[api]}"
+    # Exact, as sent: no port (not even :443), no upper case, no trailing dot.
+    if parts.netloc != expected:
+        raise TargetError(f"host {parts.netloc!r} is not the target's endpoint {expected!r}")
+    path = parts.path
+    same = path.lower() == op_path.lower() if api == "kv" else path == op_path
+    if not same:
+        raise TargetError("data-plane URL path is not the operation's path")
+    if api == "kv":
+        if parts.query != f"api-version={KV_API_VERSION}":
+            raise TargetError(f"Key Vault query must be exactly api-version={KV_API_VERSION}")
+    elif parts.query or "?" in url:
+        raise TargetError("blob URL must not have a query string")
+
+
 def check_next_link(first_url: str, next_url: str) -> None:
     """A page link may only change the query string of the first request."""
     first_host, first_segs = _split(first_url)

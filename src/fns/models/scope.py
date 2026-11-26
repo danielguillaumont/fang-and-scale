@@ -35,8 +35,11 @@ ScopeOperation = Annotated[
     str,
     AfterValidator(_check_operation),
     Field(
-        description="arm:<Namespace>/<type>/<read|write|delete|action> or graph:<METHOD> /<path>",
-        pattern=r"^(arm:\S+|graph:(GET|POST|PUT|PATCH|DELETE) /\S+)$",
+        description=(
+            "arm:<Namespace>/<type>/<read|write|delete|action>, graph:<METHOD> /<path>, "
+            "kv:GET /secrets[/<name>] or blob:HEAD /<container>/<blob>"
+        ),
+        pattern=r"^(arm:\S+|graph:(GET|POST|PUT|PATCH|DELETE) /\S+|kv:GET /\S+|blob:HEAD /\S+)$",
     ),
 ]
 
@@ -50,6 +53,55 @@ class TestIdentity(FnsModel):
     """Entra object ID of the service principal or managed identity."""
     kind: Literal["servicePrincipal", "managedIdentity"]
     name: str = Field(min_length=1, max_length=256)
+
+
+DATA_PLANE_VERB: Final = "prove"
+"""The only verb that may read a data plane (M3 P5.1)."""
+
+DATA_RESOURCE_TYPES: Final[dict[str, tuple[str, str]]] = {
+    "kv": ("microsoft.keyvault", "vaults"),
+    "blob": ("microsoft.storage", "storageaccounts"),
+}
+"""The resource type each data-plane API acts on (provider namespace, type)."""
+
+
+def data_resource(resource_id: str) -> tuple[str, str] | None:
+    """``(api, name)`` if the ID is exactly a vault or storage account, else None."""
+    path = parse_arm_id(resource_id)
+    if path.level != "resource" or path.resource_group is None or len(path.providers) != 1:
+        return None
+    provider = path.providers[0]
+    if len(provider.pairs) != 1:
+        return None
+    rtype, name = provider.pairs[0]
+    for api, (ns, t) in DATA_RESOURCE_TYPES.items():
+        if (provider.namespace, rtype) == (ns, t):
+            return api, name
+    return None
+
+
+class DataObject(FnsModel):
+    """One data-plane object ``prove`` may read, bound to the resource that holds it.
+
+    A data-plane call is allowed only if its operation is listed under ``prove`` *and*
+    its (resource, path) pair is listed here, so a scope cannot read the payroll blob
+    path from the invoices account, or a secret from another vault.
+    """
+
+    resource: ArmId
+    """The vault or storage account (full ARM ID)."""
+    operation: ScopeOperation
+    """``kv:GET /secrets/<name>`` or ``blob:HEAD /<container>/<blob>``."""
+
+    @model_validator(mode="after")
+    def _kind(self) -> DataObject:
+        op = parse_operation(self.operation)
+        found = data_resource(self.resource)
+        if not op.is_data_plane or op.path == "/secrets":
+            raise ValueError("a data object names one secret or one blob")
+        if found is None or found[0] != op.api:
+            raise ValueError(f"{op.api} object on a resource that is not a {op.api} resource")
+        return self
 
 
 class ScopeBudget(FnsModel):
@@ -71,6 +123,8 @@ class ScopeManifest(FnsModel):
     test_identities: tuple[TestIdentity, ...] = ()
     allowed_operations: dict[Verb, tuple[ScopeOperation, ...]] = Field(default_factory=dict)
     """Exact operations per verb. A missing verb allows nothing."""
+    data_objects: tuple[DataObject, ...] = ()
+    """Data-plane objects ``prove`` may read. Empty means no data-plane call at all."""
     budget: ScopeBudget
     expires_at: TzDatetime
     """After this instant the manifest allows nothing."""
@@ -108,6 +162,9 @@ class ScopeManifest(FnsModel):
             keys = [parse_operation(op).key for op in ops]
             if len(set(keys)) != len(keys):
                 raise ValueError(f"duplicate operation under {verb}")
+            data = [op for op in ops if parse_operation(op).is_data_plane]
+            if data and verb != DATA_PLANE_VERB:
+                raise ValueError(f"data-plane operations are allowed only under prove: {data}")
             if verb in READ_ONLY_VERBS:
                 writes = [op for op in ops if not parse_operation(op).is_read]
                 if writes:
@@ -116,6 +173,25 @@ class ScopeManifest(FnsModel):
                     )
             out[verb] = tuple(sorted(ops, key=lambda op: parse_operation(op).key))
         return out
+
+    @field_validator("data_objects")
+    @classmethod
+    def _data_objects(cls, v: tuple[DataObject, ...]) -> tuple[DataObject, ...]:
+        keys = [(parse_arm_id(d.resource).format(), parse_operation(d.operation).key) for d in v]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate data object")
+        return tuple(d for _, d in sorted(zip(keys, v, strict=True), key=lambda kd: kd[0]))
+
+    @model_validator(mode="after")
+    def _data_objects_in_scope(self) -> ScopeManifest:
+        rgs = {parse_arm_id(rg).format() for rg in self.allowed_resource_groups}
+        listed = {parse_operation(op).key for op in self.allowed_operations.get("prove", ())}
+        for d in self.data_objects:
+            if parse_arm_id(d.resource).resource_group_id not in rgs:
+                raise ValueError(f"data object {d.resource} is outside allowed_resource_groups")
+            if parse_operation(d.operation).key not in listed:
+                raise ValueError(f"data object operation {d.operation} is not listed under prove")
+        return self
 
     @model_validator(mode="after")
     def _rgs_in_subscriptions(self) -> ScopeManifest:
