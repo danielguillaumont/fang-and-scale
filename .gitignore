@@ -30,3 +30,7 @@ crash.log
 .fns/
 runs/
 *.sqlite
+
+# Tooling caches
+.hypothesis/
+.import_linter_cache/

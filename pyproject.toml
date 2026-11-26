@@ -1,0 +1,143 @@
+[project]
+name = "fang-and-scale"
+version = "0.0.1"
+description = "Unit tests for breach blast radius in Microsoft Entra and Azure."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pydantic>=2.10",
+    "pyyaml>=6.0.2",
+    "rich>=13.9",
+    "typer>=0.15",
+]
+
+[project.scripts]
+fns = "fns.cli:main"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.120",
+    "import-linter>=2.1",
+    "jsonschema>=4.23",
+    "mypy>=1.14",
+    "poethepoet>=0.32",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "ruff>=0.9",
+    "types-jsonschema>=4.23",
+    "types-pyyaml>=6.0.12",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "fns"
+
+# ---------------------------------------------------------------------------
+# Tasks: run as `uv run poe <task>`. `cmd` tasks run without a shell, so they
+# behave the same on PowerShell (Windows) and bash (CI).
+# ---------------------------------------------------------------------------
+[tool.poe.tasks]
+setup.sequence = [
+    { cmd = "uv sync --all-groups" },
+    { cmd = "pre-commit install" },
+]
+setup.help = "Install dependencies and pre-commit hooks"
+
+lint.sequence = [{ cmd = "ruff check ." }, { cmd = "ruff format --check ." }]
+lint.help = "Ruff lint and format check"
+
+fmt.sequence = [{ cmd = "ruff check --fix ." }, { cmd = "ruff format ." }]
+fmt.help = "Auto-fix lint and format"
+
+typecheck.cmd = "mypy"
+typecheck.help = "mypy --strict"
+
+imports.cmd = "lint-imports"
+imports.help = "Enforce package boundaries (verifier isolation)"
+
+test.cmd = "pytest"
+test.help = "Run the test suite"
+
+check.sequence = ["lint", "typecheck", "imports", "test"]
+check.help = "Everything that must pass before a commit"
+
+lab-up.sequence = [
+    { cmd = "terraform -chdir=lab init" },
+    { cmd = "terraform -chdir=lab apply" },
+]
+lab-up.help = "Apply the Terraform lab (M1 Phase B)"
+
+lab-down.cmd = "terraform -chdir=lab destroy"
+lab-down.help = "Destroy the Terraform lab (M1 Phase B)"
+
+demo.cmd = "fns demo scout"
+demo.help = "Replay the bundled fixture through scout (no tenant needed)"
+
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "UP", "SIM", "C4", "RUF",
+    "PTH",   # pathlib only
+    "DTZ",   # no naive datetimes
+    "S",     # bandit
+    "T20",   # no print(); use the Rich console
+    "TID",   # banned imports (Azure SDKs only in adapters)
+    "N",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+# The only places allowed to import Azure SDKs (see banned-api below).
+"src/fns/adapters/**" = ["TID251"]
+"src/fns/scope/credentials.py" = ["TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+# Rule 2: every Azure/Graph call goes through fns.scope.gate. SDK imports are
+# allowed only in the adapters and the credential factory (Phase B).
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"azure".msg = "Azure SDKs may only be imported in fns.adapters or fns.scope.credentials (all calls go through the scope gate)."
+"msgraph".msg = "msgraph may only be imported in fns.adapters (all calls go through the scope gate)."
+
+# ---------------------------------------------------------------------------
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+plugins = ["pydantic.mypy"]
+warn_unreachable = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+xfail_strict = true
+filterwarnings = ["error"]
+
+# ---------------------------------------------------------------------------
+# Rule 5: the verifier never imports proposer (harden) or executor (strike)
+# code, nor the adapters the executor drives. Checked transitively.
+[tool.importlinter]
+root_package = "fns"
+
+[[tool.importlinter.contracts]]
+name = "Verifier is isolated from proposer, executor and adapters"
+type = "forbidden"
+source_modules = ["fns.verify"]
+forbidden_modules = ["fns.adapters", "fns.harden", "fns.strike"]
