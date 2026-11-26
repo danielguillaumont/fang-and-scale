@@ -1,0 +1,731 @@
+{
+  "$defs": {
+    "CollectorRun": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ms": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "error_codes": {
+          "default": [],
+          "description": "e.g. http-403, http-429-exhausted, scope-denied.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Error Codes",
+          "type": "array"
+        },
+        "items": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Items",
+          "type": "integer"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9.\\-]{0,63}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "complete",
+            "partial",
+            "failed",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "status"
+      ],
+      "title": "CollectorRun",
+      "type": "object"
+    },
+    "Contains": {
+      "additionalProperties": false,
+      "description": "Scope hierarchy: subscription -> resource group -> resource.",
+      "properties": {
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "contains",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "Contains",
+      "type": "object"
+    },
+    "DenyAssignment": {
+      "additionalProperties": false,
+      "description": "principal (or the all-zeros Everyone principal) -> scope entity.",
+      "properties": {
+        "actions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "data_actions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Actions",
+          "type": "array"
+        },
+        "deny_assignment_id": {
+          "minLength": 2,
+          "pattern": "^/(subscriptions|providers)/",
+          "title": "Deny Assignment Id",
+          "type": "string"
+        },
+        "do_not_apply_to_child_scopes": {
+          "default": false,
+          "title": "Do Not Apply To Child Scopes",
+          "type": "boolean"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "excluded_principal_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+            "type": "string"
+          },
+          "title": "Excluded Principal Ids",
+          "type": "array"
+        },
+        "not_actions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Not Actions",
+          "type": "array"
+        },
+        "not_data_actions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Not Data Actions",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "denyAssignment",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type",
+        "deny_assignment_id"
+      ],
+      "title": "DenyAssignment",
+      "type": "object"
+    },
+    "Entity": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "id": {
+          "description": "Lowercased object GUID (Graph types) or lowercased ARM ID (ARM types).",
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "properties": {
+          "patternProperties": {
+            "^[A-Za-z][A-Za-z0-9_.]{0,127}$": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "title": "Properties",
+          "type": "object"
+        },
+        "type": {
+          "enum": [
+            "user",
+            "servicePrincipal",
+            "managedIdentity",
+            "application",
+            "group",
+            "directoryRole",
+            "roleDefinition",
+            "resource",
+            "scope"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "HasAppRole": {
+      "additionalProperties": false,
+      "description": "principal -> resource service principal (e.g. Microsoft Graph).",
+      "properties": {
+        "app_role_id": {
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+          "title": "App Role Id",
+          "type": "string"
+        },
+        "app_role_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "e.g. Application.ReadWrite.OwnedBy, resolved from the resource SP's appRoles.",
+          "title": "App Role Value"
+        },
+        "assignment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assignment Id"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "hasAppRole",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type",
+        "app_role_id"
+      ],
+      "title": "HasAppRole",
+      "type": "object"
+    },
+    "HasDirectoryRole": {
+      "additionalProperties": false,
+      "description": "principal -> directoryRole (entity id = role definition/template GUID).",
+      "properties": {
+        "assignment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assignment Id"
+        },
+        "directory_scope_id": {
+          "default": "/",
+          "description": "'/' for tenant-wide; '/<objectId>' for app- or AU-scoped assignments.",
+          "title": "Directory Scope Id",
+          "type": "string"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "hasDirectoryRole",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "HasDirectoryRole",
+      "type": "object"
+    },
+    "HasIdentity": {
+      "additionalProperties": false,
+      "description": "ARM resource -> managed identity it runs as.",
+      "properties": {
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "hasIdentity",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "HasIdentity",
+      "type": "object"
+    },
+    "HasRbacRole": {
+      "additionalProperties": false,
+      "description": "principal -> scope entity (dst is the assignment scope).",
+      "properties": {
+        "assignment_id": {
+          "minLength": 2,
+          "pattern": "^/(subscriptions|providers)/",
+          "title": "Assignment Id",
+          "type": "string"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ABAC condition; unsupported semantics make dependent findings inconclusive.",
+          "title": "Condition"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "role_definition_id": {
+          "minLength": 2,
+          "pattern": "^/(subscriptions|providers)/",
+          "title": "Role Definition Id",
+          "type": "string"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "hasRbacRole",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type",
+        "role_definition_id",
+        "assignment_id"
+      ],
+      "title": "HasRbacRole",
+      "type": "object"
+    },
+    "InstanceOf": {
+      "additionalProperties": false,
+      "description": "servicePrincipal -> application it instantiates (same appId).",
+      "properties": {
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "instanceOf",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "InstanceOf",
+      "type": "object"
+    },
+    "MemberOf": {
+      "additionalProperties": false,
+      "properties": {
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "memberOf",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "MemberOf",
+      "type": "object"
+    },
+    "NotCollected": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "surface": {
+          "minLength": 1,
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surface",
+        "reason"
+      ],
+      "title": "NotCollected",
+      "type": "object"
+    },
+    "Owns": {
+      "additionalProperties": false,
+      "properties": {
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "owns",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type"
+      ],
+      "title": "Owns",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Request Id"
+        },
+        "source_api": {
+          "description": "The scope operation that produced this fact.\n\ne.g. ``arm:Microsoft.Authorization/roleAssignments/read``.",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Api",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_api",
+        "observed_at"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "SnapshotCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "collectors": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CollectorRun"
+          },
+          "title": "Collectors",
+          "type": "array"
+        },
+        "not_collected": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NotCollected"
+          },
+          "title": "Not Collected",
+          "type": "array"
+        }
+      },
+      "title": "SnapshotCoverage",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A read-only inventory of one tenant + its in-scope subscriptions.",
+  "properties": {
+    "collected_at": {
+      "format": "date-time",
+      "title": "Collected At",
+      "type": "string"
+    },
+    "collector_version": {
+      "title": "Collector Version",
+      "type": "string"
+    },
+    "coverage": {
+      "$ref": "#/$defs/SnapshotCoverage",
+      "default": {
+        "collectors": [],
+        "not_collected": []
+      }
+    },
+    "edges": {
+      "default": [],
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "contains": "#/$defs/Contains",
+            "denyAssignment": "#/$defs/DenyAssignment",
+            "hasAppRole": "#/$defs/HasAppRole",
+            "hasDirectoryRole": "#/$defs/HasDirectoryRole",
+            "hasIdentity": "#/$defs/HasIdentity",
+            "hasRbacRole": "#/$defs/HasRbacRole",
+            "instanceOf": "#/$defs/InstanceOf",
+            "memberOf": "#/$defs/MemberOf",
+            "owns": "#/$defs/Owns"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/MemberOf"
+          },
+          {
+            "$ref": "#/$defs/Owns"
+          },
+          {
+            "$ref": "#/$defs/Contains"
+          },
+          {
+            "$ref": "#/$defs/InstanceOf"
+          },
+          {
+            "$ref": "#/$defs/HasIdentity"
+          },
+          {
+            "$ref": "#/$defs/HasAppRole"
+          },
+          {
+            "$ref": "#/$defs/HasDirectoryRole"
+          },
+          {
+            "$ref": "#/$defs/HasRbacRole"
+          },
+          {
+            "$ref": "#/$defs/DenyAssignment"
+          }
+        ]
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "entities": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Entity"
+      },
+      "title": "Entities",
+      "type": "array"
+    },
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "tenant_id": {
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "mode",
+    "tenant_id",
+    "collected_at",
+    "collector_version"
+  ],
+  "title": "Snapshot",
+  "type": "object"
+}

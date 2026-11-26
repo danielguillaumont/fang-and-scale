@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated, NoReturn
 
 import typer
@@ -85,6 +86,33 @@ def prove() -> None:
 def molt() -> None:
     """Diff two snapshots and invalidate stale conclusions (Molt)."""
     _not_implemented("molt")
+
+
+@app.command()
+def schema(
+    out: Annotated[Path, typer.Option("--out", help="Directory for the generated schemas.")] = Path(
+        "schemas"
+    ),
+    check: Annotated[
+        bool, typer.Option("--check", help="Fail if committed schemas differ from the models.")
+    ] = False,
+) -> None:
+    """Write JSON Schemas for scope.yaml, contracts and snapshots."""
+    from fns import schema as schema_mod
+
+    con = make_console()
+    if check:
+        stale = schema_mod.drifted(out)
+        if stale:
+            err = make_console(stderr=True)
+            for path in stale:
+                err.print(f"[fns.fail]stale[/] {path.as_posix()}")
+            err.print("Run `uv run poe schema` and commit the result.", style="fns.muted")
+            raise typer.Exit(ExitCode.CONTRACT_FAILED)
+        con.print(f"[fns.pass]ok[/] schemas in {out.as_posix()} are up to date")
+        return
+    for path in schema_mod.write_all(out):
+        con.print(f"wrote {path.as_posix()}")
 
 
 def main() -> None:
