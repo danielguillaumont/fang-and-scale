@@ -165,6 +165,9 @@ class Snap:
             **kw,
         )
 
+    def access_policy(self, principal: str, vault: str, secrets: tuple[str, ...]) -> Snap:
+        return self.edge("hasAccessPolicy", principal, vault.lower(), secrets=secrets)
+
     def missing(self, surface: str) -> Snap:
         self.not_collected.append({"surface": surface, "reason": "test"})
         return self

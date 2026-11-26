@@ -30,8 +30,11 @@ def _world(s: sem.OperationSemantics, way: sem.Way | None) -> tuple[Snap, dict[s
     else:
         rtype = way.resource_types[0] if way and way.resource_types else sem.KEY_VAULT
         rid = KV if rtype == sem.KEY_VAULT else ST
+        props = {"enableRbacAuthorization": False} if way and way.kind == "accessPolicy" else {}
         snap.resource(
-            rid, "Microsoft.KeyVault/vaults" if rid == KV else "Microsoft.Storage/storageAccounts"
+            rid,
+            "Microsoft.KeyVault/vaults" if rid == KV else "Microsoft.Storage/storageAccounts",
+            **props,
         )
         item = {"resource": rid, "operations": [s.operation]}
     if way is None:
@@ -46,6 +49,8 @@ def _world(s: sem.OperationSemantics, way: sem.Way | None) -> tuple[Snap, dict[s
             role_definition_id=CUSTOM,
             assignment_id=f"{RG}/providers/Microsoft.Authorization/roleAssignments/{pid(4243)}",
         )
+    elif way.kind == "accessPolicy":
+        snap.access_policy(AGENT, KV, (way.values[0],))
     elif way.kind == "appPerm":
         snap.graph_perm(AGENT, way.values[0])
     elif way.kind == "dirRole":
@@ -72,7 +77,7 @@ def test_without_a_grant_nothing_is_reached(s: sem.OperationSemantics) -> None:
 
 
 def test_table_keys_are_unique_and_versioned() -> None:
-    assert sem.SEMANTICS_VERSION == 1
+    assert sem.SEMANTICS_VERSION == 2
     assert len(sem.TABLE) == 10
     assert sem.lookup("resource", "SECRETS/GET") is sem.lookup("resource", "secrets/get")
     assert sem.lookup("resource", "certificates/get") is None
