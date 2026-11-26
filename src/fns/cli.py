@@ -336,9 +336,25 @@ def prove(
     contract: Annotated[Path, typer.Option(help="Contract file (*.fns.yaml).")],
     snapshot: Annotated[Path, typer.Option(help="Snapshot JSON written by `fns scout`.")],
     probes: Annotated[
-        Path,
-        typer.Option(help="Probe results to replay (FIXTURE). Live probes arrive in M3 P5."),
-    ],
+        Path | None,
+        typer.Option(help="Probe results to replay (FIXTURE). Use this or --live."),
+    ] = None,
+    live: Annotated[
+        bool,
+        typer.Option(
+            "--live",
+            help="Run the probes against the lab as the signed-in test identity (needs az login).",
+        ),
+    ] = False,
+    scope: Annotated[
+        Path, typer.Option(help="Scope manifest for --live (written by `uv run poe lab-up`).")
+    ] = Path("scope.lab.yaml"),
+    record: Annotated[
+        Path | None,
+        typer.Option(
+            help="With --live: also write sanitized probes.json into this scout recording."
+        ),
+    ] = None,
     out: Annotated[Path, typer.Option(help="Directory for runs/<run id>/.")] = Path(".fns"),
     sign: Annotated[
         str, typer.Option(help="offline-test (labelled TEST), sigstore (CI with OIDC), none.")
@@ -347,9 +363,12 @@ def prove(
         "unspecified"
     ),
 ) -> None:
-    """Freeze assertions, run probes, and verify in a separate process (M3, offline).
+    """Freeze assertions, run probes, and verify in a separate process (M3).
 
-    Exit codes follow `fns contain`; 5 means the verifier refused the evidence.
+    With --probes the results are replayed (FIXTURE). With --live every probe is a
+    GET or HEAD through the scope gate, as the test identity the token belongs to.
+    Exit codes follow `fns contain`; 4 means the scope or the identity refused the
+    run, 5 that the verifier refused the evidence.
     """
     from pydantic import ValidationError
 
@@ -362,14 +381,83 @@ def prove(
     if sign not in {"offline-test", "sigstore", "none"}:
         err.print(f"unknown signer {sign!r}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.USAGE)
+    if live == (probes is not None):
+        err.print("give exactly one of --probes FILE or --live", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.USAGE)
+    if record is not None and not live:
+        err.print("--record needs --live", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.USAGE)
     try:
         c = load_contract(contract)
         snap = load_snapshot(snapshot)
-        results = load_results(probes)
+        results = load_results(probes) if probes is not None else None
     except (OSError, ValidationError, YamlError) as exc:
         err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
-    _run_prove(c, snap, MockProbe(results, at=snap.collected_at), out, sign, identity)
+    if results is not None:
+        _run_prove(c, snap, MockProbe(results, at=snap.collected_at), out, sign, identity)
+    _run_live_prove(c, snap, scope, out, record, sign, identity)
+
+
+def _run_live_prove(
+    c: Any, snap: Any, scope: Path, out: Path, record: Path | None, sign: str, identity: str
+) -> None:
+    from pydantic import ValidationError
+
+    from fns.journal.sqlite import JournalError
+    from fns.models.scope import ScopeExpiredError
+    from fns.prove.live import LiveProveError, ProberNotAllowedError, run_live_prove
+    from fns.scope.credentials import CredentialError, PrincipalMismatchError, TenantMismatchError
+    from fns.yamlio import YamlError
+
+    con = make_console()
+    err = make_console(stderr=True)
+    try:
+        done = run_live_prove(
+            c,
+            snap,
+            scope,
+            out,
+            record=record,
+            signer=sign,  # type: ignore[arg-type]  # checked by the caller
+            identity=identity,
+        )
+    except (TenantMismatchError, PrincipalMismatchError, ProberNotAllowedError) as exc:
+        err.print(f"refused: {exc}. No probe was sent.", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.SCOPE_DENIED) from exc
+    except FileNotFoundError as exc:
+        err.print(f"scope manifest not found: {scope.as_posix()}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (ScopeExpiredError, ValidationError, YamlError) as exc:
+        err.print(f"invalid scope manifest: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except LiveProveError as exc:
+        err.print(f"cannot start live probes: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except CredentialError as exc:
+        err.print(
+            f"{exc}. Sign in as the test identity first (docs/runbooks/m3-live-run.md)",
+            style="fns.fail",
+            markup=False,
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (JournalError, OSError) as exc:
+        err.print(f"prove failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    who = done.prober
+    con.print(
+        f"LIVE probes as object {who.object_id} (appid {who.app_id or 'none'})",
+        style="fns.brand",
+        markup=False,
+    )
+    for line in done.result.output.splitlines():
+        typer.echo(line)
+    if done.recorded is not None:
+        con.print(f"recorded {done.recorded.as_posix()}", style="fns.muted", markup=False)
+        for line in done.omitted:
+            con.print(f"  not recorded (cannot be replayed): {line}", markup=False)
+    con.print(f"run directory {done.result.run_dir.as_posix()}", style="fns.muted", markup=False)
+    raise typer.Exit(done.result.exit_code)
 
 
 def _run_prove(c: Any, snap: Any, probe: Any, out: Path, sign: str, identity: str) -> None:

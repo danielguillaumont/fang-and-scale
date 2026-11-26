@@ -20,6 +20,7 @@ import json
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Final, Protocol
 
 from fns.models.operations import Api
@@ -75,8 +76,41 @@ def token_tenant(token: str) -> str | None:
         return None
 
 
+class PrincipalMismatchError(CredentialError):
+    """A token was issued to another principal than the first one (``oid``)."""
+
+
+@dataclass(frozen=True, slots=True)
+class SignedInIdentity:
+    """Who the tokens belong to, from the ARM token's claims (decision V4)."""
+
+    object_id: str
+    """``oid``: the service principal's object ID. This is what the gate pins."""
+    app_id: str | None
+    """``appid`` (v1 tokens) or ``azp`` (v2): the application's client ID."""
+
+
+def _guid(value: object) -> str | None:
+    try:
+        return str(uuid.UUID(str(value))) if value else None
+    except ValueError:
+        return None
+
+
+def token_identity(token: str) -> SignedInIdentity:
+    claims = token_claims(token)
+    oid = _guid(claims.get("oid"))
+    if oid is None:
+        raise CredentialError("access token has no readable oid claim")
+    return SignedInIdentity(oid, _guid(claims.get("appid") or claims.get("azp")))
+
+
 class PinnedTokens:
-    """Tokens for one tenant; every token's ``tid`` is checked, not just the first."""
+    """Tokens for one tenant; every token's ``tid`` is checked, not just the first.
+
+    Once :meth:`signed_in_identity` has been called, every later token must also
+    carry the same ``oid``: a CLI session that switches identity mid-run aborts.
+    """
 
     REFRESH_MARGIN_SECONDS: Final = 300
 
@@ -91,6 +125,7 @@ class PinnedTokens:
         self._source = source if source is not None else _cli_credential(self.tenant_id)
         self._wall = wall
         self._cache: dict[Api, tuple[str, float]] = {}
+        self._identity: SignedInIdentity | None = None
 
     def token(self, api: Api) -> str:
         cached = self._cache.get(api)
@@ -107,6 +142,12 @@ class PinnedTokens:
             actual = token_tenant(raw)
             if actual != self.tenant_id:
                 raise TenantMismatchError(self.tenant_id, actual)
+            if self._identity is not None:
+                oid = _guid(token_claims(raw).get("oid"))
+                if oid != self._identity.object_id:
+                    raise PrincipalMismatchError(
+                        f"a {api} token belongs to another principal than the first token"
+                    )
             self._cache[api] = (raw, expires_on)
         return self._cache[api][0]
 
@@ -114,6 +155,15 @@ class PinnedTokens:
         """Fetch an ARM token and return its tenant (raises on mismatch)."""
         self.token("arm")
         return self.tenant_id
+
+    def signed_in_identity(self) -> SignedInIdentity:
+        """``oid`` and ``appid`` of the ARM token; pins every later token to that ``oid``."""
+        if self._identity is None:
+            self._identity = token_identity(self.token("arm"))
+            for api, (raw, _) in self._cache.items():
+                if _guid(token_claims(raw).get("oid")) != self._identity.object_id:
+                    raise PrincipalMismatchError(f"the cached {api} token is another principal's")
+        return self._identity
 
 
 def _cli_credential(tenant_id: str) -> _TokenSource:

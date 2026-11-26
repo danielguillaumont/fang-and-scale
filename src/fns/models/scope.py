@@ -48,11 +48,15 @@ class TestIdentity(FnsModel):
     """An identity the executor may act as (``strike``)."""
 
     __test__: ClassVar[bool] = False  # not a pytest test class
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"app_id"})
 
     object_id: Guid
     """Entra object ID of the service principal or managed identity."""
     kind: Literal["servicePrincipal", "managedIdentity"]
     name: str = Field(min_length=1, max_length=256)
+    app_id: Guid | None = None
+    """Application (client) ID. When set, ``fns prove --live`` also requires the
+    token's ``appid`` to match it (decision V4)."""
 
 
 DATA_PLANE_VERB: Final = "prove"
@@ -113,6 +117,8 @@ class ScopeBudget(FnsModel):
 
 class ScopeManifest(FnsModel):
     """The scope manifest (``scope.yaml``)."""
+
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"data_objects"})
 
     version: Literal[1]
     tenant_id: Guid

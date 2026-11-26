@@ -59,10 +59,15 @@ class ProveResult:
     """The verifier process's stdout (and stderr, if any)."""
 
 
+ProbeFactory = Callable[[SqliteJournal, str], Probe]
+"""Builds the probe once the run journal is open: ``(journal, run_id) -> probe``.
+Live probes need it, so their gate journals into the run's own journal."""
+
+
 def prepare(
     contract: Contract,
     snapshot: Snapshot,
-    probe: Probe,
+    probe: Probe | ProbeFactory,
     out_dir: Path,
     *,
     now: Callable[[], datetime],
@@ -70,7 +75,8 @@ def prepare(
     when = now()
     report = contain(contract, snapshot, now=when)
     aset = freeze(contract, snapshot, report, frozen_at=when)
-    if probe.mode == "FIXTURE" and aset.mode != "FIXTURE":
+    mode = getattr(probe, "mode", "LIVE")  # a factory builds a live probe
+    if mode == "FIXTURE" and aset.mode != "FIXTURE":
         # Fixture probe results make the whole run FIXTURE evidence.
         aset = AssertionSet.model_validate({**aset.model_dump(), "mode": "FIXTURE"})
     run_dir = out_dir / "runs" / aset.run_id
@@ -79,7 +85,8 @@ def prepare(
         if not journal.has_run(aset.run_id):
             journal.begin_run(aset.run_id, "prove", aset.mode)
         freeze_into(journal, aset, run_dir)
-        probes = run_probes(journal, aset, probe, run_dir, now=now)
+        built = probe if hasattr(probe, "observe") else probe(journal, aset.run_id)
+        probes = run_probes(journal, aset, built, run_dir, now=now)  # type: ignore[arg-type]
     return report, aset, run_dir, probes
 
 
@@ -99,7 +106,7 @@ def spawn_verifier(
 def prove(
     contract: Contract,
     snapshot: Snapshot,
-    probe: Probe,
+    probe: Probe | ProbeFactory,
     out_dir: Path,
     *,
     now: Callable[[], datetime],
