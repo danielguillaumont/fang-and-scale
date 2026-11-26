@@ -236,6 +236,33 @@ def mutate(
     raise typer.Exit(mutate_cli.exit_code(report, max_survivors))
 
 
+@app.command()
+def report(
+    contain: Annotated[Path, typer.Option(help="Report JSON from `fns contain --json`.")],
+    mutation: Annotated[
+        Path | None, typer.Option(help="Report JSON from `fns mutate --json`.")
+    ] = None,
+    prove_dir: Annotated[
+        Path | None, typer.Option("--prove", help="Run directory written by `fns prove`.")
+    ] = None,
+    out: Annotated[Path, typer.Option(help="HTML file to write.")] = Path(".fns/report.html"),
+) -> None:
+    """Write a static HTML report: coverage, reach graph, findings, proof, mutation (M5)."""
+    from pydantic import ValidationError
+
+    from fns import report_cli
+    from fns.console import FixtureConsole
+
+    err = make_console(stderr=True)
+    try:
+        inputs = report_cli.load_inputs(contain, mutation, prove_dir)
+    except (OSError, ValidationError, ValueError) as exc:
+        err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    con = FixtureConsole(make_console()) if inputs.contain.mode == "FIXTURE" else make_console()
+    raise typer.Exit(report_cli.write(inputs, out, con, err))
+
+
 detections_app = typer.Typer(help="Detection rules as code (M4).", no_args_is_help=True)
 app.add_typer(detections_app, name="detections")
 
@@ -610,6 +637,77 @@ def demo_mutate(
         mutate_cli.write(report, json_out)
         con.print(f"wrote {json_out.as_posix()}", style="fns.muted", markup=False)
     raise typer.Exit(mutate_cli.exit_code(report, 0))
+
+
+@demo_app.command("report")
+def demo_report(
+    out: Annotated[Path, typer.Option(help="Directory for the journal, runs and report.")] = Path(
+        ".fns"
+    ),
+    fixture: Annotated[
+        Path | None, typer.Option(help="Replay a recorded fixture set instead of the bundled one.")
+    ] = None,
+    lab: Annotated[
+        Path, typer.Option(help="Lab Terraform, for the mutation section (fixture runs only).")
+    ] = Path("lab"),
+) -> None:
+    """Run contain and prove (and mutate, for a lab fixture) on a fixture; write the HTML report.
+
+    Everything is replayed from files and labelled FIXTURE. Probe results are hand-written.
+    """
+    from pydantic import ValidationError
+
+    from fns import mutate_cli, report_cli
+    from fns.console import FixtureConsole
+    from fns.contain_run import demo_contract, run_demo_contain
+    from fns.demo import DEMO_FIXTURE
+    from fns.fixtures.replay import FixtureError, bundled
+    from fns.journal.sqlite import JournalError
+    from fns.models.scope import ScopeExpiredError
+    from fns.mutate import MutateError
+    from fns.probes.mock import RESULTS_FILE, MockProbe, MockResults
+    from fns.prove.run import prove as run_prove
+    from fns.yamlio import YamlError
+
+    con = FixtureConsole(make_console())
+    err = FixtureConsole(make_console(stderr=True))
+    try:
+        scout, contain_report = run_demo_contain(out, fixture)
+        snap = scout.snapshot
+        c = demo_contract(fixture)
+        root = fixture if fixture is not None else bundled(DEMO_FIXTURE)
+        results = MockResults.model_validate_json(
+            root.joinpath(RESULTS_FILE).read_text(encoding="utf-8")
+        )
+        proved = run_prove(
+            c,
+            snap,
+            MockProbe(results, at=snap.collected_at),
+            out,
+            now=lambda: snap.collected_at,
+            signer="offline-test",
+            identity="fixture-replay",
+        )
+        mutation = None
+        if fixture is not None and lab.is_dir():
+            mutation = mutate_cli.run(c, snap, lab, harden=True, now=snap.collected_at)
+        inputs = report_cli.load_inputs_from(contain_report, mutation, proved.run_dir)
+    except (
+        FixtureError,
+        JournalError,
+        MutateError,
+        ScopeExpiredError,
+        ValidationError,
+        YamlError,
+        OSError,
+    ) as exc:
+        err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    source = fixture.as_posix() if fixture else DEMO_FIXTURE
+    con.print(f"Replaying fixture {source!r}; no network calls are made.", style="fns.muted")
+    raise typer.Exit(
+        report_cli.write(inputs, out / f"report.{snap.mode}.html", con, make_console(stderr=True))
+    )
 
 
 @demo_app.command("prove")
