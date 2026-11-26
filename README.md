@@ -90,31 +90,90 @@ Other commands: `fns harden`, `fns record` (turns logs into `must_still_do`),
 
 ## Architecture
 
+**Main flow.** Rectangles are steps, cylinders are the files they write.
+
 ```mermaid
-flowchart LR
-  subgraph read["Read-only, every call through the scope gate"]
-    gate["scope gate<br/>tenant pin · allowlist · budget · expiry"]
-    scout["fns scout<br/>ARM + Graph collectors"]
-    gate --> scout
+flowchart TD
+  contract[/"contract<br/>*.fns.yaml"/]
+
+  subgraph inventory["Inventory: read-only"]
+    gate{{"scope gate"}}
+    scout["fns scout"]
+    snap[("snapshot")]
+    gate --> scout --> snap
   end
-  scout --> snap[("snapshot<br/>deterministic digest")]
-  contract[/"contract<br/>*.fns.yaml"/] --> contain
-  snap --> contain["fns contain<br/>reach engine (fixed point)"]
-  contain --> report[("contain report<br/>paths · rungs · coverage")]
-  report --> freeze["freeze assertions<br/>hash before probes"]
-  freeze --> probes["probes<br/>permissions API · data read"]
-  probes --> journal[("journal<br/>append-only SQLite")]
-  subgraph verifier["Separate process, separate credentials"]
-    verify["fns.verify<br/>never imports proposer or executor"]
+
+  subgraph antivenom["Antivenom: fns contain"]
+    reach["reach engine"]
+    creport[("contain report")]
+    reach --> creport
   end
-  freeze --> verify
-  journal --> verify
-  verify --> bundle[("evidence bundle<br/>in-toto + DSSE")]
-  snap --> harden["fns harden<br/>smallest Terraform diff"]
-  harden --> mutate["fns mutate<br/>mutation score"]
-  report --> out["fns report / fns comment<br/>HTML · PR comment"]
-  bundle --> out
-  mutate --> out
+
+  subgraph prove["Prove: fns prove"]
+    freeze["freeze assertions"]
+    probes["read-only probes"]
+    journal[("journal")]
+    freeze --> probes --> journal
+    subgraph boundary["TRUST BOUNDARY: own process, own credentials"]
+      verify["fns verify"]
+      bundle[("signed bundle")]
+      verify --> bundle
+    end
+    freeze --> verify
+    journal --> verify
+  end
+
+  subgraph hm["Harden / Mutate"]
+    harden["fns harden"]
+    mutate["fns mutate"]
+    harden --> mutate
+  end
+
+  subgraph report["Report"]
+    html["fns report"]
+    comment["fns comment"]
+  end
+
+  snap --> reach
+  contract --> reach
+  creport --> freeze
+  snap --> harden
+  contract --> harden
+  creport --> html
+  creport --> comment
+  bundle --> html
+  mutate --> html
+
+  style boundary stroke:#c0392b,stroke-width:3px,stroke-dasharray:6 4
+```
+
+**Trust boundaries.** Only the scope gate talks to Azure. Only two commands can
+write, and only to the lab. The verifier shares no code with what it checks.
+
+```mermaid
+flowchart TD
+  subgraph fns["fns"]
+    engine["reach engine<br/>pure: no API, no credentials"]
+    adapters["ARM + Graph adapters<br/>read-only"]
+    writers["strike, harden --apply<br/>lab only, --approve plan-hash"]
+  end
+
+  gate{{"scope gate<br/>tenant pin, allowlist,<br/>budget, expiry"}}
+  azure[("Azure + Entra")]
+  adapters --> gate
+  writers --> gate
+  gate --> azure
+
+  subgraph boundary["TRUST BOUNDARY: separate process, separate credentials"]
+    verify["fns.verify"]
+  end
+  files[("frozen assertions<br/>journal, read-only")]
+  files --> verify
+  verify -- "never imports" --x engine
+  verify -- "never imports" --x adapters
+  verify -- "never imports" --x writers
+
+  style boundary stroke:#c0392b,stroke-width:3px,stroke-dasharray:6 4
 ```
 
 Two import contracts enforce the boundaries. `fns.verify` imports nothing from
