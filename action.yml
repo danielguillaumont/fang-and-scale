@@ -1,0 +1,139 @@
+name: Fang & Scale blast radius
+description: >-
+  Evaluate a blast-radius contract on a snapshot (read-only), optionally replay
+  probe results and mutation-test the contract, and comment on the pull request.
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  contract:
+    description: Contract file (*.fns.yaml).
+    required: true
+  snapshot:
+    description: Snapshot JSON written by `fns scout` (or `fns demo scout` for fixtures).
+    required: true
+  probes:
+    description: >-
+      Probe results to replay with `fns prove` (FIXTURE only; live probes are not
+      wired into the action yet). Empty to skip prove.
+    default: ""
+  lab:
+    description: Terraform directory for `fns mutate --harden`. Empty to skip mutation.
+    default: ""
+  baseline:
+    description: Contain report JSON from the base branch, for deltas. Skipped if missing.
+    default: ""
+  comment:
+    description: Post or update one sticky comment on the pull request.
+    default: "true"
+  fail-on-contract:
+    description: Fail the step when the contract fails (exit 1) or is inconclusive over budget (3).
+    default: "true"
+  github-token:
+    description: Token used only to post the comment.
+    default: ${{ github.token }}
+
+outputs:
+  exit-code:
+    description: 0 within budget, 1 contract failed, 3 inconclusive over budget.
+    value: ${{ steps.run.outputs.exit-code }}
+  comment-file:
+    description: The Markdown comment.
+    value: ${{ steps.run.outputs.comment-file }}
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+      with:
+        python-version: "3.12"
+    - name: Install fns
+      shell: bash
+      run: uv sync --locked --no-dev --project "$GITHUB_ACTION_PATH"
+    - name: Run fns
+      id: run
+      shell: bash
+      env:
+        FNS_CONTRACT: ${{ inputs.contract }}
+        FNS_SNAPSHOT: ${{ inputs.snapshot }}
+        FNS_PROBES: ${{ inputs.probes }}
+        FNS_LAB: ${{ inputs.lab }}
+        FNS_BASELINE: ${{ inputs.baseline }}
+      run: |
+        # Read-only: contain, prove (replayed probes), mutate (model only), comment.
+        set -euo pipefail
+        out="${RUNNER_TEMP:-/tmp}/fns-action"
+        rm -rf "$out" && mkdir -p "$out"
+        fns() { uv run --frozen --no-dev --project "$GITHUB_ACTION_PATH" fns "$@"; }
+        verdict() { # 0, 1 and 3 are verdicts; anything else, or no output file, is an error
+          local code=$1 file=$2
+          if [ "$code" -gt 3 ] || [ "$code" -eq 2 ] || [ ! -s "$file" ]; then
+            echo "fns failed (exit $code) without writing $file" >&2
+            exit 2
+          fi
+        }
+        set +e
+        fns contain --contract "$FNS_CONTRACT" --snapshot "$FNS_SNAPSHOT" \
+          --out "$out" --json "$out/contain.json"
+        code=$?
+        set -e
+        verdict "$code" "$out/contain.json"
+        args=(--contain "$out/contain.json" --out "$out/comment.md")
+        if [ -n "$FNS_PROBES" ]; then
+          set +e
+          fns prove --contract "$FNS_CONTRACT" --snapshot "$FNS_SNAPSHOT" \
+            --probes "$FNS_PROBES" --out "$out" --sign offline-test --identity github-actions
+          code=$?
+          set -e
+          run_dir="$(find "$out/runs" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          verdict "$code" "$run_dir/bundle.json"
+          args+=(--prove "$run_dir")
+        fi
+        if [ -n "$FNS_LAB" ]; then
+          set +e
+          fns mutate --contract "$FNS_CONTRACT" --snapshot "$FNS_SNAPSHOT" \
+            --lab "$FNS_LAB" --harden --json "$out/mutation.json"
+          mcode=$?
+          set -e
+          verdict "$mcode" "$out/mutation.json"
+          args+=(--mutation "$out/mutation.json")
+        fi
+        if [ -n "$FNS_BASELINE" ] && [ -s "$FNS_BASELINE" ]; then
+          args+=(--baseline "$FNS_BASELINE")
+        fi
+        fns comment "${args[@]}"
+        cat "$out/comment.md" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+        {
+          echo "exit-code=$code"
+          echo "comment-file=$out/comment.md"
+        } >> "${GITHUB_OUTPUT:-/dev/null}"
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        BODY: ${{ steps.run.outputs.comment-file }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      run: |
+        set -euo pipefail
+        if [ "$HEAD_REPO" != "$REPO" ]; then
+          echo "Pull request from a fork: the token is read-only, so the comment is in the job summary."
+          exit 0
+        fi
+        id="$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq '.[] | select(.user.type == "Bot" and (.body | startswith("<!-- fns:blast-radius -->"))) | .id' \
+          | head -n 1)"
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$BODY" > /dev/null
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$BODY" > /dev/null
+        fi
+    - name: Verdict
+      if: inputs.fail-on-contract == 'true'
+      shell: bash
+      env:
+        CODE: ${{ steps.run.outputs.exit-code }}
+      run: exit "$CODE"
