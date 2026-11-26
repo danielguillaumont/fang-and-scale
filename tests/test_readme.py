@@ -33,7 +33,7 @@ def test_readme_command_exists(command: list[str]) -> None:
 def test_readme_paths_exist() -> None:
     paths = set(re.findall(r"`((?:docs|fixtures|contracts|lab|schemas)/[\w./-]+)`", README))
     for path in sorted(paths):
-        if path.endswith("lab-run-2"):  # an example of what the reader would record
+        if path.endswith("lab-run-3"):  # an example of what the reader would record
             continue
         assert (ROOT / path).exists(), path
 

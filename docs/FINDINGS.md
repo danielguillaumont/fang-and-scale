@@ -8,6 +8,38 @@ request (sanitized), the response, the date, and what the code does about it.
 | 2026-11-26 | ARM (Azure Policy) | `terraform apply` creating `rg-fns-lab` with `location = "eastus"` on an Azure for Students subscription | Any public region can be used for a resource group | Denied by the built-in assignment "Allowed resource deployment regions". Allowed on this subscription: `belgiumcentral`, `northcentralus`, `norwayeast`, `westus`, `canadacentral`. List with `az policy assignment list --query "[].{name:displayName, allowed:parameters.listOfAllowedLocations.value}"` | `location` is now a required Terraform variable with no default; runbook step 3 lists the allowed regions first, and step 4 has a troubleshooting entry |
 | 2026-11-26 | ARM (`Microsoft.KeyVault/vaults` PUT, `canadacentral`) | azurerm 5.15.0 creating `kv-crown-<suffix>`, then polling the long-running operation | Polling returns the operation status until the vault is provisioned | A polling GET returned **404** and Terraform failed, but the vault had been created. It was then missing from state, and a re-apply failed because the name was taken | Recovered with `terraform import azurerm_key_vault.crown_jewels <vault id>`, then apply. Runbook step 4, "Troubleshooting". Not retried automatically: the tool never applies Terraform |
 | 2026-11-26 | Entra ID token endpoint (client credentials, certificate) | `az login --service-principal --certificate <pem>` right after `az ad app credential reset --create-cert --append` on `sp-fns-scout` | A new credential is usable once the reset call returns | First sign-in failed with `AADSTS700027` (invalid signature on the client assertion); the same command worked about 3 minutes later with no change | Runbook step 5: wait 3 minutes and retry the login; do not create a second certificate. Live collectors use the existing CLI session, so no code change |
+| 2026-11-26 | Graph v1.0 `roleManagement/directory/roleEligibilitySchedules` (app-only, `sp-fns-scout`, `RoleManagement.Read.Directory`) | `GET https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=id,principalId,roleDefinitionId,directoryScopeId` in an Entra ID Free tenant | PIM needs Entra ID P2 or ID Governance. The response to a tenant without them was unknown to us; the tests used `AadPremiumLicenseRequired` only as an illustration | **`400`**, not `403` or an empty list: `{"error": {"code": "AadPremiumLicenseRequired", "message": "The tenant needs to have Microsoft Entra ID P2 or Microsoft Entra ID Governance license.", "innerError": {"date": "2026-11-26T18:07:28", "request-id": "<placeholder>", "client-request-id": "<placeholder>"}}}` | The collector records the status and error code (`http-400 AadPremiumLicenseRequired`) as evidence and never keys on the code or the message: any failed listing counts the same, and the licence check decides. Recorded in `fixtures/lab-run-2` |
+| 2026-11-26 | ARM `Microsoft.Authorization/roleEligibilitySchedules` (`api-version=2020-10-01`, Reader on the subscription) | `GET https://management.azure.com/subscriptions/<sub>/providers/Microsoft.Authorization/roleEligibilitySchedules?api-version=2020-10-01` in the same tenant | As above | **The same status and code from a second API**, with a different message: `400` `{"error": {"code": "AadPremiumLicenseRequired", "message": "The tenant needs to have Microsoft Entra Permissions Management or <GUID> or Microsoft Entra ID P2 or Microsoft Entra ID Governance license."}}`. ARM accepts more licences than Graph names, and it names one of them only by a GUID. The sanitizer replaced that GUID with a placeholder (`...-000000001049`), which appears nowhere else in the recording, so it is not the tenant, the subscription or any object in it. No `innerError` | Handled the same way as Graph. **Open:** the licence match (`PIM_PLAN_IDS`, and SKU or plan names containing `P2` or `GOVERNANCE`) does not know Permissions Management or the GUID-named licence. That makes no difference in this tenant, which has no SKUs. Take a tenant that has only one of those licences. Its Graph listing fails for lack of P2. If its ARM listing also failed for some other reason (a 403, a 5xx), the collector would report `not-applicable`, although Azure-resource eligibility could exist there. Widening the match is an evidence-model change, so it waits for a decision |
+| 2026-11-26 | Graph v1.0 `subscribedSkus` (app-only, `sp-fns-scout`) | `GET https://graph.microsoft.com/v1.0/subscribedSkus?$select=skuId,skuPartNumber,capabilityStatus,servicePlans` in the same tenant | Lists the tenant's commercial subscriptions | `200` with `"value": []`: an Entra ID Free tenant (here on an Azure for Students subscription) has **no subscribed SKUs at all**, not even a free one | **0 SKUs is a valid not-applicable signal.** A successful, empty answer is positive evidence that no licence carries PIM. It is different from a failed call, which leaves `pim-eligibility` not collected. The evidence line reads `GET /subscribedSkus -> ok: 0 SKU(s) [none]; plans that may carry PIM: none` |
+
+## M2 live run (2026-11-26)
+
+Run from `docs/runbooks/m2-live-run.md`. Every result matched the runbook tables.
+
+- **Terraform:** 3 to add, 0 to change, 1 to destroy (scope file, lab contract,
+  `LicenseAssignment.Read.All`). The tenant has 0 SKUs (Entra ID Free).
+- **Scout as `sp-fns-scout`, twice:** identical digests,
+  `sha256:68a0208d9c91330bd187a1f4f9b284d801e7fa7c224006edb9399bf2a179b129`.
+  There are 12 collectors. 11 are `complete`, including `arm.resource-settings` with
+  3 items. `pim.eligibility` is `not-applicable`, with the three responses above as
+  evidence.
+- **Recorded as `fixtures/lab-run-2`,** with the contract `lab/contract.tf`
+  rendered (names only). `test_no_real_ids` passed, and `_idmap.json` is ignored.
+  The replay digest is
+  `da85272752f74a1bc99a966743abe0657f226f28aede542b9dfe75ec61ab549c`. It differs
+  from the live digest because the IDs are placeholders and the mode is `FIXTURE`.
+  It is pinned in `tests/golden/lab-run-2.digest`.
+- **`fns contain`, live:** critical reachable 11/0, inconclusive 2/2, exit 1. The
+  fixture replay gives the same result. `stpayroll` `blob/read` now fails without
+  a "not collected" assumption, because shared-key access was collected (C1).
+- **`fns mutate --harden`, live:** 6/8, exit 0 with `--max-survivors 2`. The
+  survivors are exactly `app-owner:id-verifier` and `app-owner:sp-fns-scout`. The
+  hardened baseline has 0 failing and 13 inconclusive findings.
+- **The M2 C4 regression test is `tests/fixtures/test_lab_run_2.py`:** collectors,
+  PIM evidence, verdicts, summary, mutation score and survivors, against
+  goldens.
+- **Cleanup:** the scout certificate is deleted, the PEM is removed, and
+  `az logout` was run.
 
 ## First live run (2026-11-26)
 
