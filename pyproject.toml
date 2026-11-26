@@ -165,6 +165,8 @@ filterwarnings = ["error"]
 # code, nor the adapters the executor drives. Checked transitively.
 [tool.importlinter]
 root_package = "fns"
+# External packages are graphed too, so the verifier can be kept off the Azure SDKs.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Verifier is isolated from proposer, executor and adapters"
@@ -191,6 +193,10 @@ forbidden_modules = [
     "fns.report",
     "fns.mutate",
     "fns.mutate_cli",
+    # V1: the verifier holds no Azure credential and cannot get one.
+    "azure",
+    "msal",
+    "msgraph",
 ]
 
 [[tool.importlinter.contracts]]
