@@ -152,9 +152,76 @@ def strike() -> None:
 
 
 @app.command()
-def harden() -> None:
-    """Smallest Terraform diff that satisfies a contract (Scale, M4)."""
-    _not_implemented("harden")
+def harden(
+    contract: Annotated[Path, typer.Option(help="Contract file (*.fns.yaml).")],
+    snapshot: Annotated[Path, typer.Option(help="Snapshot JSON written by `fns scout`.")],
+    lab: Annotated[Path, typer.Option(help="Terraform directory to propose changes to.")] = Path(
+        "lab"
+    ),
+    out: Annotated[
+        Path | None, typer.Option(help="Write the proposed diff here (never applied).")
+    ] = None,
+    apply: Annotated[bool, typer.Option("--apply", help="Not available yet.")] = False,
+) -> None:
+    """Propose the smallest Terraform diff that satisfies a contract (M4, read-only)."""
+    if apply:
+        make_console(stderr=True).print(
+            "--apply is not available: writes need the --approve <plan-hash> flow (rule 1)",
+            style="fns.fail",
+        )
+        raise typer.Exit(ExitCode.NOT_IMPLEMENTED)
+    from fns import harden_cli
+
+    raise typer.Exit(
+        harden_cli.harden(make_console(), make_console(stderr=True), contract, snapshot, lab, out)
+    )
+
+
+@app.command()
+def record(
+    logs: Annotated[list[Path], typer.Argument(help="Log Analytics rows exported as JSON.")],
+    identity: Annotated[str, typer.Option(help="Object ID of the identity to record.")],
+    contract: Annotated[
+        Path | None, typer.Option(help="Merge recorded items into this contract.")
+    ] = None,
+    out: Annotated[Path | None, typer.Option(help="Write the result here.")] = None,
+) -> None:
+    """Turn logged operations into must_still_do items (source: recorded) (M4)."""
+    from fns import harden_cli
+
+    raise typer.Exit(
+        harden_cli.record(make_console(), make_console(stderr=True), logs, identity, contract, out)
+    )
+
+
+detections_app = typer.Typer(help="Detection rules as code (M4).", no_args_is_help=True)
+app.add_typer(detections_app, name="detections")
+
+
+@detections_app.command("check")
+def detections_check(
+    directory: Annotated[Path, typer.Option("--dir", help="Rule directory.")] = Path("detections"),
+) -> None:
+    """Lint every rule and check that the reach model is covered."""
+    from fns import harden_cli
+
+    raise typer.Exit(harden_cli.detections_check(make_console(), directory))
+
+
+@detections_app.command("export")
+def detections_export(
+    param: Annotated[
+        list[str] | None, typer.Option(help="name=value for a rule parameter (repeatable).")
+    ] = None,
+    directory: Annotated[Path, typer.Option("--dir", help="Rule directory.")] = Path("detections"),
+    out: Annotated[Path, typer.Option(help="Directory for the rule bodies.")] = Path(
+        ".fns/detections"
+    ),
+) -> None:
+    """Render Sentinel scheduled alert rule bodies as JSON (not deployed)."""
+    from fns import harden_cli
+
+    raise typer.Exit(harden_cli.detections_export(make_console(), directory, param or [], out))
 
 
 @app.command()

@@ -1,0 +1,24 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: app-role-assignment-by-workload
+title: Graph app role granted by a workload identity
+description: >-
+  A service principal granted an app role (for example a Microsoft Graph application permission) to a service principal. With AppRoleAssignment.ReadWrite.All an app can grant itself any permission.
+severity: High
+tactics: [PrivilegeEscalation]
+covers:
+  - "rule:approle-self-grant"
+  - "op:directory:appRoleAssignments/write"
+tables: [AuditLogs]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: InitiatingAppId
+query: |
+  AuditLogs
+  | where OperationName == "Add app role assignment to service principal"
+  | where Result =~ "success"
+  | extend InitiatingAppId = tostring(InitiatedBy.app.servicePrincipalId)
+  | where isnotempty(InitiatingAppId)
+  | extend GrantedTo = tostring(TargetResources[0].id)
+  | extend SelfGrant = InitiatingAppId == GrantedTo
+  | project TimeGenerated, InitiatingAppId, GrantedTo, SelfGrant, CorrelationId

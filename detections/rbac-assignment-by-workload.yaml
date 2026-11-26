@@ -1,0 +1,27 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: rbac-assignment-by-workload
+title: Azure role assignment created by a monitored workload
+description: >-
+  A monitored workload identity created an Azure RBAC role assignment. With roleAssignments/write an identity can grant itself any role at that scope.
+severity: High
+tactics: [PrivilegeEscalation, Persistence]
+covers:
+  - "rule:rbac-write"
+  - "op:resource:roleAssignments/write"
+tables: [AzureActivity]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: Caller
+  AzureResource: ResourceId
+parameters:
+  monitored_identities: >-
+    KQL dynamic array of object IDs to watch, e.g. ["<guid>"] (the workload identities a contract assumes compromised)
+query: |
+  let MonitoredIdentities = dynamic({{monitored_identities}});
+  AzureActivity
+  | where OperationNameValue =~ "MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE"
+  | where ActivityStatusValue in~ ("Success", "Succeeded")
+  | where Caller in~ (MonitoredIdentities)
+  | extend ResourceId = _ResourceId
+  | project TimeGenerated, Caller, ResourceId, CorrelationId

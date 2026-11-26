@@ -1,0 +1,94 @@
+[
+  {
+    "Type": "StorageBlobLogs",
+    "TimeGenerated": "2026-11-20T10:00:00Z",
+    "OperationName": "GetBlob",
+    "AccountName": "stinvoicestiin02",
+    "_ResourceId": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stinvoicestiin02/blobServices/default",
+    "RequesterObjectId": "00000000-0000-4000-8000-000000000006",
+    "AuthenticationType": "OAuth",
+    "StatusCode": 200
+  },
+  {
+    "Type": "StorageBlobLogs",
+    "TimeGenerated": "2026-11-20T10:01:00Z",
+    "OperationName": "PutBlob",
+    "_ResourceId": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stinvoicestiin02/blobServices/default",
+    "RequesterObjectId": "00000000-0000-4000-8000-000000000006",
+    "AuthenticationType": "OAuth",
+    "StatusCode": 201
+  },
+  {
+    "Type": "StorageBlobLogs",
+    "TimeGenerated": "2026-11-20T10:02:00Z",
+    "OperationName": "GetBlob",
+    "AccountName": "streportstiin02",
+    "RequesterObjectId": "00000000-0000-4000-8000-000000000006",
+    "AuthenticationType": "OAuth",
+    "StatusCode": 200
+  },
+  {
+    "Type": "StorageBlobLogs",
+    "TimeGenerated": "2026-11-20T10:03:00Z",
+    "OperationName": "GetBlob",
+    "AccountName": "stpayrolltiin02",
+    "RequesterObjectId": "00000000-0000-4000-8000-000000000006",
+    "AuthenticationType": "OAuth",
+    "StatusCode": 403
+  },
+  {
+    "Type": "StorageBlobLogs",
+    "TimeGenerated": "2026-11-20T10:04:00Z",
+    "OperationName": "GetBlob",
+    "AccountName": "stinvoicestiin02",
+    "RequesterObjectId": "00000000-0000-4000-8000-000000000999",
+    "AuthenticationType": "OAuth",
+    "StatusCode": 200
+  },
+  {
+    "Type": "StorageBlobLogs",
+    "TimeGenerated": "2026-11-20T10:05:00Z",
+    "OperationName": "ListBlobs",
+    "AccountName": "stinvoicestiin02",
+    "RequesterObjectId": "00000000-0000-4000-8000-000000000006",
+    "AuthenticationType": "OAuth",
+    "StatusCode": 200
+  },
+  {
+    "Type": "AzureDiagnostics",
+    "TimeGenerated": "2026-11-20T10:06:00Z",
+    "ResourceProvider": "MICROSOFT.KEYVAULT",
+    "Category": "AuditEvent",
+    "OperationName": "SecretGet",
+    "ResultSignature": "OK",
+    "_ResourceId": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-tiin02",
+    "identity_claim_oid_g": "00000000-0000-4000-8000-000000000006"
+  },
+  {
+    "Type": "AzureActivity",
+    "TimeGenerated": "2026-11-20T10:07:00Z",
+    "OperationNameValue": "MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION",
+    "ActivityStatusValue": "Success",
+    "Caller": "00000000-0000-4000-8000-000000000006",
+    "_ResourceId": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltiin02"
+  },
+  {
+    "Type": "AzureActivity",
+    "TimeGenerated": "2026-11-20T10:08:00Z",
+    "OperationNameValue": "MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE",
+    "ActivityStatusValue": "Failure",
+    "Caller": "00000000-0000-4000-8000-000000000006",
+    "_ResourceId": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Authorization/roleAssignments/00000000-0000-4000-8000-000000000500"
+  },
+  {
+    "Type": "AuditLogs",
+    "TimeGenerated": "2026-11-20T10:09:00Z",
+    "OperationName": "Update application – Certificates and secrets management",
+    "Result": "success",
+    "InitiatedBy": "{\"app\": {\"servicePrincipalId\": \"00000000-0000-4000-8000-000000000006\"}}"
+  },
+  {
+    "Type": "SigninLogs",
+    "TimeGenerated": "2026-11-20T10:10:00Z"
+  }
+]
