@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from typer.testing import CliRunner
 
@@ -31,11 +33,10 @@ def test_unbuilt_commands_exit_2(command: str) -> None:
     assert "not implemented in M1" in result.output
 
 
-def test_scout_points_to_demo_until_phase_b() -> None:
-    result = runner.invoke(app, ["scout"])
-    assert result.exit_code == 2
-    assert "not implemented in M1" in result.output
-    assert "fns demo scout" in result.output
+def test_scout_without_scope_manifest_exits_1(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["scout", "--scope", str(tmp_path / "missing.yaml")])
+    assert result.exit_code == 1
+    assert "scope manifest not found" in result.output
 
 
 def test_help_lists_every_command() -> None:

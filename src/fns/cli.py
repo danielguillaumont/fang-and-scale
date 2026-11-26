@@ -50,12 +50,53 @@ def _not_implemented(command: str, hint: str | None = None) -> NoReturn:
 
 
 @app.command()
-def scout() -> None:
-    """Read-only snapshot of RBAC, Graph permissions, owners and directory roles."""
-    _not_implemented(
-        "scout",
-        "Live collection arrives in M1 Phase B. Try `fns demo scout` to replay fixtures.",
-    )
+def scout(
+    scope: Annotated[
+        Path, typer.Option(help="Scope manifest (written by `uv run poe lab-up`).")
+    ] = Path("scope.lab.yaml"),
+    out: Annotated[Path, typer.Option(help="Directory for the journal and snapshots.")] = Path(
+        ".fns"
+    ),
+    record: Annotated[
+        Path | None,
+        typer.Option(help="Also save sanitized responses as a fixture set in this directory."),
+    ] = None,
+) -> None:
+    """Read-only snapshot of the tenant in scope.yaml (needs `az login`)."""
+    from pydantic import ValidationError
+
+    from fns.journal.sqlite import JournalError
+    from fns.models.scope import ScopeExpiredError
+    from fns.scope.credentials import CredentialError, TenantMismatchError
+    from fns.scout import run_live_scout
+    from fns.summary import render_summary
+    from fns.yamlio import YamlError
+
+    con = make_console()
+    err = make_console(stderr=True)
+    try:
+        result = run_live_scout(scope, out, record=record)
+    except TenantMismatchError as exc:
+        err.print(f"tenant pinning: {exc}. No API call was made.", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.SCOPE_DENIED) from exc
+    except FileNotFoundError as exc:
+        err.print(f"scope manifest not found: {scope.as_posix()}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (ScopeExpiredError, ValidationError, YamlError) as exc:
+        err.print(f"invalid scope manifest: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except CredentialError as exc:
+        err.print(
+            f"{exc}. Sign in first: az login --tenant <tenant_id from the scope manifest>",
+            style="fns.fail",
+            markup=False,
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (JournalError, OSError) as exc:
+        err.print(f"scout failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    con.print("LIVE read-only snapshot", style="fns.brand")
+    render_summary(result, con)
 
 
 @app.command()
@@ -194,12 +235,16 @@ def demo_scout(
     out: Annotated[Path, typer.Option(help="Directory for the journal and snapshots.")] = Path(
         ".fns"
     ),
+    fixture: Annotated[
+        Path | None,
+        typer.Option(help="Replay a recorded fixture set instead of the bundled one."),
+    ] = None,
 ) -> None:
     """Replay the bundled demo tenant through the scope gate and collector."""
     from pydantic import ValidationError
 
     from fns.console import FixtureConsole
-    from fns.demo import render, run_demo_scout
+    from fns.demo import DEMO_FIXTURE, render, run_demo_scout
     from fns.fixtures.replay import FixtureError
     from fns.journal.sqlite import JournalError
     from fns.models.scope import ScopeExpiredError
@@ -208,7 +253,7 @@ def demo_scout(
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
     try:
-        result = run_demo_scout(out)
+        result = run_demo_scout(out, fixture)
     except (
         FixtureError,
         JournalError,
@@ -219,7 +264,7 @@ def demo_scout(
     ) as exc:
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
-    render(result, con)
+    render(result, con, fixture.as_posix() if fixture else DEMO_FIXTURE)
 
 
 def _is_read(op: str) -> bool:
