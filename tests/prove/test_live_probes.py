@@ -579,6 +579,7 @@ def test_live_run_on_lab_shaped_answers(tmp_path: Path, live_snapshot: Snapshot)
         assert j.decision_counts(done.result.assertions.run_id) == {"allowed": 14, "denied": 0}
     recorded = json.loads((rec / "probes.json").read_text(encoding="utf-8"))
     assert recorded["label"] == "FIXTURE"
+    assert recorded["source"] == "recorded-live"
     assert "Recorded from the lab" in recorded["description"]
     assert len(recorded["results"]) == 13
     assert done.omitted == ()

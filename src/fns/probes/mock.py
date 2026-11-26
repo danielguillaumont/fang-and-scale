@@ -2,10 +2,15 @@
 
 File format (``probes.json``)::
 
-    {"format": 1, "label": "FIXTURE", "description": "...",
+    {"format": 1, "label": "FIXTURE", "source": "hand-written", "description": "...",
      "results": [{"kind": "data-read", "resource": "kv-crown-jewels",
                   "action": "secrets/get", "outcome": "denied",
                   "http_status": 403, "detail": "..."}]}
+
+``source`` says where the results came from: ``recorded-live`` for a file written
+by ``fns prove --live --record``, ``hand-written`` (the default) for anything
+else. Replay banners say which; a file without the field never claims more than
+hand-written.
 
 ``resource`` is the last segment of the probe target's ARM ID. A probe with no
 recorded result raises :class:`ProbeUnavailableError` (outcome ``not-run``);
@@ -18,13 +23,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from fns.models.assertions import ProbeKind, ProbeObservation, ProbeSpec
 from fns.models.base import FnsModel
 from fns.probes.base import ProbeUnavailableError, observation
 
 RESULTS_FILE = "probes.json"
+RECORDED_PREFIX = "Recorded from the lab by fns prove --live"
+ResultsSource = Literal["hand-written", "recorded-live"]
 
 
 class MockResult(FnsModel):
@@ -39,8 +46,24 @@ class MockResult(FnsModel):
 class MockResults(FnsModel):
     format: Literal[1]
     label: Literal["FIXTURE"]
+    source: ResultsSource = "hand-written"
     description: str = ""
     results: tuple[MockResult, ...]
+
+    @model_validator(mode="after")
+    def _recorded_says_so(self) -> MockResults:
+        if self.source == "recorded-live" and not self.description.startswith(RECORDED_PREFIX):
+            raise ValueError(
+                f"source recorded-live needs a description starting {RECORDED_PREFIX!r}"
+            )
+        return self
+
+    @property
+    def provenance(self) -> str:
+        """For banners: what a replay of these results is replaying."""
+        if self.source == "recorded-live":
+            return "recorded live probe results"
+        return "hand-written probe results"
 
 
 def load_results(path: Path) -> MockResults:

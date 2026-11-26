@@ -209,3 +209,23 @@ def test_permissions_probe_refuses_unless_signed_in_as_the_test_identity(
     with pytest.raises(ProbeUnavailableError, match="principal-not-allowed"):
         probe.observe(_spec("Microsoft.KeyVault/vaults/write"), FID)
     assert fake.seen == []
+
+
+def test_probe_results_default_to_hand_written() -> None:
+    from fns.probes.mock import MockResults
+
+    doc = MockResults.model_validate({"format": 1, "label": "FIXTURE", "results": []})
+    assert doc.source == "hand-written"
+    assert doc.provenance == "hand-written probe results"
+
+
+def test_recorded_live_needs_the_recording_description() -> None:
+    from pydantic import ValidationError
+
+    from fns.probes.mock import RECORDED_PREFIX, MockResults
+
+    base = {"format": 1, "label": "FIXTURE", "source": "recorded-live", "results": []}
+    with pytest.raises(ValidationError, match="recorded-live needs a description"):
+        MockResults.model_validate({**base, "description": "Hand-written, honest"})
+    ok = MockResults.model_validate({**base, "description": f"{RECORDED_PREFIX} on 2026-11-26"})
+    assert ok.provenance == "recorded live probe results"

@@ -805,7 +805,8 @@ def demo_report(
 ) -> None:
     """Run contain and prove (and mutate, for a lab fixture) on a fixture; write the HTML report.
 
-    Everything is replayed from files and labelled FIXTURE. Probe results are hand-written.
+    Everything is replayed from files and labelled FIXTURE. Probe results come from the
+    fixture's probes.json: recorded live (lab-run-3) or hand-written (the others).
     """
     from pydantic import ValidationError
 
@@ -876,7 +877,8 @@ def demo_prove(
 ) -> None:
     """Replay a fixture, freeze assertions, replay probe results, verify (FIXTURE).
 
-    The probe results are hand-written, not recorded. Exit 1 is the expected result.
+    The banner says whether the probe results were recorded live or hand-written.
+    Exit 1 is the expected result.
     """
     from pydantic import ValidationError
 
@@ -912,8 +914,7 @@ def demo_prove(
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
     FixtureConsole(make_console()).print(
-        f"Replaying fixture {fixture.as_posix()!r} with hand-written probe results; "
-        "no network calls.",
+        f"Replaying fixture {fixture.as_posix()!r} with {results.provenance}; no network calls.",
         style="fns.muted",
         markup=False,
     )

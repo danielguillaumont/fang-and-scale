@@ -93,6 +93,7 @@ RECORDED = {
 def test_probe_results_are_the_sanitized_live_recording() -> None:
     doc = json.loads((LAB_RUN / "probes.json").read_text(encoding="utf-8"))
     assert doc["label"] == "FIXTURE"
+    assert doc["source"] == "recorded-live"
     assert doc["description"].startswith("Recorded from the lab by fns prove --live on 2026-11-26")
     got = {
         (r["kind"], r["resource"], "/".join(r["action"].split("/")[-2:])): (
