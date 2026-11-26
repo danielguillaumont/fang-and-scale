@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,22 +31,33 @@ from fns.prove.freeze import freeze
 JOURNAL_FILE: Final = "journal.sqlite"
 SCRUBBED_PREFIXES: Final = ("AZURE_", "ARM_", "MSI_", "IDENTITY_", "MSAL_")
 SCRUBBED_NAMES: Final = frozenset({"GITHUB_TOKEN", "GH_TOKEN"})
+AZURE_CONFIG_DIR: Final = "AZURE_CONFIG_DIR"
 
 Signer = Literal["offline-test", "sigstore", "none"]
 
 
-def verifier_env(env: Mapping[str, str] | None = None) -> dict[str, str]:
+def verifier_env(
+    env: Mapping[str, str] | None = None, *, azure_config_dir: str | None = None
+) -> dict[str, str]:
     """The verifier's environment: no executor or test-identity credentials (E7).
+
+    The verifier holds no Azure credential (decision V1). Scrubbing variables is
+    not enough: the Azure CLI keeps its login in ``~/.azure`` and anything that
+    shells out to ``az`` would find it. ``AZURE_CONFIG_DIR`` points the CLI at
+    ``azure_config_dir`` instead, an empty directory made for this one process.
 
     The GitHub OIDC request variables stay: in CI they are how the verifier gets
     its *own* identity for Sigstore keyless signing.
     """
     source = os.environ if env is None else env
-    return {
+    out = {
         k: v
         for k, v in source.items()
         if not k.upper().startswith(SCRUBBED_PREFIXES) and k.upper() not in SCRUBBED_NAMES
     }
+    if azure_config_dir is not None:
+        out[AZURE_CONFIG_DIR] = azure_config_dir
+    return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,14 +105,15 @@ def prepare(
 def spawn_verifier(
     args: list[str], *, env: Mapping[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603 - fixed argv: this interpreter, our own module
-        [sys.executable, "-m", "fns.verify", *args],
-        env=verifier_env(env),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        check=False,
-    )
+    with tempfile.TemporaryDirectory(prefix="fns-verifier-az-") as empty:
+        return subprocess.run(  # noqa: S603 - fixed argv: this interpreter, our own module
+            [sys.executable, "-m", "fns.verify", *args],
+            env=verifier_env(env, azure_config_dir=empty),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
 
 
 def prove(
