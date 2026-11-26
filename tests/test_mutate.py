@@ -168,10 +168,10 @@ def test_cli_demo_and_file_mode(lab_snapshot: Snapshot, tmp_path: Path) -> None:
     diffed = runner.invoke(app, [*base, "--lab", str(LAB), "--harden", "--diff"])
     assert "+  owners       = concat(local.owners" in diffed.output
     bad = runner.invoke(app, [*base, "--harden"])
-    assert bad.exit_code == 1  # invalid input: --harden without --lab
+    assert bad.exit_code == 2  # invalid input: --harden without --lab
 
 
 def test_demo_needs_a_checkout(tmp_path: Path) -> None:
     result = runner.invoke(app, ["demo", "mutate", "--fixture", str(tmp_path / "missing")])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "repository checkout" in result.output

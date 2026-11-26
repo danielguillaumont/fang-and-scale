@@ -163,7 +163,7 @@ def test_cli_report_from_files(tmp_path: Path) -> None:
         app, ["demo", "contain", "--out", str(tmp_path / "d"), "--json", str(demo_contain)]
     )
     mixed = runner.invoke(app, ["report", "--contain", str(demo_contain), "--prove", str(run_dir)])
-    assert mixed.exit_code == 1
+    assert mixed.exit_code == 2
     assert "refusing to mix runs" in mixed.output
     missing = runner.invoke(app, ["report", "--contain", str(tmp_path / "nope.json")])
-    assert missing.exit_code == 1
+    assert missing.exit_code == 2

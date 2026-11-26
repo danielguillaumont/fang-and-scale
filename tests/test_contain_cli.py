@@ -85,16 +85,16 @@ def test_exit_0_within_budget_is_never_called_a_pass(tmp_path: Path) -> None:
     assert "PASS" not in result.output
 
 
-def test_contain_invalid_inputs_exit_1(tmp_path: Path) -> None:
+def test_contain_invalid_inputs_exit_2(tmp_path: Path) -> None:
     missing = runner.invoke(
         app,
         ["contain", "--contract", str(tmp_path / "x.yaml"), "--snapshot", str(tmp_path / "s")],
     )
-    assert missing.exit_code == 1
+    assert missing.exit_code == 2
     bad = tmp_path / "s.json"
     bad.write_text("{}", encoding="utf-8")
     invalid = runner.invoke(
         app, ["contain", "--contract", str(LAB_CONTRACT), "--snapshot", str(bad)]
     )
-    assert invalid.exit_code == 1
+    assert invalid.exit_code == 2
     assert "invalid input" in invalid.output
