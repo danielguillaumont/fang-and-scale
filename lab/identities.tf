@@ -87,11 +87,10 @@ resource "azuread_service_principal" "scout" {
 }
 
 resource "azuread_app_role_assignment" "scout_graph" {
-  for_each = toset([
-    "Application.Read.All",
-    "Directory.Read.All",
-    "RoleManagement.Read.Directory",
-  ])
+  for_each = toset(concat(
+    ["Application.Read.All", "RoleManagement.Read.Directory"],
+    var.scout_directory_read_all ? ["Directory.Read.All"] : [],
+  ))
 
   app_role_id         = local.graph_roles[each.key]
   principal_object_id = azuread_service_principal.scout.object_id

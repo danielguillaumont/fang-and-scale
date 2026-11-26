@@ -19,9 +19,14 @@ variable "subscription_id" {
 }
 
 variable "location" {
-  description = "Azure region for lab resources."
+  description = "Azure region for lab resources. Required: subscription policy may restrict regions (docs/runbooks/m1-live-run.md, step 3)."
   type        = string
-  default     = "eastus"
+}
+
+variable "scout_directory_read_all" {
+  description = "Grant Directory.Read.All to sp-fns-scout. Set false to test whether the scout works without it (docs/FINDINGS.md)."
+  type        = bool
+  default     = true
 }
 
 variable "prefix" {
