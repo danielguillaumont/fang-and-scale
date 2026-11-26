@@ -63,12 +63,17 @@ def render_comment(inputs: Inputs, baseline: ContainReport | None = None) -> str
     if inputs.mutation:
         head.append(f"mutation {inputs.mutation.score}")
     if b:
-        signer = (inputs.signing or {}).get("signer", "unknown")
-        head.append(
-            "bundle signed (Sigstore)"
-            if signer == "sigstore"
-            else f"bundle {md(signer)}" + (" (TEST signature)" if signer == "offline-test" else "")
-        )
+        signing = inputs.signing or {}
+        signer = signing.get("signer", "unknown")
+        if signer == "sigstore":
+            staging = signing.get("sigstore_instance") == "staging"
+            head.append(
+                "bundle signed (Sigstore STAGING)" if staging else "bundle signed (Sigstore)"
+            )
+        else:
+            head.append(
+                f"bundle {md(signer)}" + (" (TEST signature)" if signer == "offline-test" else "")
+            )
     findings = b.findings if b else c.findings
     counts = Counter(f.coverage for f in findings)
     coverage = " · ".join(f"{s} {counts.get(s, 0)}" for s in COVERAGE_ORDER)
