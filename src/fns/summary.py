@@ -18,6 +18,7 @@ STATUS_STYLE = {
     "partial": "fns.inconclusive",
     "skipped": "fns.inconclusive",
     "failed": "fns.fail",
+    "not-applicable": "fns.pass",
 }
 
 
@@ -79,6 +80,12 @@ def render_summary(result: ScoutResult, out: Printer) -> None:
     )
     for nc in snap.coverage.not_collected:
         out.print(f"  - {nc.surface}: {nc.reason}", markup=False)
+    if snap.coverage.not_applicable:
+        out.print("not applicable in this tenant (evidence):", style="fns.pass")
+        for na in snap.coverage.not_applicable:
+            out.print(f"  - {na.surface}: {na.reason}", markup=False)
+            for ev in na.evidence:
+                out.print(f"      {ev}", markup=False)
     out.print(f"gated API calls: {result.calls}  run {result.run_id}", markup=False)
     out.print(f"snapshot {result.snapshot_path.as_posix()}", markup=False)
     if result.fixture_path is not None:

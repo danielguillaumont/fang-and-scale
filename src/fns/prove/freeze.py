@@ -18,6 +18,8 @@ from datetime import datetime
 from typing import Final
 
 from fns.contain import semantics as sem
+from fns.contain.closure import Closure, SnapshotIndex
+from fns.contain.evaluate import DONE
 from fns.contain.resolve import resolve_resource
 from fns.models.assertions import (
     PROBE_RUNG,
@@ -40,6 +42,10 @@ DATA_READS: Final = frozenset({"secrets/get", "secrets/list", "blob/read"})
 
 PERMISSIONS_OPERATION: Final = "arm:Microsoft.Authorization/permissions/read"
 
+PIM_ELIGIBLE: Final = "pim-eligibility:eligible"
+"""Open surface: the attacker controls a PIM-eligible principal, so an observed denial
+today does not show the operation stays denied after activation."""
+
 
 def run_id_for(report: ContainReport, frozen_at: datetime) -> str:
     text = f"{report.digest()}|{frozen_at.isoformat()}"
@@ -61,7 +67,10 @@ def freeze(
     by_finding: dict[str, list[ReachPath]] = {}
     for p in report.paths:
         by_finding.setdefault(p.finding_id, []).append(p)
-    assertions = tuple(_assertion(f, by_finding.get(f.id, []), snapshot) for f in report.findings)
+    eligible = _eligible(snapshot, report.compromised)
+    assertions = tuple(
+        _assertion(f, by_finding.get(f.id, []), snapshot, eligible) for f in report.findings
+    )
     b = contract.budget
     return AssertionSet(
         version=1,
@@ -128,7 +137,16 @@ def _resource(snapshot: Snapshot, finding: Finding) -> Entity | None:
     return resolve_resource(snapshot, ref).entity
 
 
-def _assertion(finding: Finding, paths: list[ReachPath], snapshot: Snapshot) -> Assertion:
+def _eligible(snapshot: Snapshot, compromised: str | None) -> bool:
+    """Whether anything the attacker controls is PIM-eligible (activation is not modeled)."""
+    if compromised is None:
+        return False
+    return bool(Closure(SnapshotIndex(snapshot), compromised).eligibility)
+
+
+def _assertion(
+    finding: Finding, paths: list[ReachPath], snapshot: Snapshot, eligible: bool = False
+) -> Assertion:
     probes = _Probes(finding.id)
     target = _resource(snapshot, finding)
     direct: list[str] = []
@@ -188,7 +206,10 @@ def _assertion(finding: Finding, paths: list[ReachPath], snapshot: Snapshot) -> 
         modeled_reasons=finding.reasons,
         paths=tuple(path_assertions),
         probes=tuple(probes.specs.values()),
-        open_surfaces=_open_surfaces(snapshot, semantics, target),
+        open_surfaces=(
+            *_open_surfaces(snapshot, semantics, target),
+            *((PIM_ELIGIBLE,) if eligible else ()),
+        ),
     )
 
 
@@ -212,6 +233,6 @@ def _open_surfaces(
         wanted.discard(sem.KV_ACCESS_POLICIES)
     out = set(wanted)
     out.update(
-        f"collector:{run.name}" for run in snapshot.coverage.collectors if run.status != "complete"
+        f"collector:{run.name}" for run in snapshot.coverage.collectors if run.status not in DONE
     )
     return tuple(sorted(out))

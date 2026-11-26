@@ -33,6 +33,7 @@ from fns.models.snapshot import (
     HasAccessPolicy,
     HasAppRole,
     HasDirectoryRole,
+    HasEligibleRole,
     HasIdentity,
     HasRbacRole,
     InstanceOf,
@@ -185,6 +186,30 @@ class Closure:
         missing role definitions, unresolved app role IDs)."""
         self._seed()
         self._run(rules if rules is not None else RULES)
+        self.eligibility: tuple[str, ...] = self._eligibility()
+        """PIM eligibility of anything the attacker controls (M3 E1). Activation is
+        not modeled, so each one leaves every finding open."""
+        self.uncertain.update(self.eligibility)
+
+    def _eligibility(self) -> tuple[str, ...]:
+        ix = self.index
+        holders = {p for c in self.controlled() for p in self.effective(c)}
+        out = set()
+        for e in ix.snapshot.edges:
+            if isinstance(e, HasEligibleRole) and e.src in holders:
+                where = (
+                    f"directory scope {e.directory_scope_id or '/'}"
+                    if e.plane == "directory"
+                    else ix.name(e.dst)
+                )
+                role = ix.name(e.role_definition_id)
+                if role == e.role_definition_id:
+                    role = f"role {role.rsplit('/', 1)[-1]}"
+                out.add(
+                    f"{ix.name(e.src)} is eligible (PIM) for {role} at {where}; "
+                    "activation is not modeled"
+                )
+        return tuple(sorted(out))
 
     # -- queries -----------------------------------------------------------
 
