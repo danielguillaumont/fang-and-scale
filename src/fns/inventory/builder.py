@@ -39,6 +39,7 @@ class SnapshotBuilder:
     def __init__(self) -> None:
         self._entities: dict[str, tuple[int, str, Entity]] = {}
         self._edges: dict[tuple[str, ...], tuple[str, Edge]] = {}
+        self._annotations: dict[str, dict[str, Any]] = {}
 
     def entity(
         self,
@@ -59,6 +60,14 @@ class SnapshotBuilder:
             self._entities[ent.id] = cand
         return ent.id
 
+    def annotate(self, id_: str, properties: dict[str, Any]) -> None:
+        """Add properties to an entity from a second source (e.g. a per-resource GET).
+
+        Applied at build time over whichever candidate won, so the result does not
+        depend on order. Keys must not already come from the entity's own listing.
+        """
+        self._annotations.setdefault(id_.lower(), {}).update(properties)
+
     def has(self, id_: str) -> bool:
         return id_.lower() in self._entities
 
@@ -69,6 +78,17 @@ class SnapshotBuilder:
         cur = self._edges.get(key)
         if cur is None or text < cur[0]:
             self._edges[key] = (text, edge)
+
+    def _annotated(self, entity: Entity) -> Entity:
+        extra = self._annotations.get(entity.id)
+        if not extra:
+            return entity
+        clash = sorted(set(extra) & set(entity.properties))
+        if clash:
+            raise ValueError(f"annotation would overwrite {clash} on {entity.id}")
+        return Entity.model_validate(
+            {**entity.model_dump(), "properties": {**entity.properties, **extra}}
+        )
 
     def build(
         self,
@@ -102,7 +122,7 @@ class SnapshotBuilder:
                 "tenant_id": tenant_id,
                 "collected_at": collected_at,
                 "collector_version": collector_version,
-                "entities": [e for _, _, e in self._entities.values()],
+                "entities": [self._annotated(e) for _, _, e in self._entities.values()],
                 "edges": edges,
                 "coverage": SnapshotCoverage(
                     collectors=coverage.collectors, not_collected=tuple(not_collected)

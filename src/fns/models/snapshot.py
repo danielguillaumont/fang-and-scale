@@ -204,6 +204,21 @@ class DenyAssignment(_EdgeBase):
         return (self.deny_assignment_id,)
 
 
+class HasAccessPolicy(_EdgeBase):
+    """principal -> Key Vault: a vault access policy (applies in access-policy mode only)."""
+
+    type: Literal["hasAccessPolicy"]
+    secrets: SetOfStr = ()
+    keys: SetOfStr = ()
+    certificates: SetOfStr = ()
+    """Permission names as ARM returns them, lowercased (e.g. get, list, all)."""
+
+    @field_validator("secrets", "keys", "certificates")
+    @classmethod
+    def _perms(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        return _sorted_set(tuple(p.lower() for p in v))
+
+
 Edge = Annotated[
     MemberOf
     | Owns
@@ -213,7 +228,8 @@ Edge = Annotated[
     | HasAppRole
     | HasDirectoryRole
     | HasRbacRole
-    | DenyAssignment,
+    | DenyAssignment
+    | HasAccessPolicy,
     Field(discriminator="type"),
 ]
 
