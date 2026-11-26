@@ -10,6 +10,7 @@ authors = [
     { name = "Daniel Guillaumont", email = "181521129+danielguillaumont@users.noreply.github.com" },
 ]
 dependencies = [
+    "azure-identity>=1.19",
     "pydantic>=2.10",
     "pyyaml>=6.0.2",
     "rich>=13.9",
