@@ -157,8 +157,18 @@ so in the title.
 - **Untrusted input.** Tenant names and texts are escaped in the HTML report and
   in the PR comment.
 
-Exit codes: 0 within budget, 1 contract failed, 2 usage, 3 inconclusive over
-budget, 4 scope denied, 5 evidence invalid.
+Exit codes: 0 within budget, 1 contract failed, 2 usage or invalid input,
+3 inconclusive over budget, 4 scope denied, 5 evidence invalid. Exit 1 also
+means that the check a command runs has failed:
+
+- survivors over `--max-survivors` in `fns mutate`;
+- no proposal in `fns harden`;
+- a conflict in `fns record`;
+- problems found by `fns detections check`;
+- drift found by `fns schema --check`.
+
+A missing or invalid contract, scope, snapshot, report or log file exits 2, and
+so does an internal error, so a crash never looks like a verdict.
 
 ## Roadmap
 
