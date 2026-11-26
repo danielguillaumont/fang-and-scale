@@ -6,6 +6,7 @@ fixture set, via the :class:`IdMap`):
 - GUIDs (tenant, subscription, object, assignment IDs), anywhere in strings
   and mapping keys, except public well-known IDs (``wellknown.py``);
 - emails / UPNs (``userN@example.invalid``) and ``*.onmicrosoft.com`` domains;
+- names of *users* (``user-N``); groups, apps and resources keep their names;
 - opaque non-GUID ``id`` values (Graph assignment IDs are base64 of GUIDs);
 - ``$skiptoken`` values, JWT-looking strings, and secret-bearing keys.
 
@@ -33,6 +34,11 @@ SKIPTOKEN_RE: Final = re.compile(r"(\$?skip[Tt]oken=)[^&\s\"]+")
 JWT_RE: Final = re.compile(r"eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]*")
 OPAQUE_RE: Final = re.compile(r"^opaque-\d+$")
 SAFE_EMAIL_SUFFIX: Final = "@example.invalid"
+
+PERSON_NAME_KEYS: Final = frozenset(
+    {"displayName", "givenName", "surname", "principalDisplayName", "mailNickname"}
+)
+PERSON_RE: Final = re.compile(r"^user-\d+$")
 
 REDACTED: Final = "REDACTED"
 SKIPTOKEN: Final = "SKIPTOKEN"
@@ -67,6 +73,7 @@ class IdMap:
         self.emails: dict[str, str] = dict(data.get("emails", {}))
         self.domains: dict[str, str] = dict(data.get("domains", {}))
         self.opaque: dict[str, str] = dict(data.get("opaque", {}))
+        self.people: dict[str, str] = dict(data.get("people", {}))
 
     @classmethod
     def load(cls, path: Path) -> IdMap:
@@ -80,6 +87,7 @@ class IdMap:
             "emails": self.emails,
             "domains": self.domains,
             "opaque": self.opaque,
+            "people": self.people,
             "version": 1,
         }
         path.write_text(
@@ -108,6 +116,14 @@ class IdMap:
             self.domains[key] = f"tenant{len(self.domains) + 1}.example.invalid"
         return self.domains[key]
 
+    def person(self, real: str) -> str:
+        """Display names of users are personal data; groups and apps keep theirs."""
+        if PERSON_RE.match(real):
+            return real
+        if real not in self.people:
+            self.people[real] = f"user-{len(self.people) + 1}"
+        return self.people[real]
+
     def opaque_id(self, real: str) -> str:
         if OPAQUE_RE.match(real):
             return real
@@ -124,12 +140,24 @@ def sanitize_text(text: str, idmap: IdMap) -> str:
     return GUID_RE.sub(lambda m: idmap.guid(m.group(0)), text)
 
 
+def _is_person(value: dict[str, Any]) -> bool:
+    return (
+        value.get("@odata.type") == "#microsoft.graph.user" or value.get("principalType") == "User"
+    )
+
+
 def sanitize(value: Any, idmap: IdMap, *, key: str | None = None) -> Any:
     """Return a sanitized deep copy of a JSON value."""
     if isinstance(value, dict):
-        return {
-            sanitize_text(str(k), idmap): sanitize(v, idmap, key=str(k)) for k, v in value.items()
-        }
+        person = _is_person(value)
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            new_key = sanitize_text(str(k), idmap)
+            if person and k in PERSON_NAME_KEYS and isinstance(v, str):
+                out[new_key] = idmap.person(v)
+            else:
+                out[new_key] = sanitize(v, idmap, key=str(k))
+        return out
     if isinstance(value, list):
         return [sanitize(v, idmap, key=key) for v in value]
     if isinstance(value, str):

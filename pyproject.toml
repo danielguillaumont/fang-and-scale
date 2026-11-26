@@ -10,6 +10,7 @@ authors = [
     { name = "Daniel Guillaumont", email = "181521129+danielguillaumont@users.noreply.github.com" },
 ]
 dependencies = [
+    "azure-identity>=1.19",
     "pydantic>=2.10",
     "pyyaml>=6.0.2",
     "rich>=13.9",
@@ -76,13 +77,23 @@ check.sequence = ["lint", "typecheck", "imports", "schema-check", "test"]
 check.help = "Everything that must pass before a commit"
 
 lab-up.sequence = [
-    { cmd = "terraform -chdir=lab init" },
+    { cmd = "terraform -chdir=lab init -input=false" },
     { cmd = "terraform -chdir=lab apply" },
 ]
 lab-up.help = "Apply the Terraform lab (M1 Phase B)"
 
 lab-down.cmd = "terraform -chdir=lab destroy"
 lab-down.help = "Destroy the Terraform lab (M1 Phase B)"
+
+lab-check.sequence = [
+    { cmd = "terraform -chdir=lab fmt -check -recursive" },
+    { cmd = "terraform -chdir=lab init -backend=false -input=false" },
+    { cmd = "terraform -chdir=lab validate" },
+]
+lab-check.help = "terraform fmt -check + validate (no credentials, never plans or applies)"
+
+scout.cmd = "fns scout --scope scope.lab.yaml"
+scout.help = "Live read-only scout of the lab (needs az login, see README)"
 
 demo.cmd = "fns demo scout"
 demo.help = "Replay the bundled fixture through scout (no tenant needed)"

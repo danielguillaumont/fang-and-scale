@@ -174,3 +174,23 @@ def test_mapping_is_injective(values: list[uuid.UUID]) -> None:
     mapped = [m.guid(str(v)) for v in values]
     kept = [str(v) for v in values if str(v) in wk.WELL_KNOWN_GUIDS]
     assert len(set(mapped)) == len(values) - len(kept) + len(set(kept))
+
+
+def test_user_names_are_replaced_but_app_names_are_kept() -> None:
+    m = IdMap()
+    user = {
+        "@odata.type": "#microsoft.graph.user",
+        "id": REAL_SP,
+        "displayName": "Ada Lovelace",
+        "givenName": "Ada",
+        "surname": "Lovelace",
+    }
+    app = {"@odata.type": "#microsoft.graph.servicePrincipal", "displayName": "sp-billing-agent"}
+    arm_ra = {"principalType": "User", "principalDisplayName": "Ada Lovelace"}
+    out = sanitize({"value": [user, app, arm_ra]}, m)
+    text = json.dumps(out)
+    assert "Ada" not in text
+    assert "Lovelace" not in text
+    assert out["value"][0]["displayName"] == out["value"][2]["principalDisplayName"] == "user-1"
+    assert out["value"][1]["displayName"] == "sp-billing-agent"
+    assert sanitize(out, m) == out
