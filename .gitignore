@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+*.pfx
+scope.lab.yaml
+fixtures/**/_idmap.json
+.claude/settings.local.json
+
+# Terraform
+lab/.terraform/
+lab/*.tfstate
+lab/*.tfstate.*
+lab/terraform.tfvars
+lab/.terraform.lock.hcl.bak
+crash.log
+
+# Runs
+.fns/
+runs/
+*.sqlite
