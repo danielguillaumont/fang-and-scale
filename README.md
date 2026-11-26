@@ -71,7 +71,9 @@ testing then puts back one dangerous grant at a time. The contract catches 5 of 
 the 3 survivors are real gaps in the contract (see `docs/DECISIONS.md`).
 
 **4. Report.** Coverage comes first, then the reach graph, findings and paths, the
-proof bundle and the mutation results.
+proof bundle and the mutation results. It is one self-contained HTML file with
+Cytoscape.js embedded (MIT, `src/fns/report/vendor/`), so it opens offline and
+makes no network request.
 
 Other commands: `fns harden`, `fns record` (turns logs into `must_still_do`),
 `fns detections check|export` (KQL rules as code), `fns comment`, and
