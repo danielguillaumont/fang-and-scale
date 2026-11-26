@@ -183,6 +183,45 @@ def scope_check(
     con.print(table)
 
 
+demo_app = typer.Typer(
+    help="Replay bundled fixtures (output is labelled FIXTURE).", no_args_is_help=True
+)
+app.add_typer(demo_app, name="demo")
+
+
+@demo_app.command("scout")
+def demo_scout(
+    out: Annotated[Path, typer.Option(help="Directory for the journal and snapshots.")] = Path(
+        ".fns"
+    ),
+) -> None:
+    """Replay the bundled demo tenant through the scope gate and collector."""
+    from pydantic import ValidationError
+
+    from fns.console import FixtureConsole
+    from fns.demo import render, run_demo_scout
+    from fns.fixtures.replay import FixtureError
+    from fns.journal.sqlite import JournalError
+    from fns.models.scope import ScopeExpiredError
+    from fns.yamlio import YamlError
+
+    con = FixtureConsole(make_console())
+    err = FixtureConsole(make_console(stderr=True))
+    try:
+        result = run_demo_scout(out)
+    except (
+        FixtureError,
+        JournalError,
+        ScopeExpiredError,
+        ValidationError,
+        YamlError,
+        OSError,
+    ) as exc:
+        err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    render(result, con)
+
+
 def _is_read(op: str) -> bool:
     from fns.models.operations import parse_operation
 

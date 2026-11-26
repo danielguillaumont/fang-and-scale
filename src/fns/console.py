@@ -7,6 +7,7 @@ default text/background so output stays readable on light and dark terminals.
 
 from __future__ import annotations
 
+import io
 from typing import IO, Final
 
 from rich.console import Console
@@ -67,3 +68,53 @@ def print_banner(console: Console) -> None:
     console.print(BANNER, style="fns.brand", markup=False)
     console.print(TAGLINE, style="fns.muted")
     console.print(f"fns {__version__}")
+
+
+class _EncodedBuffer(io.StringIO):
+    """A text buffer that reports the real stream's encoding, so Rich picks
+    ASCII box characters when the destination cannot encode Unicode ones."""
+
+    def __init__(self, encoding: str) -> None:
+        super().__init__()
+        self._encoding = encoding
+
+    @property
+    def encoding(self) -> str:  # type: ignore[override]
+        return self._encoding
+
+
+class FixtureConsole:
+    """Prefixes every rendered line with FIXTURE (CLAUDE.md rule 7).
+
+    Renderables (tables included) are rendered at a reduced width into a
+    buffer first, then each resulting line is printed behind the label, so no
+    line of replayed output can appear unlabelled.
+    """
+
+    LABEL: Final = "FIXTURE"
+
+    def __init__(self, console: Console) -> None:
+        self.console = console
+
+    def print(self, *objects: object, **kwargs: object) -> None:
+        from rich.text import Text
+
+        buf = _EncodedBuffer(self.console.encoding)
+        inner = Console(
+            theme=THEME,
+            file=buf,
+            width=max(40, self.console.width - len(self.LABEL) - 1),
+            color_system=self.console.color_system,  # type: ignore[arg-type]
+            force_terminal=self.console.is_terminal,
+            no_color=self.console.no_color,
+            highlight=False,
+            soft_wrap=True,
+        )
+        inner.print(*objects, **kwargs)  # type: ignore[arg-type]
+        lines = buf.getvalue().splitlines() or [""]
+        for line in lines:
+            self.console.print(
+                Text.assemble((self.LABEL, "fns.fixture"), " ", Text.from_ansi(line.rstrip())),
+                soft_wrap=True,
+                highlight=False,
+            )

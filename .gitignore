@@ -34,3 +34,4 @@ runs/
 # Tooling caches
 .hypothesis/
 .import_linter_cache/
+**/_idmap.json

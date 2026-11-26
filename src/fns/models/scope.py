@@ -17,7 +17,7 @@ from fns.models.armid import parse_arm_id
 from fns.models.base import FnsModel
 from fns.models.ids import ArmId, Guid, TzDatetime
 from fns.models.operations import OperationError, parse_operation
-from fns.yamlio import load_yaml
+from fns.yamlio import load_yaml, loads_yaml
 
 Verb = Literal["scout", "contain", "strike", "harden", "prove", "molt"]
 READ_ONLY_VERBS: Final[frozenset[str]] = frozenset({"scout", "contain", "prove", "molt"})
@@ -137,7 +137,15 @@ class ScopeExpiredError(ValueError):
 
 def load_scope(path: Path, *, now: datetime) -> ScopeManifest:
     """Load and validate ``scope.yaml``. Expired means invalid."""
-    manifest = ScopeManifest.model_validate(load_yaml(path))
+    return _checked(ScopeManifest.model_validate(load_yaml(path)), now)
+
+
+def parse_scope(text: str, *, now: datetime) -> ScopeManifest:
+    """Like :func:`load_scope`, from text (package resources, fixtures)."""
+    return _checked(ScopeManifest.model_validate(loads_yaml(text)), now)
+
+
+def _checked(manifest: ScopeManifest, now: datetime) -> ScopeManifest:
     if manifest.is_expired(now):
         raise ScopeExpiredError(f"scope manifest expired at {manifest.expires_at.isoformat()}")
     return manifest
