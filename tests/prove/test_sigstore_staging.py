@@ -361,3 +361,20 @@ def test_workflow_signs_the_recorded_fixture_not_a_live_run() -> None:
     runs = "\n".join(s.get("run", "") for s in job["steps"])
     assert "--live" not in runs
     assert "fns demo scout --fixture" in runs
+
+
+def test_the_prove_step_reads_the_exit_code_before_errexit_can_stop_it() -> None:
+    """Steps run under bash -eo pipefail; the expected exit 1 must not end the step.
+
+    Regression: the first run on main signed on staging, then stopped at the
+    pipeline's exit 1 before the code check, so the verify step never ran.
+    """
+    doc = _load(WORKFLOW)
+    (job,) = doc["jobs"].values()
+    step = next(s for s in job["steps"] if s.get("id") == "prove")
+    lines = [ln.strip() for ln in step["run"].splitlines()]
+    commands = [ln for ln in lines if ln and not ln.startswith("#")]
+    assert commands[0].startswith("set +e"), commands[0]
+    read = commands.index("code=${PIPESTATUS[0]}")
+    assert commands[read + 1] == "set -e"
+    assert not any(c.startswith("set -e") for c in commands[:read])
