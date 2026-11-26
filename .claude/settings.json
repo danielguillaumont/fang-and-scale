@@ -6,19 +6,28 @@
     "sessionUrl": false
   },
   "permissions": {
+    "allow": [
+      "Bash(git push*)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./lab/*.tfstate)",
       "Read(./lab/*.tfstate.*)",
       "Read(./lab/terraform.tfvars)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push origin main*)",
+      "Bash(git push -u origin main*)",
+      "Bash(gh repo delete*)",
+      "Bash(gh secret*)",
       "Bash(terraform destroy*)",
-      "Bash(az role assignment create*)",
-      "Bash(az ad app credential*)"
+      "Bash(az *)"
     ],
     "ask": [
       "Bash(terraform apply*)",
-      "Bash(git push*)",
       "Bash(gh repo*)"
     ]
   }
