@@ -1,9 +1,30 @@
 # M3 P5: live plan (probes, data-plane scope gate, Sigstore in CI)
 
-**Status: plan only, written 2026-11-26.** Nothing in this document has been sent
-to Azure, Graph or Sigstore. It covers what M3 P5 (`docs/milestones/M3.md`) needs
-before the gate can run on the lab. It also proposes the decisions to approve and
-drafts the runbook, `docs/runbooks/m3-live-run.md`.
+**Status: approved and built, 2026-11-26.** V1 to V6 are approved:
+- V3 is staging only until the repository is public;
+- V6 has conditions.
+
+Both are recorded in `docs/DECISIONS.md`. The offline PRs #29 to #34 are merged.
+**The runbook is `docs/runbooks/m3-live-run.md`.** Section 10 below is the
+original draft, kept for the record and superseded.
+
+Corrections from the build, which the runbook already follows:
+
+- **6 `prove` operations, not 5.** The V6 pre-flight adds
+  `arm:Microsoft.KeyVault/vaults/secrets/read`, a metadata read that never
+  returns the value.
+- **Data-plane reads are bound to their resource** (`data_objects` in
+  `scope.yaml`), so the payroll path cannot be requested from the invoices
+  account. The test identity also carries `app_id`, for the V4 `appid` check.
+- **14 requests, not "at most 13".** That is 13 distinct probes plus the
+  pre-flight. The journal holds 17 `probe:` steps, one per frozen spec, and 14
+  gate decisions, because a question asked for two findings is sent once.
+- **The apply is not local-only.**
+  - The secret gets the tag `fns-data = synthetic` (an in-place update).
+  - The scope is renewed, because it expires on 2026-12-03.
+  - Expected plan: 2 to add, 1 to change, 2 to destroy.
+- **Both certificates last at most 1 day.** The agent and the scout each sign in
+  under a temporary `AZURE_CONFIG_DIR`.
 
 M3's gate (PLAN §8): live probes confirm or refute each path, `fns prove` runs
 under `id-verifier`, and the bundle verifies with Sigstore.
@@ -26,8 +47,9 @@ rule-2 change, so it is plan-first and comes with negative tests.
 
 **Actions in the tenant** (the draft runbook, section 10). You run all of them:
 
-- One Terraform apply. It re-renders `scope.lab.yaml` with a `prove` block. That
-  is a local file only, with no Azure or Entra change.
+- One Terraform apply. It re-renders `scope.lab.yaml` with a `prove` block,
+  renews its expiry, and tags the synthetic secret `fns-data = synthetic`. That
+  last change is in place, and the value is unchanged.
 - A short-lived certificate on `sp-fns-scout` for a fresh scout, removed at the
   end. This is the same as in M1 and M2.
 - A short-lived certificate on **`sp-billing-agent`**, so the probes run as the
@@ -38,9 +60,9 @@ rule-2 change, so it is plan-first and comes with negative tests.
 ## 1. What each probe does in the tenant
 
 The seeded lab contract freezes 17 probe specs. They are 13 distinct probes
-(9 rung-2 and 4 rung-3), and the journal key `probe:<id>` runs each one once. So
-a live `fns prove` sends **at most 13 requests**, all of them `GET` or `HEAD`, all
-as `sp-billing-agent`. Contract items on `directory:tenant` and on the two
+(9 rung-2 and 4 rung-3). Each distinct probe is sent once, and the secret read
+first sends a metadata pre-flight (V6). So a live `fns prove` sends **14
+requests**, all of them `GET` or `HEAD`, all as `sp-billing-agent`. Contract items on `directory:tenant` and on the two
 applications have no probe. Their paths start with an escalation write (E2), so
 they stay `fail` at rung 1.
 
@@ -121,7 +143,7 @@ FINDINGS entry.
   in the lab, so the probes leave no data-plane log entries. Storage
   last-access-time tracking is off by default, and the lab does not turn it on.
 - **Contract budget.** The scope budget is 500 calls and 15 minutes. Scout uses
-  34 calls, and prove uses at most 13.
+  34 calls, and prove uses 14.
 
 ### Expected verdicts (unhardened lab)
 
@@ -398,7 +420,7 @@ never run.
   costs nothing now. It does cost the observed denial that a `pass` needs after
   M4 hardening.
 
-## 10. Draft runbook: `docs/runbooks/m3-live-run.md`
+## 10. Draft runbook (superseded by `docs/runbooks/m3-live-run.md`)
 
 The commands are Windows PowerShell, from the repository root. Use the lab from
 M1 and M2, which stays up. **Do not run this until PRs 1 to 4 are merged and you
