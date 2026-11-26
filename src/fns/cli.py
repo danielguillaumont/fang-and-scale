@@ -100,9 +100,49 @@ def scout(
 
 
 @app.command()
-def contain() -> None:
-    """Assumed-compromise reach and contract evaluation (Antivenom, M2)."""
-    _not_implemented("contain")
+def contain(
+    contract: Annotated[Path, typer.Option(help="Contract file (*.fns.yaml).")],
+    snapshot: Annotated[
+        Path, typer.Option(help="Snapshot JSON written by `fns scout` (.fns/snapshots/...).")
+    ],
+    json_out: Annotated[
+        Path | None,
+        typer.Option("--json", help="Write the report here (default .fns/reports/)."),
+    ] = None,
+    out: Annotated[Path, typer.Option(help="Directory for reports.")] = Path(".fns"),
+    alternatives: Annotated[
+        int, typer.Option(min=0, max=3, help="Alternative paths to print per failure.")
+    ] = 0,
+) -> None:
+    """Assumed-compromise reach and contract evaluation (Antivenom). Offline.
+
+    Exit 0 within budget, 1 contract failed, 3 inconclusive over budget.
+    """
+    from pydantic import ValidationError
+
+    from fns.console import FixtureConsole
+    from fns.contain_run import contain as run_contain
+    from fns.contain_run import load_snapshot, write_report
+    from fns.models.contract import load_contract
+    from fns.report.contain_text import render_contain
+    from fns.yamlio import YamlError
+
+    err = make_console(stderr=True)
+    try:
+        c = load_contract(contract)
+        snap = load_snapshot(snapshot)
+    except FileNotFoundError as exc:
+        err.print(f"not found: {exc.filename}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    except (ValidationError, YamlError, ValueError) as exc:
+        err.print(f"invalid input: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    report = run_contain(c, snap)
+    con = FixtureConsole(make_console()) if snap.mode == "FIXTURE" else make_console()
+    render_contain(report, con, max_alternatives=alternatives)
+    path = write_report(report, json_out, out)
+    con.print(f"wrote {path.as_posix()}", style="fns.muted", markup=False)
+    raise typer.Exit(report.summary.exit_code)
 
 
 @app.command()
@@ -138,7 +178,7 @@ def schema(
         bool, typer.Option("--check", help="Fail if committed schemas differ from the models.")
     ] = False,
 ) -> None:
-    """Write JSON Schemas for scope.yaml, contracts and snapshots."""
+    """Write JSON Schemas for scope.yaml, contracts, snapshots and contain reports."""
     from fns import schema as schema_mod
 
     con = make_console()
@@ -265,6 +305,65 @@ def demo_scout(
         err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
     render(result, con, fixture.as_posix() if fixture else DEMO_FIXTURE)
+
+
+@demo_app.command("contain")
+def demo_contain(
+    out: Annotated[
+        Path, typer.Option(help="Directory for the journal, snapshot and report.")
+    ] = Path(".fns"),
+    fixture: Annotated[
+        Path | None,
+        typer.Option(help="Replay a recorded fixture set (uses its contract.fns.yaml)."),
+    ] = None,
+    contract: Annotated[
+        Path | None, typer.Option(help="Evaluate this contract instead of the fixture's.")
+    ] = None,
+    json_out: Annotated[
+        Path | None,
+        typer.Option("--json", help="Write the report here (default <out>/reports/)."),
+    ] = None,
+    alternatives: Annotated[
+        int, typer.Option(min=0, max=3, help="Alternative paths to print per failure.")
+    ] = 0,
+) -> None:
+    """Replay a fixture through scout, then run `fns contain` on it (labelled FIXTURE).
+
+    The bundled demo contract fails on purpose: exit 1 is the expected result.
+    """
+    from pydantic import ValidationError
+
+    from fns.console import FixtureConsole
+    from fns.contain_run import run_demo_contain, write_report
+    from fns.demo import DEMO_FIXTURE
+    from fns.fixtures.replay import FixtureError
+    from fns.journal.sqlite import JournalError
+    from fns.models.contract import load_contract
+    from fns.models.scope import ScopeExpiredError
+    from fns.report.contain_text import render_contain
+    from fns.yamlio import YamlError
+
+    con = FixtureConsole(make_console())
+    err = FixtureConsole(make_console(stderr=True))
+    try:
+        c = load_contract(contract) if contract is not None else None
+        _scout, report = run_demo_contain(out, fixture, c)
+    except (
+        FixtureError,
+        JournalError,
+        ScopeExpiredError,
+        ValidationError,
+        YamlError,
+        OSError,
+    ) as exc:
+        err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    source = fixture.as_posix() if fixture else DEMO_FIXTURE
+    con.print(f"Replaying fixture {source!r}; no network calls are made.", style="fns.muted")
+    render_contain(report, con, max_alternatives=alternatives)
+    path = write_report(report, json_out, out)
+    con.print(f"wrote {path.as_posix()}", style="fns.muted", markup=False)
+    raise typer.Exit(report.summary.exit_code)
 
 
 def _is_read(op: str) -> bool:

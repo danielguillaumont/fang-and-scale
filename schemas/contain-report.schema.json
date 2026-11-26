@@ -1,0 +1,469 @@
+{
+  "$defs": {
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "sha256 of the stored request/response artifact.",
+          "title": "Artifact Digest"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
+        },
+        "outcome": {
+          "enum": [
+            "allowed",
+            "denied",
+            "unknown",
+            "not-run"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "path_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The escalation path this evidence rests on, in the enclosing ContainReport.",
+          "title": "Path Id"
+        },
+        "rung": {
+          "enum": [
+            "modeled",
+            "evaluated",
+            "observed",
+            "logged"
+          ],
+          "title": "Rung",
+          "type": "string"
+        },
+        "source": {
+          "description": "What produced it: a scope operation, probe name, or log query name.",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rung",
+        "outcome",
+        "source"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "minLength": 1,
+          "title": "Contract",
+          "type": "string"
+        },
+        "coverage": {
+          "enum": [
+            "verified",
+            "evaluated-only",
+            "modeled-only",
+            "not-assessed",
+            "out-of-scope"
+          ],
+          "title": "Coverage",
+          "type": "string"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "gap": {
+          "anyOf": [
+            {
+              "enum": [
+                "model-gap",
+                "platform-gap",
+                "detection-gap"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gap"
+        },
+        "id": {
+          "description": "sha256 of (contract, item_kind, target, operation); computed if omitted.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "item_kind": {
+          "enum": [
+            "must_not_reach",
+            "must_still_do"
+          ],
+          "title": "Item Kind",
+          "type": "string"
+        },
+        "operation": {
+          "minLength": 1,
+          "title": "Operation",
+          "type": "string"
+        },
+        "reasons": {
+          "description": "Human-readable explanation; at least one, in the order they apply.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "target": {
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "contract",
+        "item_kind",
+        "target",
+        "operation",
+        "verdict",
+        "coverage",
+        "reasons"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "PathStep": {
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "description": "``assume-compromised``, ``snapshot``, an escalation rule, or the final way.",
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Rule",
+          "type": "string"
+        },
+        "sources": {
+          "default": [],
+          "description": "Snapshot facts this hop rests on, with the scope operation that collected them.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule",
+        "text"
+      ],
+      "title": "PathStep",
+      "type": "object"
+    },
+    "ReachPath": {
+      "additionalProperties": false,
+      "properties": {
+        "assumptions": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "finding_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "partial": {
+          "default": false,
+          "description": "The grant covers only part of the target (a child scope, or owned objects).",
+          "title": "Partial",
+          "type": "boolean"
+        },
+        "rank": {
+          "description": "0 is the shortest path; higher ranks are alternatives.",
+          "minimum": 0,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "rung": {
+          "default": "modeled",
+          "enum": [
+            "modeled",
+            "evaluated",
+            "observed",
+            "logged"
+          ],
+          "title": "Rung",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PathStep"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "finding_id",
+        "rank",
+        "steps"
+      ],
+      "title": "ReachPath",
+      "type": "object"
+    },
+    "ReportSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "description": "Failed must_not_reach findings.",
+          "minimum": 0,
+          "title": "Critical",
+          "type": "integer"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            1,
+            3
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "inconclusive": {
+          "minimum": 0,
+          "title": "Inconclusive",
+          "type": "integer"
+        },
+        "max_critical_reachable": {
+          "minimum": 0,
+          "title": "Max Critical Reachable",
+          "type": "integer"
+        },
+        "max_inconclusive": {
+          "minimum": 0,
+          "title": "Max Inconclusive",
+          "type": "integer"
+        },
+        "on_inconclusive": {
+          "enum": [
+            "fail",
+            "warn"
+          ],
+          "title": "On Inconclusive",
+          "type": "string"
+        },
+        "still_do_failed": {
+          "minimum": 0,
+          "title": "Still Do Failed",
+          "type": "integer"
+        },
+        "warning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Warning"
+        }
+      },
+      "required": [
+        "critical",
+        "max_critical_reachable",
+        "still_do_failed",
+        "inconclusive",
+        "max_inconclusive",
+        "on_inconclusive",
+        "exit_code"
+      ],
+      "title": "ReportSummary",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "compromised": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Object ID of the assumed-compromised identity, or None if it did not resolve.",
+      "title": "Compromised"
+    },
+    "compromised_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Compromised Name"
+    },
+    "contract": {
+      "minLength": 1,
+      "title": "Contract",
+      "type": "string"
+    },
+    "contract_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Digest",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "paths": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReachPath"
+      },
+      "title": "Paths",
+      "type": "array"
+    },
+    "semantics_version": {
+      "minimum": 0,
+      "title": "Semantics Version",
+      "type": "integer"
+    },
+    "snapshot_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Digest",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/ReportSummary"
+    },
+    "tenant_id": {
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "tool_version": {
+      "title": "Tool Version",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "mode",
+    "contract",
+    "contract_digest",
+    "snapshot_digest",
+    "tenant_id",
+    "semantics_version",
+    "compromised",
+    "generated_at",
+    "tool_version",
+    "findings",
+    "summary"
+  ],
+  "title": "ContainReport",
+  "type": "object"
+}

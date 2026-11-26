@@ -1,0 +1,23 @@
+# The seeded billing-agent contract (docs/PLAN.md section 3) with the resource
+# names of the bundled demo tenant. `fns demo contain` evaluates it.
+version: 1
+contract: billing-agent-blast-radius
+assume_compromised: sp:sp-billing-agent
+
+must_not_reach:
+  - resource: kv-crown-jewels
+    operations: [secrets/get, secrets/list]
+  - directory: tenant
+    operations: [roleAssignments/write, applications/credentials/update]
+  - resource: stpayroll
+    operations: [listKeys, blob/read]
+
+must_still_do:
+  - resource: stinvoices
+    operations: [blob/read, blob/write]
+    source: declared
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 2
+on_inconclusive: fail
