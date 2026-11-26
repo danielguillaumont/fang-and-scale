@@ -41,7 +41,8 @@
             "complete",
             "partial",
             "failed",
-            "skipped"
+            "skipped",
+            "not-applicable"
           ],
           "title": "Status",
           "type": "string"
@@ -414,6 +415,78 @@
       "title": "HasDirectoryRole",
       "type": "object"
     },
+    "HasEligibleRole": {
+      "additionalProperties": false,
+      "description": "principal -> role it is *eligible* for through PIM (not active).\n\n``plane`` directory: dst is the Entra role definition (template GUID).\n``plane`` arm: dst is the ARM scope; the role definition is an attribute.\nThe reach model does not activate eligibility: it makes dependent findings\ninconclusive instead (M3 E1).",
+      "properties": {
+        "directory_scope_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "'/' or '/<objectId>' for the directory plane; None for ARM.",
+          "title": "Directory Scope Id"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "plane": {
+          "enum": [
+            "directory",
+            "arm"
+          ],
+          "title": "Plane",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "role_definition_id": {
+          "minLength": 1,
+          "title": "Role Definition Id",
+          "type": "string"
+        },
+        "schedule_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schedule Id"
+        },
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "type": {
+          "const": "hasEligibleRole",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "src",
+        "dst",
+        "provenance",
+        "type",
+        "plane",
+        "role_definition_id"
+      ],
+      "title": "HasEligibleRole",
+      "type": "object"
+    },
     "HasIdentity": {
       "additionalProperties": false,
       "description": "ARM resource -> managed identity it runs as.",
@@ -568,6 +641,38 @@
       "title": "MemberOf",
       "type": "object"
     },
+    "NotApplicable": {
+      "additionalProperties": false,
+      "description": "A surface that does not exist in this tenant, and the responses that show it.",
+      "properties": {
+        "evidence": {
+          "description": "What was observed, e.g. the status and error code of a listing, and the\nsubscribed SKUs. Order is the order of the requests.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "surface": {
+          "minLength": 1,
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surface",
+        "reason",
+        "evidence"
+      ],
+      "title": "NotApplicable",
+      "type": "object"
+    },
     "NotCollected": {
       "additionalProperties": false,
       "properties": {
@@ -666,6 +771,15 @@
           "title": "Collectors",
           "type": "array"
         },
+        "not_applicable": {
+          "default": [],
+          "description": "Surfaces shown not to exist; findings do not wait on them.",
+          "items": {
+            "$ref": "#/$defs/NotApplicable"
+          },
+          "title": "Not Applicable",
+          "type": "array"
+        },
         "not_collected": {
           "default": [],
           "items": {
@@ -696,6 +810,7 @@
       "$ref": "#/$defs/SnapshotCoverage",
       "default": {
         "collectors": [],
+        "not_applicable": [],
         "not_collected": []
       }
     },
@@ -709,6 +824,7 @@
             "hasAccessPolicy": "#/$defs/HasAccessPolicy",
             "hasAppRole": "#/$defs/HasAppRole",
             "hasDirectoryRole": "#/$defs/HasDirectoryRole",
+            "hasEligibleRole": "#/$defs/HasEligibleRole",
             "hasIdentity": "#/$defs/HasIdentity",
             "hasRbacRole": "#/$defs/HasRbacRole",
             "instanceOf": "#/$defs/InstanceOf",
@@ -747,6 +863,9 @@
           },
           {
             "$ref": "#/$defs/HasAccessPolicy"
+          },
+          {
+            "$ref": "#/$defs/HasEligibleRole"
           }
         ]
       },

@@ -40,6 +40,9 @@ class FnsModel(BaseModel):
     )
 
     __volatile__: ClassVar[frozenset[str]] = frozenset()
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset()
+    """Fields added after data was recorded: left out of the canonical form while
+    empty, so digests of earlier snapshots and reports do not change."""
 
     def canonical_json(self, *, for_digest: bool = False) -> str:
         return canonical_dumps(to_canonical(self, for_digest=for_digest))
@@ -56,10 +59,11 @@ def to_canonical(value: Any, *, for_digest: bool = False) -> Any:
         volatile: frozenset[str] = (
             getattr(cls, "__volatile__", frozenset()) if for_digest else frozenset()
         )
+        omit: frozenset[str] = getattr(cls, "__omit_empty__", frozenset())
         return {
             name: to_canonical(getattr(value, name), for_digest=for_digest)
             for name in cls.model_fields
-            if name not in volatile
+            if name not in volatile and not (name in omit and getattr(value, name) in ((), None))
         }
     if value is None or isinstance(value, (bool, str)):
         return value
