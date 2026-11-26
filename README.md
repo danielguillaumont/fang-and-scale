@@ -85,7 +85,9 @@ Why this set:
 - **Directory.Read.All** is the broadest grant here: read access to the whole
   directory. It is included because membership and owner objects of type user or
   group are not fully returned with `Application.Read.All` alone. The first live
-  run checks whether it can be dropped, and the result goes in `docs/FINDINGS.md`.
+  run (2026-11-26) showed the set is sufficient: scouting as `sp-fns-scout` gave
+  the same digest as scouting as the lab admin. Whether `Directory.Read.All` can
+  be dropped is the next live test (`docs/FINDINGS.md`).
 - Not granted: anything `ReadWrite`, `Policy.Read.All` (Conditional Access is not
   collected in M1), audit or sign-in logs, and Key Vault or Storage data roles.
 
