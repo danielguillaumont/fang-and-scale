@@ -144,3 +144,20 @@ def test_verifier_environment_is_scrubbed(monkeypatch: pytest.MonkeyPatch) -> No
         prove_run.spawn_verifier(["check", "--run", "x"])
     assert "AZURE_CLIENT_SECRET" not in seen["env"]  # type: ignore[operator]
     assert seen["argv"][1:3] == ["-m", "fns.verify"]  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ([], "exactly one of --probes FILE or --live"),
+        (["--live", "--probes", "p.json"], "exactly one of --probes FILE or --live"),
+        (["--probes", "p.json", "--record", "x"], "--record needs --live"),
+    ],
+)
+def test_prove_needs_probes_or_live(tmp_path: Path, extra: list[str], message: str) -> None:
+    result = runner.invoke(
+        app,
+        ["prove", "--contract", "c.yaml", "--snapshot", "s.json", "--out", str(tmp_path), *extra],
+    )
+    assert result.exit_code == 2, result.output
+    assert message in result.output

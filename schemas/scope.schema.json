@@ -50,6 +50,20 @@
       "additionalProperties": false,
       "description": "An identity the executor may act as (``strike``).",
       "properties": {
+        "app_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Application (client) ID. When set, ``fns prove --live`` also requires the\ntoken's ``appid`` to match it (decision V4).",
+          "title": "App Id"
+        },
         "kind": {
           "enum": [
             "servicePrincipal",

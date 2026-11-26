@@ -13,7 +13,7 @@ from fns.journal.sqlite import SqliteJournal
 from fns.models.assertions import PROBE_RUNG, AssertionSet, ProbeObservation, ProbeSpec, probe_id
 from fns.models.scope import ScopeManifest
 from fns.probes.base import ProbeUnavailableError
-from fns.probes.data_read import DataReadProbe, RoutedProbe
+from fns.probes.data_read import RoutedProbe
 from fns.probes.mock import MockProbe, MockResults
 from fns.probes.permissions import OPERATION, ArmPermissionsProbe, permits
 from fns.probes.runner import run_probes
@@ -136,7 +136,7 @@ def test_permissions_probe_rejects_malformed_bodies() -> None:
         permits({"value": [1]}, "x", data_plane=False)
 
 
-def test_live_data_reads_are_unavailable_until_the_gate_can_name_them() -> None:
+def test_routed_probe_without_a_probe_for_the_kind() -> None:
     spec = ProbeSpec(
         id="d" * 64,
         kind="data-read",
@@ -145,8 +145,6 @@ def test_live_data_reads_are_unavailable_until_the_gate_can_name_them() -> None:
         target=KV,
         action="secrets/get",
     )
-    with pytest.raises(ProbeUnavailableError, match=r"P5.1"):
-        DataReadProbe().observe(spec, FID)
     with pytest.raises(ProbeUnavailableError, match="no probe"):
         RoutedProbe({}, mode="LIVE").observe(spec, FID)
 
