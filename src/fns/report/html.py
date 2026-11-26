@@ -2,10 +2,11 @@
 
 One self-contained file. Every value from a tenant (names, step texts, sources)
 is untrusted (PLAN section 9) and is escaped; the graph data is embedded as
-JSON with ``<``, ``>`` and ``&`` escaped and shown with ``textContent`` only. The
-only network fetch is Cytoscape from cdnjs, pinned and checked with SRI. A
-Content-Security-Policy blocks every other script, so the page still reads
-completely without it (the paths are also written out as text).
+JSON with ``<``, ``>`` and ``&`` escaped and shown with ``textContent`` only.
+Cytoscape is vendored (``vendor/``, MIT) and embedded, so the page makes no network
+request and renders offline. A Content-Security-Policy allows exactly two inline
+scripts by hash, Cytoscape and the page's own, and nothing else; the paths are
+also written out as text.
 """
 
 from __future__ import annotations
@@ -15,7 +16,9 @@ import hashlib
 import json
 from collections import Counter
 from dataclasses import dataclass
+from functools import cache
 from html import escape
+from importlib.resources import files
 from typing import Any, Final
 
 from fns.models.bundle import EvidenceBundle
@@ -23,8 +26,14 @@ from fns.models.evidence import RUNG_ORDER, CoverageState, Finding
 from fns.models.mutation import MutationReport
 from fns.models.report import ContainReport
 
-CYTOSCAPE_URL: Final = "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.30.2/cytoscape.min.js"
+CYTOSCAPE_VERSION: Final = "3.30.2"
+CYTOSCAPE_FILE: Final = f"cytoscape-{CYTOSCAPE_VERSION}.min.js"
+CYTOSCAPE_SOURCE: Final = (
+    f"https://cdnjs.cloudflare.com/ajax/libs/cytoscape/{CYTOSCAPE_VERSION}/cytoscape.min.js"
+)
+"""Where the vendored file came from (provenance only; the page never loads it)."""
 CYTOSCAPE_SRI: Final = "sha384-IWROdLKRsN1UuJywMlWl7/blXQ8GEooN2n7dzTxfEPd7ybYIKCUJ2Ol/1Gpf3YV4"
+"""The published SRI hash of that file; the vendored copy must match it byte for byte."""
 COVERAGE_ORDER: Final[tuple[CoverageState, ...]] = (
     "verified",
     "evaluated-only",
@@ -218,12 +227,32 @@ out.textContent=d.text+(d.sources.length?'\\n'+d.sources.join('\\n'):'');});
 })();"""
 
 
+class VendorError(RuntimeError):
+    """The vendored Cytoscape file is missing or differs from the pinned hash."""
+
+
+@cache
+def cytoscape_js() -> str:
+    """The vendored Cytoscape, checked against the pinned SRI hash before use."""
+    data = files("fns.report").joinpath("vendor", CYTOSCAPE_FILE).read_bytes()
+    actual = "sha384-" + base64.b64encode(hashlib.sha384(data).digest()).decode()
+    if actual != CYTOSCAPE_SRI:
+        raise VendorError(f"vendor/{CYTOSCAPE_FILE} is {actual}, expected {CYTOSCAPE_SRI}")
+    text = data.decode("utf-8")
+    if "</script" in text.lower() or "<!--" in text:
+        raise VendorError(f"vendor/{CYTOSCAPE_FILE} cannot be embedded in a script element")
+    return text
+
+
+def _sha256(script: str) -> str:
+    return base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode()
+
+
 def _csp() -> str:
-    digest = base64.b64encode(hashlib.sha256(SCRIPT.encode()).digest()).decode()
     return (
         "default-src 'none'; img-src data:; style-src 'unsafe-inline'; "
-        f"script-src https://cdnjs.cloudflare.com 'sha256-{digest}'; "
-        "base-uri 'none'; form-action 'none'"
+        f"script-src 'sha256-{_sha256(cytoscape_js())}' 'sha256-{_sha256(SCRIPT)}'; "
+        "connect-src 'none'; base-uri 'none'; form-action 'none'"
     )
 
 
@@ -443,8 +472,8 @@ def render_html(inputs: Inputs) -> str:
         f"</code><br>Report digest <code>{_e(c.digest())}</code><br>Semantics v"
         f"{c.semantics_version}, fns {_e(c.tool_version)}, "
         f"generated {_e(c.generated_at.isoformat())}"
-        "</p><p>Read-only page built from files. The only network request loads Cytoscape "
-        "from cdnjs (pinned, SRI-checked).</p></footer>",
+        "</p><p>Read-only page built from files. It makes no network request: Cytoscape "
+        f"{CYTOSCAPE_VERSION} (MIT licence, The Cytoscape Consortium) is embedded.</p></footer>",
     ]
     return (
         '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
@@ -454,7 +483,6 @@ def render_html(inputs: Inputs) -> str:
         + "".join(body)
         + "</main>"
         f'<script type="application/json" id="fns-graph">{_safe_json(graph_elements(c))}</script>'
-        f'<script src="{CYTOSCAPE_URL}" integrity="{CYTOSCAPE_SRI}" crossorigin="anonymous" '
-        'referrerpolicy="no-referrer"></script>'
+        f"<script>{cytoscape_js()}</script>"
         f"<script>{SCRIPT}</script></body></html>\n"
     )

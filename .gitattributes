@@ -4,3 +4,7 @@
 *.sqlite binary
 *.png binary
 *.ico binary
+
+# Vendored third-party files stay byte for byte as published (hash-checked).
+src/fns/report/vendor/*.js -text
+src/fns/report/vendor/*.LICENSE -text

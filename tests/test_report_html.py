@@ -18,11 +18,13 @@ from fns.fixtures.replay import bundled
 from fns.models.report import ContainReport
 from fns.mutate_cli import run as run_mutation
 from fns.report.html import (
+    CYTOSCAPE_FILE,
     CYTOSCAPE_SRI,
     SCRIPT,
     Inputs,
     ReportInputError,
     check,
+    cytoscape_js,
     graph_elements,
     render_html,
 )
@@ -59,10 +61,34 @@ def test_page_leads_with_coverage_and_is_deterministic(lab_report: ContainReport
     assert page == render_html(Inputs(lab_report))
     assert page.index('id="coverage"') < page.index('id="graph-h"') < page.index('id="findings"')
     assert "FIXTURE: replayed" in page and "<title>FIXTURE" in page
-    assert CYTOSCAPE_SRI in page
     script_hash = base64.b64encode(hashlib.sha256(SCRIPT.encode()).digest()).decode()
     assert f"'sha256-{script_hash}'" in page
     assert f"<script>{SCRIPT}</script>" in page
+
+
+def _sha(algo: str, data: bytes) -> str:
+    return base64.b64encode(hashlib.new(algo, data).digest()).decode()
+
+
+def test_vendored_cytoscape_is_the_pinned_file() -> None:
+    data = (ROOT / "src" / "fns" / "report" / "vendor" / CYTOSCAPE_FILE).read_bytes()
+    assert f"sha384-{_sha('sha384', data)}" == CYTOSCAPE_SRI
+    assert (ROOT / "src" / "fns" / "report" / "vendor" / "cytoscape-3.30.2.LICENSE").is_file()
+    assert data.startswith(b"/**\n * Copyright (c) 2016-2024, The Cytoscape Consortium.")
+
+
+def test_report_renders_offline(lab_report: ContainReport) -> None:
+    page = render_html(Inputs(lab_report))
+    assert f"<script>{cytoscape_js()}</script>" in page
+    own = page.replace(cytoscape_js(), "")  # its licence comments name web sites
+    assert "http://" not in own and "https://" not in own and "cdnjs" not in own
+    assert " src=" not in own and " href=" not in own
+    assert "Permission is hereby granted" in page  # the MIT notice travels with the code
+    csp = re.search(r'Content-Security-Policy" content="([^"]+)"', page)
+    assert csp
+    hashes = re.findall(r"'sha256-([A-Za-z0-9+/=]+)'", csp.group(1))
+    assert hashes == [_sha("sha256", cytoscape_js().encode()), _sha("sha256", SCRIPT.encode())]
+    assert "https:" not in csp.group(1) and "connect-src 'none'" in csp.group(1)
 
 
 def test_tenant_strings_are_escaped(lab_report: ContainReport) -> None:
