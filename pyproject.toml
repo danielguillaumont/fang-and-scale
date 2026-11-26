@@ -4,6 +4,11 @@ version = "0.0.1"
 description = "Unit tests for breach blast radius in Microsoft Entra and Azure."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Daniel Guillaumont", email = "181521129+danielguillaumont@users.noreply.github.com" },
+]
 dependencies = [
     "pydantic>=2.10",
     "pyyaml>=6.0.2",

@@ -17,3 +17,7 @@ uv run poe setup    # install deps and pre-commit hooks
 uv run poe check    # ruff + mypy + import boundaries + pytest
 uv run fns --help
 ```
+
+## License
+
+Apache-2.0. See `LICENSE`.
