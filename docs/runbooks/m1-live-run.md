@@ -134,7 +134,7 @@ Creates locally:
 - `lab/terraform.tfstate`: gitignored; it contains the synthetic secret.
 - `scope.lab.yaml`: gitignored; real lab IDs, the 12 read operations, budget 500
   calls / 15 minutes, expires 7 days after creation. To renew it:
-  `terraform -chdir=lab apply -replace=time_offset.scope_expiry`.
+  `terraform -chdir=lab apply "-replace=time_offset.scope_expiry"`.
 
 `fns scope check` should print the lab tenant, subscription, `rg-fns-lab`, 12
 scout operations and the expiry.

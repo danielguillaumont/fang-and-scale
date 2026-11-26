@@ -1,6 +1,6 @@
 # Renders ../scope.lab.yaml (gitignored) for `fns scout` and `fns prove --live`. The expiry is fixed when
 # the lab is created (time_offset), so plans stay stable; re-render it with:
-#   terraform -chdir=lab apply -replace=time_offset.scope_expiry
+#   terraform -chdir=lab apply "-replace=time_offset.scope_expiry"   (quoted for PowerShell)
 
 resource "time_offset" "scope_expiry" {
   offset_days = var.scope_valid_days

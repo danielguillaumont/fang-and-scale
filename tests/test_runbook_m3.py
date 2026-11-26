@@ -115,9 +115,40 @@ def test_emergency_cleanup_covers_both_identities_and_the_pem_files() -> None:
 
 
 def test_the_scope_is_renewed() -> None:
-    assert "terraform -chdir=lab apply -replace=time_offset.scope_expiry" in COMMANDS
+    # Unquoted, PowerShell mangled -replace=a.b in the M3 live run (2026-11-26).
+    assert 'terraform -chdir=lab apply "-replace=time_offset.scope_expiry"' in COMMANDS
+    assert "terraform -chdir=lab apply -replace=" not in TEXT
     assert "2026-12-03" in TEXT
     assert "**2 to add, 1 to change, 2\nto destroy**" in TEXT
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "docs/runbooks/m1-live-run.md",
+        "docs/runbooks/m2-live-run.md",
+        "docs/runbooks/m3-live-run.md",
+        "docs/milestones/M3-live-plan.md",
+        "lab/scope.tf",
+    ],
+)
+def test_the_replace_argument_is_quoted_everywhere(path: str) -> None:
+    text = (ROOT / path).read_text(encoding="utf-8")
+    assert '"-replace=time_offset.scope_expiry"' in text
+    assert " -replace=time_offset" not in text
+
+
+@pytest.mark.parametrize("var", ["$scoutDir", "$agentDir", "$p"])
+def test_temp_profiles_are_removed_with_a_retry(var: str) -> None:
+    """In M3 one Remove-Item failed on a file Windows still held, and worked 10 s later."""
+    assert f"Remove-Item -Recurse -Force {var} -ErrorAction SilentlyContinue" in COMMANDS
+    i = COMMANDS.index(f"Remove-Item -Recurse -Force {var} -ErrorAction SilentlyContinue")
+    assert COMMANDS[i - 1] == "foreach ($i in 1..5) {"
+    assert COMMANDS[i + 1] == f"if (-not (Test-Path {var})) {{ break }}"
+    assert COMMANDS[i + 2] == "Start-Sleep -Seconds 3"
+    assert not [
+        c for c in COMMANDS if c.startswith("Remove-Item -Recurse -Force") and c.endswith("Dir")
+    ]
 
 
 def test_the_secret_value_is_never_read_by_hand() -> None:
