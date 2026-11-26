@@ -66,6 +66,7 @@ def test_cli_schema_writes_lf_files(tmp_path: Path) -> None:
         "contain-report.schema.json",
         "contract.schema.json",
         "evidence-bundle.schema.json",
+        "mutation-report.schema.json",
         "scope.schema.json",
         "snapshot.schema.json",
     ]

@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from fns.models.assertions import AssertionSet
 from fns.models.bundle import EvidenceBundle
 from fns.models.contract import Contract
+from fns.models.mutation import MutationReport
 from fns.models.report import ContainReport
 from fns.models.scope import ScopeManifest
 from fns.models.snapshot import Snapshot
@@ -24,6 +25,7 @@ SCHEMAS: Final[dict[str, type[BaseModel]]] = {
     "assertions": AssertionSet,
     "contain-report": ContainReport,
     "evidence-bundle": EvidenceBundle,
+    "mutation-report": MutationReport,
     "contract": Contract,
     "scope": ScopeManifest,
     "snapshot": Snapshot,
