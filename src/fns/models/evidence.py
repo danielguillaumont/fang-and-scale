@@ -55,6 +55,8 @@ class Evidence(FnsModel):
     """sha256 of the stored request/response artifact."""
     observed_at: TzDatetime | None = None
     notes: str | None = None
+    path_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    """The escalation path this evidence rests on, in the enclosing ContainReport."""
 
     def sort_key(self) -> tuple[int, str, str, str]:
         return (RUNG_ORDER[self.rung], self.outcome, self.source, self.artifact_digest or "")

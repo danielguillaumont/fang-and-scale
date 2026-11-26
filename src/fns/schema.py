@@ -13,11 +13,13 @@ from typing import Any, Final
 from pydantic import BaseModel
 
 from fns.models.contract import Contract
+from fns.models.report import ContainReport
 from fns.models.scope import ScopeManifest
 from fns.models.snapshot import Snapshot
 
 DRAFT: Final = "https://json-schema.org/draft/2020-12/schema"
 SCHEMAS: Final[dict[str, type[BaseModel]]] = {
+    "contain-report": ContainReport,
     "contract": Contract,
     "scope": ScopeManifest,
     "snapshot": Snapshot,

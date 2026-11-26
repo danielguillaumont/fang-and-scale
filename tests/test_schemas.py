@@ -61,7 +61,12 @@ def test_cli_schema_writes_lf_files(tmp_path: Path) -> None:
     result = runner.invoke(app, ["schema", "--out", str(tmp_path)])
     assert result.exit_code == 0, result.output
     files = sorted(p.name for p in tmp_path.iterdir())
-    assert files == ["contract.schema.json", "scope.schema.json", "snapshot.schema.json"]
+    assert files == [
+        "contain-report.schema.json",
+        "contract.schema.json",
+        "scope.schema.json",
+        "snapshot.schema.json",
+    ]
     for p in tmp_path.iterdir():
         assert b"\r\n" not in p.read_bytes()
 
