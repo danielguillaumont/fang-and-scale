@@ -189,6 +189,8 @@ forbidden_modules = [
     "fns.demo",
     "fns.scout",
     "fns.report",
+    "fns.mutate",
+    "fns.mutate_cli",
 ]
 
 [[tool.importlinter.contracts]]
@@ -208,4 +210,5 @@ forbidden_modules = [
     "fns.journal",
     "fns.strike",
     "fns.harden",
+    "fns.mutate",
 ]
