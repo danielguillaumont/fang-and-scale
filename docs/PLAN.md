@@ -156,9 +156,9 @@ labels every result `FIXTURE`.
 | M1 | Lab + contracts | `terraform apply` builds lab; `fns scout` snapshot digest identical twice; scope + contract JSON Schema published |
 | M2 | Contain (Antivenom) | `fns contain` fails seeded contract, prints escalation path with rung labels + coverage |
 | M3 | Prove | Live probes confirm/refute each path; `fns prove` under `id-verifier`; bundle verifies with Sigstore |
-| M4 | Harden + detect | Record mode writes `must_still_do`; `fns harden` turns contract green with legit use kept; each strike has a KQL rule + detection result |
+| M4 | Harden + detect | Record mode writes `must_still_do`; `fns harden` turns contract green with legit use kept; four non-destructive lab strikes (listKeys, vault write, owner adds credential, app role self-grant), each with a KQL rule + detection result |
 | M5 | Mutation + CI | Mutation score per contract; GitHub Action PR comments; `fns demo` with no tenant; README/report/brand; v0.1 tagged |
-| M6 | Strike + agents | Stratus Entra/Azure adapters; Agent ID; MCP server + Claude Code skill; LLM vs deterministic bake-off |
+| M6 | Strike + agents | Stratus Entra/Azure adapters beyond the four M4 strikes; Agent ID; MCP server + Claude Code skill; LLM vs deterministic bake-off |
 
 ## 9. Safety
 
