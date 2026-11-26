@@ -487,6 +487,7 @@ def mutate(
     base_eval = evaluate(contract, baseline)
     base_fail = _labels(base_eval, "fail")
     base_inc = _labels(base_eval, "inconclusive")
+    base_reasons = {o.finding.id: set(o.finding.reasons) for o in base_eval.outcomes}
     results: list[MutantResult] = []
     for m in prep.mutants:
         ev = evaluate(contract, apply_mutant(baseline, m))
@@ -499,6 +500,20 @@ def mutate(
             outcome = "inconclusive"
         else:
             outcome = "survived"
+        new_reasons = (
+            ()
+            if outcome == "killed"
+            else tuple(
+                sorted(
+                    {
+                        r
+                        for o in ev.outcomes
+                        for r in o.finding.reasons
+                        if r not in base_reasons.get(o.finding.id, set())
+                    }
+                )
+            )
+        )
         diff = (
             _diff(files[m.terraform_file], m.terraform_lines, m.terraform_file)
             if m.terraform_file and m.terraform_lines is not None
@@ -512,6 +527,7 @@ def mutate(
                 outcome=outcome,
                 new_failures=tuple(new_fail),
                 new_inconclusive=tuple(new_inc),
+                new_reasons=new_reasons,
                 terraform_file=m.terraform_file if diff else None,
                 terraform_diff=diff,
                 terraform_note=None if diff else (m.terraform_note or "no Terraform"),
