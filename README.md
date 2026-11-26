@@ -8,6 +8,13 @@ fix, proves the result with signed evidence, and fails CI if it regresses.
 
 *Challenge the defence. Reduce the damage. Prove the improvement.*
 
+> [!IMPORTANT]
+> **Authorized use only.** Run Fang & Scale only against a tenant you own or have
+> written permission to test, preferably a dedicated lab tenant like the one
+> `lab/` builds. It reads directory and RBAC data, and `fns prove --live` sends
+> real requests as the identity a contract names. Report vulnerabilities
+> privately: see [SECURITY.md](SECURITY.md).
+
 ```yaml
 # contracts/examples/billing-agent.fns.yaml (shortened)
 version: 2

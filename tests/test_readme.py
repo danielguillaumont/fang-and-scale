@@ -46,3 +46,18 @@ def test_readme_contract_snippet_matches_the_example() -> None:
     for line in snippet.splitlines():
         if line.strip() and not line.startswith("#"):
             assert line.rstrip() in example, line
+
+
+def test_the_authorized_use_notice_is_near_the_top() -> None:
+    head = "\n".join(README.splitlines()[:20])
+    assert "**Authorized use only.**" in head
+    assert "SECURITY.md" in head
+
+
+def test_public_repository_files_are_present() -> None:
+    security = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+    assert "Report a vulnerability" in security
+    assert "authorized to test" in security
+    assert (ROOT / "CONTRIBUTING.md").is_file()
+    owners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
+    assert "* @danielguillaumont" in owners.splitlines()
