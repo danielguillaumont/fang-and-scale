@@ -18,8 +18,10 @@ PIM eligibility (M3 E1) runs only when the scope allows its reads. The surface
 
 - collected: every eligibility listing succeeded (the edges are in the snapshot);
 - not applicable: no listing returned a row, at least one failed with an HTTP
-  error, and ``/subscribedSkus`` succeeded with no licence that may carry PIM.
-  The responses are the evidence; nothing is inferred from a failure alone;
+  error, and ``/subscribedSkus`` succeeded and every service plan in it is known,
+  by ID, not to carry PIM (``graph.PIM_FREE_PLAN_IDS``). An unknown plan or SKU
+  keeps the surface not collected. The responses are the evidence; nothing is
+  inferred from a failure alone;
 - otherwise not collected, with the reason.
 """
 
@@ -536,34 +538,36 @@ class Collector:
             return None
 
         evidence = [f"{name} -> {step.text()}" for name, step in listings]
-        skus: list[str] = []
-        pim_plans: list[str] = []
+        found: list[graph.Licences] = []
         sku_step: _Step | None = None
         if graph.OP_SUBSCRIBED_SKUS in ops:
 
             def licences() -> int:
                 items, _ = self._list(graph.subscribed_skus_request())
-                found, plans = graph.pim_licences(items)
-                skus.extend(found)
-                pim_plans.extend(plans)
+                found.append(graph.pim_licences(items))
                 return len(items)
 
             sku_step = self._step(t, licences)
             if sku_step.ok:
-                evidence.append(
-                    f"GET /subscribedSkus -> ok: {len(skus)} SKU(s) [{', '.join(skus) or 'none'}];"
-                    f" plans that may carry PIM: {', '.join(pim_plans) or 'none'}"
+                got = found[0]
+                line = (
+                    f"GET /subscribedSkus -> ok: {len(got.skus)} SKU(s)"
+                    f" [{', '.join(got.skus) or 'none'}];"
+                    f" plans that may carry PIM: {', '.join(got.pim) or 'none'}"
                 )
+                if got.unknown:
+                    line += f"; plans not known to be PIM-free: {', '.join(got.unknown)}"
+                evidence.append(line)
             else:
                 evidence.append(f"GET /subscribedSkus -> {sku_step.text()}")
         else:
             evidence.append("GET /subscribedSkus is not in the scope")
 
         failed = [step for _, step in listings if not step.ok]
+        lic = found[0] if found and sku_step is not None and sku_step.ok else None
         if (
-            sku_step is not None
-            and sku_step.ok
-            and not pim_plans
+            lic is not None
+            and lic.rules_out_pim
             and rows == 0
             and failed
             and all(step.responded for step in failed)
@@ -577,8 +581,13 @@ class Collector:
                 evidence=tuple(evidence),
             )
         why = [*missing, *(f"{n} -> {s.text()}" for n, s in listings if not s.ok)]
-        if pim_plans:
-            why.append(f"licences that may carry PIM: {', '.join(pim_plans)}")
-        elif sku_step is None or not sku_step.ok:
+        if lic is not None and lic.pim:
+            why.append(f"licences that may carry PIM: {', '.join(lic.pim)}")
+        if lic is not None and lic.unknown:
+            why.append(
+                "service plans not known to be PIM-free, so PIM cannot be ruled out: "
+                + ", ".join(lic.unknown)
+            )
+        elif lic is None:
             why.append("subscribed SKUs not collected, so PIM cannot be ruled out")
         return NotCollected(surface=PIM_ELIGIBILITY, reason="; ".join(why))

@@ -6,6 +6,7 @@ exposure and fewer volatile fields between runs.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Final
 
 from fns.adapters.azure.http import GRAPH_BASE, ApiRequest
@@ -34,10 +35,41 @@ PIM_OPERATIONS: Final = (OP_DIR_ROLE_ELIGIBILITY, OP_SUBSCRIBED_SKUS)
 """Entra PIM eligibility and the licences that show whether PIM exists (M3 E1)."""
 
 PIM_PLAN_IDS: Final = frozenset({"eec0eb4f-6444-4f95-aba0-50c24d67f998"})
-"""Service plan AAD_PREMIUM_P2 (Microsoft Entra ID P2), which carries PIM."""
-PIM_PLAN_MARKERS: Final = ("P2", "GOVERNANCE")
-"""Deliberately broad: any plan or SKU name containing these may carry PIM. A false
-match only keeps the surface 'not collected'; it never lets a finding pass."""
+"""Service plans known to carry PIM: AAD_PREMIUM_P2 (Microsoft Entra ID P2).
+
+Only used to name the plan in the reason. Any plan that is not in
+:data:`PIM_FREE_PLAN_IDS` already keeps PIM open, whether or not it is listed here.
+"""
+PIM_FREE_PLAN_IDS: Final[frozenset[str]] = frozenset()
+"""Service plan IDs known **not** to carry PIM, matched by ``servicePlanId`` only.
+
+PIM is ``not-applicable`` only if every service plan of every live SKU is in this
+set (2026-11-26 decision). A plan or SKU that is not, including one without an ID,
+keeps ``pim-eligibility`` not collected, so findings stay inconclusive. Names are
+never matched: SKU and plan names change and are not unique.
+
+Empty on purpose. Add an ID only with its plan name and a source (Microsoft's
+"Product names and service plan identifiers for licensing" list) and the date
+checked. Until then only a tenant with no service plans at all, like the lab
+(Entra ID Free, 0 SKUs), can be ``not-applicable``.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class Licences:
+    """What ``/subscribedSkus`` says about PIM, by service plan ID."""
+
+    skus: tuple[str, ...]
+    """SKU part numbers that are not ``Deleted``."""
+    pim: tuple[str, ...]
+    """``SKU/plan`` for plans known to carry PIM."""
+    unknown: tuple[str, ...]
+    """``SKU/plan`` for plans not known to be PIM-free (or a SKU with no plans)."""
+
+    @property
+    def rules_out_pim(self) -> bool:
+        return not self.pim and not self.unknown
+
 
 GRAPH_OPERATIONS: Final = (
     OP_SERVICE_PRINCIPALS,
@@ -349,14 +381,21 @@ def parse_directory_role_eligibility(
     return skipped, errors
 
 
-def pim_licences(items: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
-    """(SKU part numbers, plans that may carry PIM) from ``/subscribedSkus``.
+def pim_licences(
+    items: list[dict[str, Any]], *, pim_free: frozenset[str] | None = None
+) -> Licences:
+    """Classify ``/subscribedSkus`` by service plan ID (never by name).
 
-    A SKU counts unless its capabilityStatus is ``Deleted``; a plan counts unless
-    its provisioningStatus is ``Disabled``. Both are the conservative direction.
+    A SKU whose capabilityStatus is ``Deleted`` is skipped: its licence is gone.
+    Every other SKU counts with **all** its plans, whatever their
+    provisioningStatus: skipping a disabled plan would make ``not-applicable``
+    easier to reach, which is the wrong direction. A SKU with no plans, or a plan
+    with no ID, is unknown.
     """
+    free = PIM_FREE_PLAN_IDS if pim_free is None else pim_free
     skus: set[str] = set()
     pim: set[str] = set()
+    unknown: set[str] = set()
     for sku in items:
         part = str(sku.get("skuPartNumber") or sku.get("skuId") or "unknown-sku")
         if str(sku.get("capabilityStatus") or "") == "Deleted":
@@ -365,13 +404,16 @@ def pim_licences(items: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
         plans = sku.get("servicePlans")
         if not isinstance(plans, list):
             raise ParseError("servicePlans must be a list")
-        if any(m in part.upper() for m in PIM_PLAN_MARKERS):
-            pim.add(part)
+        if not plans:
+            unknown.add(f"{part}/(no service plans)")
         for plan in plans:
-            if not isinstance(plan, dict) or plan.get("provisioningStatus") == "Disabled":
-                continue
+            if not isinstance(plan, dict):
+                raise ParseError("each service plan must be an object")
             name = str(plan.get("servicePlanName") or "")
             plan_id = str(plan.get("servicePlanId") or "").lower()
-            if plan_id in PIM_PLAN_IDS or any(m in name.upper() for m in PIM_PLAN_MARKERS):
-                pim.add(f"{part}/{name or plan_id}")
-    return sorted(skus), sorted(pim)
+            label = f"{part}/{name or plan_id or '(no id)'}"
+            if plan_id in PIM_PLAN_IDS:
+                pim.add(label)
+            elif not GUID_RE.fullmatch(plan_id) or plan_id not in free:
+                unknown.add(label)
+    return Licences(tuple(sorted(skus)), tuple(sorted(pim)), tuple(sorted(unknown)))
