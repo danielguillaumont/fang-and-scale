@@ -26,17 +26,18 @@ budget:
   max_critical_reachable: 0
 ```
 
-> **Status.** M1 and M2 are done and ran live. M3 to M5 are built and tested
-> offline, against the recorded lab runs and hand-written fixtures. The M3 live
-> run is ready: `docs/runbooks/m3-live-run.md` (plan and decisions in
-> `docs/milestones/M3-live-plan.md`). See [Real vs. fixture](#real-vs-fixture)
-> before you trust any result.
+> **Status.** M1, M2 and M3 are done and ran live. In M3 the probes ran as the
+> assumed-compromised identity itself (`docs/runbooks/m3-live-run.md`). M4 and M5
+> are built and tested offline, against the recorded lab runs and hand-written
+> fixtures. See [Real vs. fixture](#real-vs-fixture) before you trust any result.
 
 ## 90-second demo (no tenant)
 
 Requires [uv](https://docs.astral.sh/uv/) and a clone of this repository. The
-demo commands replay `fixtures/lab-run-2`, the live lab run recorded in M2 and
-sanitized (`fixtures/lab-run-1` is the M1 run). Every line they print starts with
+demo commands replay `fixtures/lab-run-3`, the live lab run recorded in M3 and
+sanitized. Its scout ran as `sp-fns-scout`, and its probes ran as
+`sp-billing-agent`. `fixtures/lab-run-1` and `fixtures/lab-run-2` are the M1 and
+M2 runs. Every line they print starts with
 `FIXTURE`, and none of them makes a network call.
 
 ```
@@ -193,8 +194,8 @@ denial, every path refuted, and no open surfaces.
 | Rung | Means | Produced by | Status |
 | --- | --- | --- | --- |
 | 1 modeled | the reach model says so, from a snapshot | `fns contain` | built; live scout ran in M1 |
-| 2 evaluated | Azure's own permission evaluation agrees | `fns prove` (ARM permissions probe) | built; probes replayed from hand-written results |
-| 3 observed | a live, non-destructive probe saw it | `fns prove` (data-read probe) | interface only; live probes need approval (M3 P5) |
+| 2 evaluated | Azure's own permission evaluation agrees | `fns prove` (ARM permissions probe) | built; ran live in M3 (9 probes) |
+| 3 observed | a live, non-destructive probe saw it | `fns prove` (data-read probe) | built; ran live in M3: 4 reads as the test identity, 1 allowed and 3 denied |
 | 4 logged | the probe also shows up in the logs | detections (M4 K4) | rules written; never run in a workspace |
 
 Coverage states: `verified`, `evaluated-only`, `modeled-only`, `not-assessed`,
@@ -204,12 +205,12 @@ Coverage states: `verified`, `evaluated-only`, `modeled-only`, `not-assessed`,
 
 | What | Evidence so far |
 | --- | --- |
-| Scout (RBAC, Graph, owners, roles) | **Live** on the lab tenant, 2026-11-26, twice. Recorded and sanitized as `fixtures/lab-run-1` (M1) and `fixtures/lab-run-2` (M2). |
+| Scout (RBAC, Graph, owners, roles) | **Live** on the lab tenant, 2026-11-26, three times. Recorded and sanitized as `fixtures/lab-run-1` (M1), `fixtures/lab-run-2` (M2) and `fixtures/lab-run-3` (M3). The M3 digest is identical to M2's. |
 | Key Vault and storage settings collectors (M2 C1) | **Live** in the M2 run, 2026-11-26: one vault and two storage accounts, `complete`. |
 | PIM eligibility collector | **Live** in the M2 run, as `not-applicable` with evidence: the lab tenant is Entra ID Free (0 SKUs), and Graph and ARM both answered `400 AadPremiumLicenseRequired`. The `collected` path, in a tenant with P2, is mocked tests only. |
 | Reach engine and contracts (`fns contain`) | **Live** on the M2 snapshot, signed in as the read-only scout: 11 critical reachable, 2 inconclusive, exit 1, the same as the fixture replay. Results are rung 1 (modeled). The replay of `fixtures/lab-run-2` with its contract is a committed regression test. |
-| Prove: probe results | **Hand-written** (`probes.json`), shaped like expected lab answers. Not recorded. |
-| Signing | Offline test key, labelled `TEST`. The Sigstore path is written but has never run. |
+| Prove: probe results | **Live** on the lab, 2026-11-26, signed in as `sp-billing-agent`. There were 14 `GET` and `HEAD` requests through the scope gate, all allowed by it. Result: passed 1 (invoices `blob/read`, observed), critical reachable 11, inconclusive 1, exit 1. The Key Vault and payroll reads were denied when probed, but escalation paths remain, so they still fail. The results are recorded and sanitized as `fixtures/lab-run-3/probes.json`, and its replay is the M3 regression test, with the same verdicts. The `probes.json` in lab-run-1 and lab-run-2 stays hand-written. |
+| Signing | The live run is signed with the offline test key, labelled `TEST`. In CI, `prove-sign` signs the lab-run-3 replay with Sigstore keyless signing on **staging** only, and verifies it against the workflow's identity. Production Sigstore needs approval. |
 | Harden, mutate | Model only, on the recorded snapshot and `lab/*.tf`. Nothing applied. `fns mutate --harden` on the live M2 snapshot scored 6/8, with the two accepted app-owner survivors. |
 | Record mode | Hand-written sample logs. |
 | Detections | Structural lint only; never deployed. |
@@ -252,7 +253,7 @@ so does an internal error, so a crash never looks like a verdict.
 | --- | --- | --- |
 | M1 Lab + contracts | Terraform lab, scope gate, scout, schemas | done, live |
 | M2 Contain | reach engine, escalation rules, settings and PIM collectors | done, live (tag `m2`) |
-| M3 Prove | freeze, probes, isolated verifier, signed bundle | built offline; live probes ready to run (`docs/runbooks/m3-live-run.md`); Sigstore signing in CI on **staging** only |
+| M3 Prove | freeze, probes, isolated verifier, signed bundle | **done**: live probes ran on 2026-11-26 (`fixtures/lab-run-3`); Sigstore signing in CI on **staging** only; production pending approval |
 | M4 Harden + detect | minimizer, record mode, KQL rules | built offline; live loop pending approval |
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
 | M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | not started |
@@ -277,8 +278,8 @@ differs from `tenant_id`.
 
 ```
 uv run poe scout                                       # live, read-only
-uv run fns scout --record fixtures/lab-run-3          # also save a sanitized fixture set
-uv run fns demo scout --fixture fixtures/lab-run-3    # replay it later, no tenant needed
+uv run fns scout --record fixtures/my-run            # also save a sanitized fixture set
+uv run fns demo scout --fixture fixtures/my-run      # replay it later, no tenant needed
 ```
 
 ### Scout permissions

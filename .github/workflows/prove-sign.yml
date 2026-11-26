@@ -32,7 +32,7 @@ jobs:
       id-token: write
     env:
       FNS_SIGSTORE_INSTANCE: staging
-      FIXTURE: fixtures/lab-run-2
+      FIXTURE: fixtures/lab-run-3
       SIGSTORE_IDENTITY: https://github.com/danielguillaumont/fang-and-scale/.github/workflows/prove-sign.yml@refs/heads/main
       SIGSTORE_ISSUER: https://token.actions.githubusercontent.com
     steps:

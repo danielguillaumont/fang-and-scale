@@ -1,0 +1,49 @@
+# Sanitized copy recorded by `fns scout --record`. Placeholder IDs only.
+version: 1
+tenant_id: 00000000-0000-4000-8000-000000000002
+subscription_ids:
+  - 00000000-0000-4000-8000-000000000001
+allowed_resource_groups:
+  - /subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg-fns-lab
+test_identities:
+  - object_id: 00000000-0000-4000-8000-000000000007
+    kind: servicePrincipal
+    name: sp-billing-agent
+    app_id: 00000000-0000-4000-8000-000000000824
+allowed_operations:
+  scout:
+    - arm:Microsoft.Authorization/roleAssignments/read
+    - arm:Microsoft.Authorization/roleDefinitions/read
+    - arm:Microsoft.Authorization/denyAssignments/read
+    - arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read
+    - arm:Microsoft.KeyVault/vaults/read
+    - arm:Microsoft.Storage/storageAccounts/read
+    - arm:Microsoft.Authorization/roleEligibilitySchedules/read
+    - graph:GET /servicePrincipals
+    - graph:GET /applications
+    - graph:GET /servicePrincipals/{id}/owners
+    - graph:GET /applications/{id}/owners
+    - graph:GET /servicePrincipals/{id}/appRoleAssignments
+    - graph:GET /servicePrincipals/{id}/memberOf
+    - graph:GET /roleManagement/directory/roleDefinitions
+    - graph:GET /roleManagement/directory/roleAssignments
+    - graph:GET /roleManagement/directory/roleEligibilitySchedules
+    - graph:GET /subscribedSkus
+  prove:
+    - arm:Microsoft.Authorization/permissions/read
+    - arm:Microsoft.KeyVault/vaults/secrets/read
+    - kv:GET /secrets
+    - kv:GET /secrets/payroll-db-password
+    - blob:HEAD /payroll/employees-SYNTHETIC.csv
+    - blob:HEAD /invoices/invoice-0001-SYNTHETIC.json
+data_objects:
+  - resource: /subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-tiin02
+    operation: kv:GET /secrets/payroll-db-password
+  - resource: /subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltiin02
+    operation: blob:HEAD /payroll/employees-SYNTHETIC.csv
+  - resource: /subscriptions/00000000-0000-4000-8000-000000000001/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stinvoicestiin02
+    operation: blob:HEAD /invoices/invoice-0001-SYNTHETIC.json
+budget:
+  max_api_calls: 500
+  max_minutes: 15
+expires_at: "2026-12-03T20:43:06Z"

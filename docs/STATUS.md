@@ -1,5 +1,14 @@
 # Status after the 2026-11-26 morning review
 
+## Milestone results
+
+| Milestone | Live run | Result | Regression test |
+| --- | --- | --- | --- |
+| M1 Scout | 2026-11-26 | scout as the admin, then as `sp-fns-scout` | `fixtures/lab-run-1` |
+| M2 Contain | 2026-11-26 | critical reachable 11, inconclusive 2, exit 1; mutation 6/8 with the two accepted app-owner survivors | `tests/fixtures/test_lab_run_2.py` |
+| M3 Prove | 2026-11-26, probes as `sp-billing-agent` | passed 1 (invoices `blob/read`, observed and verified), critical reachable 11, still-do failed 0, inconclusive 1, exit 1. The Key Vault and payroll reads were denied when probed and still fail: escalation paths remain | `tests/fixtures/test_lab_run_3.py` |
+
+
 Every item from the morning review of `docs/OVERNIGHT.md` is done. Each one got
 its own branch and PR. CI passed on ubuntu and windows on the first run every
 time, and all of them are merged to `main`. No Azure call, `az` command or
