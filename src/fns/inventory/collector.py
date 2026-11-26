@@ -12,10 +12,20 @@ never abort the snapshot:
 Per-object Graph calls (owners, app role assignments, memberships) are made
 only for tenant-owned service principals and managed identities, so a tenant
 with hundreds of Microsoft first-party service principals stays within budget.
+
+PIM eligibility (M3 E1) runs only when the scope allows its reads. The surface
+``pim-eligibility`` then ends in one of three states:
+
+- collected: every eligibility listing succeeded (the edges are in the snapshot);
+- not applicable: no listing returned a row, at least one failed with an HTTP
+  error, and ``/subscribedSkus`` succeeded with no licence that may carry PIM.
+  The responses are the evidence; nothing is inferred from a failure alone;
+- otherwise not collected, with the reason.
 """
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -26,7 +36,15 @@ from fns.adapters.azure import arm, graph
 from fns.adapters.azure.http import ApiRequest, ApiResponse, Transport, TransportError
 from fns.inventory.builder import PRIORITY_PRIMARY, SnapshotBuilder
 from fns.models.scope import ScopeManifest
-from fns.models.snapshot import CollectorRun, NotCollected, Provenance, Snapshot, SnapshotCoverage
+from fns.models.snapshot import (
+    CollectorRun,
+    CollectorStatus,
+    NotApplicable,
+    NotCollected,
+    Provenance,
+    Snapshot,
+    SnapshotCoverage,
+)
 from fns.scope.gate import Clock, Gate, ScopeDeniedError
 
 MAX_PAGES: Final = 1000
@@ -34,8 +52,10 @@ RETRY_STATUSES: Final = frozenset({429, 500, 502, 503, 504})
 MAX_BACKOFF_SECONDS: Final = 60.0
 
 KV_ACCESS_POLICIES: Final = "key-vault-access-policies"
+PIM_ELIGIBILITY: Final = "pim-eligibility"
+PIM_COLLECTOR: Final = "pim.eligibility"
 NOT_COLLECTED: Final = (
-    NotCollected(surface="pim-eligibility", reason="eligible assignments not collected in M1"),
+    NotCollected(surface=PIM_ELIGIBILITY, reason="eligible assignments not collected in M1"),
     NotCollected(surface="conditional-access", reason="not collected in M1"),
     NotCollected(
         surface=KV_ACCESS_POLICIES,
@@ -52,11 +72,39 @@ NOT_COLLECTED: Final = (
 )
 
 
+_ERROR_CODE = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
+
+
+def _error_code(body: dict[str, Any]) -> str | None:
+    """The ``error.code`` of an ARM or Graph error body, if well formed."""
+    err = body.get("error")
+    code = err.get("code") if isinstance(err, dict) else None
+    return code if isinstance(code, str) and _ERROR_CODE.fullmatch(code) else None
+
+
 class _CollectError(Exception):
-    def __init__(self, code: str, *, denied: bool = False) -> None:
+    def __init__(self, code: str, *, denied: bool = False, detail: str | None = None) -> None:
         super().__init__(code)
         self.code = code
         self.denied = denied
+        self.detail = detail
+        """The response's error code, when there was a response."""
+
+
+@dataclass(frozen=True)
+class _Step:
+    ok: bool
+    error: _CollectError | None = None
+
+    @property
+    def responded(self) -> bool:
+        """Failed with an HTTP status from the service (not scope, not transport)."""
+        return self.error is not None and self.error.code.startswith("http-")
+
+    def text(self) -> str:
+        if self.error is None:
+            return "ok"
+        return " ".join(x for x in (self.error.code, self.error.detail) if x)
 
 
 @dataclass
@@ -70,6 +118,8 @@ class _Tally:
     started: float = 0.0
     ended: float = 0.0
     depends: tuple[_Tally, ...] = ()
+    verdict: Literal["not-applicable"] | None = None
+    """Set when evidence beyond this collector's own requests decides its status."""
 
     def run(self) -> CollectorRun:
         """Never report more than was observed (CLAUDE.md rule 4).
@@ -78,7 +128,7 @@ class _Tally:
         best ``partial``; with no requests at all it is ``skipped``, not an
         empty ``complete``.
         """
-        status: Literal["complete", "partial", "failed", "skipped"]
+        status: CollectorStatus
         errors = set(self.errors)
         upstream_ok = all(d.run().status == "complete" for d in self.depends)
         if not upstream_ok:
@@ -94,6 +144,8 @@ class _Tally:
             status = "skipped"
         else:
             status = "failed"
+        if self.verdict is not None:
+            status = self.verdict
         return CollectorRun(
             name=self.name,
             status=status,
@@ -168,7 +220,7 @@ class Collector:
                 attempt += 1
                 continue
             if not resp.ok:
-                raise _CollectError(f"http-{resp.status}")
+                raise _CollectError(f"http-{resp.status}", detail=_error_code(resp.body))
             return resp
 
     def _list(self, req: ApiRequest) -> tuple[list[dict[str, Any]], Provenance]:
@@ -195,21 +247,24 @@ class Collector:
         return self._exchange(req, None).body
 
     def _attempt(self, tally: _Tally, fn: Callable[[], int]) -> bool:
+        return self._step(tally, fn).ok
+
+    def _step(self, tally: _Tally, fn: Callable[[], int]) -> _Step:
         try:
             tally.items += fn()
             tally.ok += 1
-            return True
+            return _Step(True)
         except _CollectError as exc:
             tally.errors.add(exc.code.split(":")[0] if exc.denied else exc.code)
             if exc.denied:
                 tally.denied += 1
             else:
                 tally.failed += 1
-            return False
+            return _Step(False, exc)
         except (arm.ParseError, graph.ParseError):
             tally.errors.add("bad-response")
             tally.failed += 1
-            return False
+            return _Step(False, _CollectError("bad-response"))
 
     # -- collection -----------------------------------------------------------------------
 
@@ -411,8 +466,24 @@ class Collector:
         self._attempt(t, dir_roles)
         t.ended = self.clock.monotonic()
 
+        # PIM eligibility last: it keeps only principals the snapshot already holds.
+        not_applicable: list[NotApplicable] = []
+        pim_ops = allowed & {*arm.PIM_OPERATIONS, *graph.PIM_OPERATIONS}
+        if pim_ops:
+            t = collector(PIM_COLLECTOR)
+            state = self._pim(b, t, pim_ops)
+            t.ended = self.clock.monotonic()
+            not_collected = [n for n in not_collected if n.surface != PIM_ELIGIBILITY]
+            if isinstance(state, NotApplicable):
+                not_applicable.append(state)
+                t.verdict = "not-applicable"
+            elif state is not None:
+                not_collected.append(state)
+
         coverage = SnapshotCoverage(
-            collectors=tuple(x.run() for x in tallies), not_collected=tuple(not_collected)
+            collectors=tuple(x.run() for x in tallies),
+            not_collected=tuple(not_collected),
+            not_applicable=tuple(not_applicable),
         )
         return b.build(
             mode=self.mode,
@@ -421,3 +492,93 @@ class Collector:
             collector_version=f"fns {__version__}",
             coverage=coverage,
         )
+
+    # -- PIM eligibility (M3 E1) -----------------------------------------------------------
+
+    def _pim(
+        self, b: SnapshotBuilder, t: _Tally, ops: set[str]
+    ) -> NotApplicable | NotCollected | None:
+        """Collect eligibility. None means collected: the surface is closed."""
+        rows = 0
+        listings: list[tuple[str, _Step]] = []
+        missing: list[str] = []
+        directory_listing = "GET /roleManagement/directory/roleEligibilitySchedules"
+
+        if graph.OP_DIR_ROLE_ELIGIBILITY in ops:
+
+            def directory() -> int:
+                nonlocal rows
+                items, prov = self._list(graph.directory_role_eligibility_request())
+                rows += len(items)
+                t.errors.update(graph.parse_directory_role_eligibility(b, items, prov)[1])
+                return len(items)
+
+            listings.append((directory_listing, self._step(t, directory)))
+        else:
+            missing.append(f"{directory_listing} is not in the scope")
+
+        for sub in self.manifest.subscription_ids:
+            name = f"ARM roleEligibilitySchedules on /subscriptions/{sub}"
+            if arm.OP_ROLE_ELIGIBILITY not in ops:
+                missing.append(f"{name} is not in the scope")
+                continue
+
+            def resources(sub: str = str(sub)) -> int:
+                nonlocal rows
+                items, prov = self._list(arm.role_eligibility_request(sub))
+                rows += len(items)
+                t.errors.update(arm.parse_role_eligibility(b, items, prov)[1])
+                return len(items)
+
+            listings.append((name, self._step(t, resources)))
+
+        if not missing and all(step.ok for _, step in listings):
+            return None
+
+        evidence = [f"{name} -> {step.text()}" for name, step in listings]
+        skus: list[str] = []
+        pim_plans: list[str] = []
+        sku_step: _Step | None = None
+        if graph.OP_SUBSCRIBED_SKUS in ops:
+
+            def licences() -> int:
+                items, _ = self._list(graph.subscribed_skus_request())
+                found, plans = graph.pim_licences(items)
+                skus.extend(found)
+                pim_plans.extend(plans)
+                return len(items)
+
+            sku_step = self._step(t, licences)
+            if sku_step.ok:
+                evidence.append(
+                    f"GET /subscribedSkus -> ok: {len(skus)} SKU(s) [{', '.join(skus) or 'none'}];"
+                    f" plans that may carry PIM: {', '.join(pim_plans) or 'none'}"
+                )
+            else:
+                evidence.append(f"GET /subscribedSkus -> {sku_step.text()}")
+        else:
+            evidence.append("GET /subscribedSkus is not in the scope")
+
+        failed = [step for _, step in listings if not step.ok]
+        if (
+            sku_step is not None
+            and sku_step.ok
+            and not pim_plans
+            and rows == 0
+            and failed
+            and all(step.responded for step in failed)
+        ):
+            return NotApplicable(
+                surface=PIM_ELIGIBILITY,
+                reason=(
+                    "no subscribed licence carries PIM (Entra ID P2 or ID Governance), "
+                    "and no eligibility listing returned a row"
+                ),
+                evidence=tuple(evidence),
+            )
+        why = [*missing, *(f"{n} -> {s.text()}" for n, s in listings if not s.ok)]
+        if pim_plans:
+            why.append(f"licences that may carry PIM: {', '.join(pim_plans)}")
+        elif sku_step is None or not sku_step.ok:
+            why.append("subscribed SKUs not collected, so PIM cannot be ruled out")
+        return NotCollected(surface=PIM_ELIGIBILITY, reason="; ".join(why))
