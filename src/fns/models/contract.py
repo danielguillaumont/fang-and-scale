@@ -5,6 +5,10 @@ what it must still be able to do. Targets may be short names (resolved
 against a snapshot in M2; ambiguous or unresolved means ``inconclusive``) or
 full ARM IDs. Contract operations describe the attacker's capabilities and are
 a different vocabulary from scope operations (the tool's own API calls).
+
+Version 2 adds ``must_not_reach`` targets that name one Entra object:
+``application: <name, appId or object id>`` and ``service_principal: <name,
+appId or object id>``. A version 1 contract cannot use them.
 """
 
 from __future__ import annotations
@@ -83,22 +87,72 @@ class DirectoryTarget(FnsModel):
         return f"directory:{self.directory}"
 
 
+ObjectName = Annotated[
+    str,
+    Field(
+        min_length=1,
+        max_length=256,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._\-]*$",
+        description="Display name, appId or object id",
+    ),
+]
+
+
+class ApplicationTarget(FnsModel):
+    """One application object (contract version 2)."""
+
+    application: ObjectName
+    operations: tuple[ContractOperation, ...] = Field(min_length=1)
+
+    @field_validator("operations")
+    @classmethod
+    def _ops(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        return _sorted_unique_ops(v)
+
+    @property
+    def target_key(self) -> str:
+        return f"application:{self.application.lower()}"
+
+
+class ServicePrincipalTarget(FnsModel):
+    """One service principal (contract version 2)."""
+
+    service_principal: ObjectName
+    operations: tuple[ContractOperation, ...] = Field(min_length=1)
+
+    @field_validator("operations")
+    @classmethod
+    def _ops(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        return _sorted_unique_ops(v)
+
+    @property
+    def target_key(self) -> str:
+        return f"service_principal:{self.service_principal.lower()}"
+
+
+_KINDS: tuple[tuple[str, type[FnsModel]], ...] = (
+    ("resource", ResourceTarget),
+    ("directory", DirectoryTarget),
+    ("application", ApplicationTarget),
+    ("service_principal", ServicePrincipalTarget),
+)
+
+
 def _reach_kind(v: Any) -> str | None:
-    if isinstance(v, dict):
-        if "resource" in v:
-            return "resource"
-        if "directory" in v:
-            return "directory"
-        return None
-    if isinstance(v, ResourceTarget):
-        return "resource"
-    if isinstance(v, DirectoryTarget):
-        return "directory"
+    for key, cls in _KINDS:
+        if (isinstance(v, dict) and key in v) or isinstance(v, cls):
+            return key
     return None
 
 
+ReachTarget = ResourceTarget | DirectoryTarget | ApplicationTarget | ServicePrincipalTarget
+ObjectTarget = ApplicationTarget | ServicePrincipalTarget
+
 ReachItem = Annotated[
-    Annotated[ResourceTarget, Tag("resource")] | Annotated[DirectoryTarget, Tag("directory")],
+    Annotated[ResourceTarget, Tag("resource")]
+    | Annotated[DirectoryTarget, Tag("directory")]
+    | Annotated[ApplicationTarget, Tag("application")]
+    | Annotated[ServicePrincipalTarget, Tag("service_principal")],
     Discriminator(_reach_kind),
 ]
 
@@ -118,7 +172,8 @@ class ContractThresholds(FnsModel):
 class Contract(FnsModel):
     """A blast-radius contract."""
 
-    version: Literal[1]
+    version: Literal[1, 2]
+    """2 allows ``application`` and ``service_principal`` targets in ``must_not_reach``."""
     contract: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")
     """Contract name (lowercase slug)."""
     assume_compromised: IdentityRef
@@ -129,9 +184,7 @@ class Contract(FnsModel):
 
     @field_validator("must_not_reach")
     @classmethod
-    def _sort_reach(
-        cls, v: tuple[ResourceTarget | DirectoryTarget, ...]
-    ) -> tuple[ResourceTarget | DirectoryTarget, ...]:
+    def _sort_reach(cls, v: tuple[ReachTarget, ...]) -> tuple[ReachTarget, ...]:
         keys = [i.target_key for i in v]
         if len(set(keys)) != len(keys):
             raise ValueError("each must_not_reach target must be listed once")
@@ -144,6 +197,20 @@ class Contract(FnsModel):
         if len(set(keys)) != len(keys):
             raise ValueError("each must_still_do target must be listed once")
         return tuple(sorted(v, key=lambda i: i.target_key))
+
+    @model_validator(mode="after")
+    def _version_allows_targets(self) -> Contract:
+        if self.version == 1:
+            v2 = sorted(
+                i.target_key
+                for i in self.must_not_reach
+                if isinstance(i, ApplicationTarget | ServicePrincipalTarget)
+            )
+            if v2:
+                raise ValueError(
+                    f"application and service_principal targets need version: 2 ({v2})"
+                )
+        return self
 
     @model_validator(mode="after")
     def _no_contradictions(self) -> Contract:
