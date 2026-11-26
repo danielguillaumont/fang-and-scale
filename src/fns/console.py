@@ -59,7 +59,7 @@ def make_console(
         stderr=stderr,
         force_terminal=force_terminal,
         highlight=False,
-        soft_wrap=False,
+        soft_wrap=True,  # never wrap messages: paths and IDs must stay copy-pastable
     )
 
 
