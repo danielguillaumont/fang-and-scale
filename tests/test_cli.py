@@ -42,7 +42,17 @@ def test_scout_without_scope_manifest_exits_1(tmp_path: Path) -> None:
 def test_help_lists_every_command() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for command in ["scout", "contain", "prove", "verify", "harden", "record", "mutate", *UNBUILT]:
+    for command in [
+        "scout",
+        "contain",
+        "prove",
+        "verify",
+        "harden",
+        "record",
+        "mutate",
+        "report",
+        *UNBUILT,
+    ]:
         assert command in result.output
 
 
