@@ -75,7 +75,11 @@ def _depth_delta(line: str) -> int:
 
 
 def parse_blocks(path: Path) -> list[Block]:
-    lines = path.read_text(encoding="utf-8").splitlines()
+    return parse_lines(path.name, path.read_text(encoding="utf-8").splitlines())
+
+
+def parse_lines(name: str, lines: list[str]) -> list[Block]:
+    """Top-level blocks of one file; ``name`` is the file name recorded on each block."""
     blocks: list[Block] = []
     i = 0
     while i < len(lines):
@@ -96,8 +100,8 @@ def parse_blocks(path: Path) -> list[Block]:
                 break
             j += 1
         if depth != 0:
-            raise TfParseError(f"{path.name}: block {m.group(2)}.{m.group(3)} never closes")
-        blocks.append(Block(path.name, m.group(1), m.group(2), m.group(3), i, j, attrs, attr_lines))
+            raise TfParseError(f"{name}: block {m.group(2)}.{m.group(3)} never closes")
+        blocks.append(Block(name, m.group(1), m.group(2), m.group(3), i, j, attrs, attr_lines))
         i = j + 1
     return blocks
 
