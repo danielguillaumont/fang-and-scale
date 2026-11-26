@@ -1,0 +1,24 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: object-owner-added-by-workload
+title: Owner added to an application or service principal by a workload identity
+description: >-
+  A service principal made someone an owner of an application or a service principal. An owner holding Application.ReadWrite.OwnedBy can add credentials and sign in as that object, so a new owner is one step before owner-adds-credential. Watch the verifier and scout identities above all.
+severity: High
+tactics: [Persistence, PrivilegeEscalation]
+covers:
+  - "op:application:owners/update"
+  - "op:servicePrincipal:owners/update"
+tables: [AuditLogs]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: InitiatingAppId
+query: |
+  AuditLogs
+  | where OperationName in~ ("Add owner to application", "Add owner to service principal")
+  | where Result =~ "success"
+  | extend InitiatingAppId = tostring(InitiatedBy.app.servicePrincipalId)
+  | where isnotempty(InitiatingAppId)
+  | extend TargetObjectId = tostring(TargetResources[0].id)
+  | extend NewOwnerId = tostring(TargetResources[1].id)
+  | project TimeGenerated, InitiatingAppId, TargetObjectId, NewOwnerId, OperationName, CorrelationId
