@@ -35,9 +35,14 @@ azuread), pytest + hypothesis, ruff, mypy --strict.
 
 ## Commands
 
-- `make setup`  install deps with uv, install pre-commit hooks
-- `make check`  ruff + mypy + pytest (must pass before every commit)
-- `make lab-up` / `make lab-down`  apply / destroy the Terraform lab
+Tasks are poethepoet tasks in `pyproject.toml`; they run the same on Windows
+(PowerShell) and Linux (CI). No Makefile, no shell-specific commands.
+
+- `uv run poe setup`  install deps with uv, install pre-commit hooks
+- `uv run poe check`  ruff + mypy + import boundaries + pytest (must pass before every commit)
+- `uv run poe schema`  regenerate committed JSON Schemas in `schemas/`
+- `uv run poe lab-up` / `uv run poe lab-down`  apply / destroy the Terraform lab
+- `uv run poe demo`  replay the bundled fixture through `fns demo scout`
 - `uv run fns --help`
 
 ## Working style
