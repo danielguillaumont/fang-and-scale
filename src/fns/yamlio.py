@@ -89,3 +89,9 @@ def load_yaml(path: Path) -> dict[str, Any]:
     if path.stat().st_size > MAX_BYTES:
         raise YamlError(f"{path} exceeds 1 MiB")
     return loads_yaml(path.read_text(encoding="utf-8"))
+
+
+def dumps_yaml(data: dict[str, Any]) -> str:
+    """Deterministic YAML for files the tool writes (keys in insertion order)."""
+    text: str = yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=100)
+    return text
