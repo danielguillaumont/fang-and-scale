@@ -1,4 +1,6 @@
 # Install with `uv run poe setup`. mypy and pytest run in `uv run poe check`.
+# Vendored files stay byte for byte as published (src/fns/report/vendor/README.md).
+exclude: ^src/fns/report/vendor/.*\.(js|LICENSE)$
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
