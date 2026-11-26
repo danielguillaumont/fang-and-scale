@@ -21,6 +21,14 @@ request (sanitized), the response, the date, and what the code does about it.
   `tests/fixtures/test_no_real_ids.py` passed, and the replay digest is pinned in
   `tests/golden/lab-run-1.digest`.
 
+## Research items (planned, not run)
+
+- **R1. Does ARM authorize before it validates?** If so, a deliberately
+  invalid write returns `403` when the caller is denied and `400` when it is
+  allowed, which would be a non-mutating authorization probe for writes. The
+  plan is in `docs/milestones/M3.md` (R1). No request has been sent; until a
+  result is recorded here, writes stay at rung 2 at most (E4).
+
 ## Open questions from Phase B
 
 - **Is `Directory.Read.All` needed?** Partly answered. The full set is
