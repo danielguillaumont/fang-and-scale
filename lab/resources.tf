@@ -112,8 +112,9 @@ resource "azurerm_key_vault_secret" "payroll_db" {
   value        = random_password.synthetic_secret.result
   key_vault_id = azurerm_key_vault.crown_jewels.id
   content_type = "synthetic; Fang & Scale lab"
-  tags         = local.tags
-  depends_on   = [time_sleep.rbac_propagation]
+  # fns prove reads this secret only if its ARM metadata carries this tag (M3 V6).
+  tags       = merge(local.tags, { "fns-data" = "synthetic" })
+  depends_on = [time_sleep.rbac_propagation]
 }
 
 resource "azurerm_storage_container" "payroll" {

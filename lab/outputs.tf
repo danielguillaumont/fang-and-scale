@@ -43,3 +43,11 @@ output "resources" {
     storage_invoices = azurerm_storage_account.invoices.id
   }
 }
+
+output "billing_agent" {
+  description = "The test identity fns prove --live signs in as (M3 runbook)."
+  value = {
+    client_id = azuread_application.billing_agent.client_id
+    object_id = azuread_service_principal.billing_agent.object_id
+  }
+}

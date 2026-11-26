@@ -10,11 +10,25 @@ import re
 from pathlib import Path
 
 from fns.adapters.azure import arm, graph
+from fns.models.operations import parse_operation
 from fns.models.scope import parse_scope
+from fns.probes.data_read import METADATA_READ, SYNTHETIC_TAG
+from fns.probes.permissions import OPERATION as PERMISSIONS_OP
 from tests.factories import NOW, RG, SP_AGENT, SUB, TENANT
 
 LAB = Path(__file__).resolve().parents[1] / "lab"
 FOR_BLOCK = "%{ for op in operations ~}\n    - ${op}\n%{ endfor ~}\n"
+PROVE_BLOCK = "%{ for op in prove_operations ~}\n    - ${op}\n%{ endfor ~}\n"
+OBJECTS_BLOCK = (
+    "%{ for obj in data_objects ~}\n"
+    "  - resource: ${obj.resource}\n"
+    "    operation: ${obj.operation}\n"
+    "%{ endfor ~}\n"
+)
+AGENT_APP = "00000000-0000-4000-8000-000000000907"
+VAULT = f"{RG}/providers/Microsoft.KeyVault/vaults/kv-crown-x"
+PAYROLL = f"{RG}/providers/Microsoft.Storage/storageAccounts/stpayrollx"
+INVOICES = f"{RG}/providers/Microsoft.Storage/storageAccounts/stinvoicesx"
 
 
 def _scope_tf_operations() -> list[str]:
@@ -24,15 +38,68 @@ def _scope_tf_operations() -> list[str]:
     return re.findall(r'"([^"]+)"', block.group(1))
 
 
+def _resource_names() -> dict[str, str]:
+    """Literal names of the lab's secret, containers and blobs (resources.tf)."""
+    text = (LAB / "resources.tf").read_text(encoding="utf-8")
+    out: dict[str, str] = {}
+    for kind, name in (
+        ("azurerm_key_vault_secret", "payroll_db"),
+        ("azurerm_storage_container", "payroll"),
+        ("azurerm_storage_container", "invoices"),
+        ("azurerm_storage_blob", "payroll"),
+        ("azurerm_storage_blob", "invoice"),
+    ):
+        block = re.search(rf'resource "{kind}" "{name}" \{{(.*?)\n\}}', text, re.S)
+        assert block is not None, (kind, name)
+        found = re.search(r'^\s*name\s*=\s*"([^"]+)"', block.group(1), re.M)
+        assert found is not None, (kind, name)
+        out[f"{kind}.{name}.name"] = found.group(1)
+    return out
+
+
+def _prove_operations() -> tuple[list[str], list[tuple[str, str]]]:
+    """``prove_operations`` and ``data_objects`` from scope.tf, references resolved."""
+    text = (LAB / "scope.tf").read_text(encoding="utf-8")
+    names = _resource_names()
+
+    def resolve(s: str) -> str:
+        return re.sub(r"\$\{([\w.]+)\}", lambda m: names[m.group(1)], s)
+
+    local_ops = {k: resolve(v) for k, v in re.findall(r'^\s*(\w+_op)\s*=\s*"([^"]+)"', text, re.M)}
+    block = re.search(r"prove_operations = \[(.*?)\]", text, re.S)
+    assert block is not None
+    ops: list[str] = []
+    for item in re.findall(r'"([^"]+)"|local\.(\w+)', block.group(1)):
+        ops.append(resolve(item[0]) if item[0] else local_ops[item[1]])
+    resources = {
+        "azurerm_key_vault.crown_jewels.id": VAULT,
+        "azurerm_storage_account.payroll.id": PAYROLL,
+        "azurerm_storage_account.invoices.id": INVOICES,
+    }
+    objects = [
+        (resources[r], local_ops[o])
+        for r, o in re.findall(r"resource = ([\w.]+), operation = local\.(\w+)", text)
+    ]
+    return ops, objects
+
+
 def _render(operations: list[str]) -> str:
     template = (LAB / "scope.lab.yaml.tftpl").read_text(encoding="utf-8")
-    assert FOR_BLOCK in template
+    prove_ops, objects = _prove_operations()
+    for block in (FOR_BLOCK, PROVE_BLOCK, OBJECTS_BLOCK):
+        assert block in template
     text = template.replace(FOR_BLOCK, "".join(f"    - {op}\n" for op in operations))
+    text = text.replace(PROVE_BLOCK, "".join(f"    - {op}\n" for op in prove_ops))
+    text = text.replace(
+        OBJECTS_BLOCK,
+        "".join(f"  - resource: {r}\n    operation: {o}\n" for r, o in objects),
+    )
     values = {
         "tenant_id": TENANT,
         "subscription_id": SUB,
         "resource_group": RG,
         "agent_object_id": SP_AGENT,
+        "agent_app_id": AGENT_APP,
         "expires_at": "2026-12-02T12:00:00Z",
     }
     for key, value in values.items():
@@ -53,8 +120,51 @@ def test_lab_operations_match_the_collector_catalogue() -> None:
 
 def test_rendered_scope_is_a_valid_read_only_manifest() -> None:
     manifest = parse_scope(_render(_scope_tf_operations()), now=NOW)
-    assert set(manifest.allowed_operations) == {"scout"}
+    assert set(manifest.allowed_operations) == {"scout", "prove"}
     assert [str(i.object_id) for i in manifest.test_identities] == [SP_AGENT]
+    assert [str(i.app_id) for i in manifest.test_identities] == [AGENT_APP]
+    ops = [parse_operation(op) for ops in manifest.allowed_operations.values() for op in ops]
+    assert all(op.is_read for op in ops)
+
+
+def test_prove_scope_matches_what_the_probes_send() -> None:
+    """Every operation the live probes need, and nothing more, bound to its resource."""
+    manifest = parse_scope(_render(_scope_tf_operations()), now=NOW)
+    names = _resource_names()
+    secret = names["azurerm_key_vault_secret.payroll_db.name"]
+    pay = (
+        names["azurerm_storage_container.payroll.name"],
+        names["azurerm_storage_blob.payroll.name"],
+    )
+    inv = (
+        names["azurerm_storage_container.invoices.name"],
+        names["azurerm_storage_blob.invoice.name"],
+    )
+    expected = {
+        PERMISSIONS_OP,
+        METADATA_READ,
+        "kv:GET /secrets",
+        f"kv:GET /secrets/{secret}",
+        f"blob:HEAD /{pay[0]}/{pay[1]}",
+        f"blob:HEAD /{inv[0]}/{inv[1]}",
+    }
+    assert set(manifest.allowed_operations["prove"]) == expected
+    bound = {(d.resource.lower(), d.operation) for d in manifest.data_objects}
+    assert bound == {
+        (VAULT.lower(), f"kv:GET /secrets/{secret}"),
+        (PAYROLL.lower(), f"blob:HEAD /{pay[0]}/{pay[1]}"),
+        (INVOICES.lower(), f"blob:HEAD /{inv[0]}/{inv[1]}"),
+    }
+
+
+def test_the_probed_secret_is_tagged_synthetic() -> None:
+    """V6: the probe reads the secret only if its metadata says it is synthetic."""
+    text = (LAB / "resources.tf").read_text(encoding="utf-8")
+    block = re.search(r'resource "azurerm_key_vault_secret" "payroll_db" \{(.*?)\n\}', text, re.S)
+    assert block is not None
+    key, value = SYNTHETIC_TAG
+    assert f'"{key}" = "{value}"' in block.group(1)
+    assert "random_password.synthetic_secret.result" in block.group(1)
 
 
 def test_lab_never_creates_credentials() -> None:
