@@ -27,9 +27,10 @@ budget:
 ```
 
 > **Status.** M1 and M2 are done and ran live. M3 to M5 are built and tested
-> offline, against the recorded lab runs and hand-written fixtures. Their live runs
-> are waiting on approval; the M3 plan is `docs/milestones/M3-live-plan.md`. See
-> [Real vs. fixture](#real-vs-fixture) before you trust any result.
+> offline, against the recorded lab runs and hand-written fixtures. The M3 live
+> run is ready: `docs/runbooks/m3-live-run.md` (plan and decisions in
+> `docs/milestones/M3-live-plan.md`). See [Real vs. fixture](#real-vs-fixture)
+> before you trust any result.
 
 ## 90-second demo (no tenant)
 
@@ -251,7 +252,7 @@ so does an internal error, so a crash never looks like a verdict.
 | --- | --- | --- |
 | M1 Lab + contracts | Terraform lab, scope gate, scout, schemas | done, live |
 | M2 Contain | reach engine, escalation rules, settings and PIM collectors | done, live (tag `m2`) |
-| M3 Prove | freeze, probes, isolated verifier, signed bundle | built offline; live probes and Sigstore pending approval (`docs/milestones/M3-live-plan.md`) |
+| M3 Prove | freeze, probes, isolated verifier, signed bundle | built offline; live probes ready to run (`docs/runbooks/m3-live-run.md`); Sigstore signing in CI on **staging** only |
 | M4 Harden + detect | minimizer, record mode, KQL rules | built offline; live loop pending approval |
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
 | M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | not started |

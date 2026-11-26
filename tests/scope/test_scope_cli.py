@@ -99,3 +99,17 @@ def test_markup_in_values_is_not_interpreted(tmp_path: Path) -> None:
     result = runner.invoke(app, ["scope", "check", str(_write(tmp_path, data))])
     assert result.exit_code == 0
     assert "[bold red]x[/]" in result.output
+
+
+def test_summary_shows_the_prover_app_id_and_data_objects(tmp_path: Path) -> None:
+    """The M3 runbook checks both before any probe runs."""
+    from tests.prove.test_live_probes import AGENT_APP, scope_doc
+
+    doc = scope_doc(expires_at=(datetime.now(UTC) + timedelta(days=3)).isoformat())
+    result = runner.invoke(app, ["scope", "check", str(_write(tmp_path, doc))])
+    assert result.exit_code == 0, result.output
+    out = result.output
+    assert f"app_id {AGENT_APP}" in out
+    assert "data objects 3 (prove reads only these)" in out
+    assert "kv:GET /secrets/payroll-db-password on /subscriptions/" in out
+    assert "blob:HEAD /invoices/invoice-0001-SYNTHETIC.json on /subscriptions/" in out

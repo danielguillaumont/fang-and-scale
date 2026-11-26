@@ -588,7 +588,12 @@ def scope_check(
         con.print(f"  {rg}")
     con.print(f"test identities {len(m.test_identities)}")
     for ident in m.test_identities:
-        con.print(f"  {ident.object_id} {ident.kind} {ident.name}", markup=False)
+        app_id = f" app_id {ident.app_id}" if ident.app_id else ""
+        con.print(f"  {ident.object_id} {ident.kind} {ident.name}{app_id}", markup=False)
+    if m.data_objects:
+        con.print(f"data objects {len(m.data_objects)} (prove reads only these)")
+        for obj in m.data_objects:
+            con.print(f"  {obj.operation} on {obj.resource}", markup=False)
 
     table = Table(title="allowed operations", show_lines=False)
     table.add_column("verb")
