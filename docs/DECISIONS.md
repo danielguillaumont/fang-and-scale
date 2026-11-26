@@ -63,3 +63,9 @@
 | 2026-11-25 | App display names in the lab match PLAN (`sp-billing-agent`, ...) and are not prefixed; only the RG and globally unique resources use the prefix/suffix | Contracts reference identities by name; the lab tenant is dedicated, so names cannot collide |
 | 2026-11-25 | Sanitizer also replaces display names of user objects (`user-N`); apps, groups and resources keep their names | The lab admin appears as an owner; a personal name must not reach a committed fixture |
 | 2026-11-25 | `fns demo scout --fixture DIR` replays a recorded set | Proves record/replay round-trips and lets anyone rerun a recorded lab snapshot without a tenant |
+| 2026-11-26 | Lab `location` is a required variable with no default | Region policies (Azure for Students blocks `eastus`) made the default fail on the first live run; choosing explicitly beats a default that may be denied |
+| 2026-11-26 | `scout_directory_read_all` toggle (default true) instead of removing `Directory.Read.All` now | The first run proved the set sufficient, not minimal; the toggle lets the next run test the smaller set without editing Terraform |
+| 2026-11-26 | Commit the first recorded lab run as `fixtures/lab-run-1` with a golden replay digest | Pins real ARM/Graph response shapes as a regression test; checked by `test_no_real_ids` and against the idmap before committing |
+| 2026-11-26 | Recorded fixtures are excluded from pre-commit's 500 KB limit | Graph's `/servicePrincipals` page with `appRoles` alone is most of 575 KB; the leak scan, not file size, is the safeguard that matters for fixtures |
+| 2026-11-26 | The recorder replaces the live scope's header comment | The live header says "do not commit (real IDs)", which is false for the sanitized copy and would mislead reviewers |
+| 2026-11-26 | Well-known IDs are checked against the recorded lab responses in a test | Two constants were wrong or missing and were silently replaced with placeholders; a test catches the next one |
