@@ -1,0 +1,26 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: workload-runs-code-on-identity-host
+title: Code run on a host with a managed identity
+description: >-
+  A monitored workload identity ran a command on a VM or started an Automation job. Code that runs there acts as the host's managed identity.
+severity: High
+tactics: [Execution, PrivilegeEscalation]
+covers:
+  - "rule:managed-identity"
+tables: [AzureActivity]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: Caller
+  AzureResource: ResourceId
+parameters:
+  monitored_identities: >-
+    KQL dynamic array of object IDs to watch, e.g. ["<guid>"] (the workload identities a contract assumes compromised)
+query: |
+  let MonitoredIdentities = dynamic({{monitored_identities}});
+  AzureActivity
+  | where OperationNameValue in~ ("MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION", "MICROSOFT.AUTOMATION/AUTOMATIONACCOUNTS/JOBS/WRITE")
+  | where ActivityStatusValue in~ ("Success", "Succeeded", "Started")
+  | where Caller in~ (MonitoredIdentities)
+  | extend ResourceId = _ResourceId
+  | project TimeGenerated, Caller, ResourceId, OperationNameValue, CorrelationId

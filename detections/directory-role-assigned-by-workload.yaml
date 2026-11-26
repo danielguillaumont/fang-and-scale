@@ -1,0 +1,23 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: directory-role-assigned-by-workload
+title: Directory role assigned by a workload identity
+description: >-
+  A service principal added a member to an Entra directory role. Expected only from approved automation.
+severity: High
+tactics: [PrivilegeEscalation, Persistence]
+covers:
+  - "rule:rolemanagement-write"
+  - "op:directory:roleAssignments/write"
+tables: [AuditLogs]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: InitiatingAppId
+query: |
+  AuditLogs
+  | where OperationName in ("Add member to role", "Add eligible member to role")
+  | where Result =~ "success"
+  | extend InitiatingAppId = tostring(InitiatedBy.app.servicePrincipalId)
+  | where isnotempty(InitiatingAppId)
+  | extend RoleName = tostring(TargetResources[0].displayName)
+  | project TimeGenerated, InitiatingAppId, RoleName, OperationName, CorrelationId

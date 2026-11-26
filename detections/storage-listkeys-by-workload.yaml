@@ -1,0 +1,27 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: storage-listkeys-by-workload
+title: Storage account keys listed by a monitored workload
+description: >-
+  A monitored workload identity listed storage account keys. An account key gives full data-plane access to the account, bypassing RBAC data roles.
+severity: Medium
+tactics: [CredentialAccess]
+covers:
+  - "op:resource:listKeys"
+  - "way:listkeys-data"
+tables: [AzureActivity]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: Caller
+  AzureResource: ResourceId
+parameters:
+  monitored_identities: >-
+    KQL dynamic array of object IDs to watch, e.g. ["<guid>"] (the workload identities a contract assumes compromised)
+query: |
+  let MonitoredIdentities = dynamic({{monitored_identities}});
+  AzureActivity
+  | where OperationNameValue =~ "MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION"
+  | where ActivityStatusValue in~ ("Success", "Succeeded")
+  | where Caller in~ (MonitoredIdentities)
+  | extend ResourceId = _ResourceId
+  | project TimeGenerated, Caller, ResourceId, CorrelationId

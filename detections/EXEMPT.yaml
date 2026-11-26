@@ -1,0 +1,2 @@
+# Coverage keys with no detection rule, and why (tests/harden/test_detections.py).
+"rule:member-of": group membership is a standing fact, not an action an attacker takes

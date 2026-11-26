@@ -1,0 +1,26 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: keyvault-control-plane-write-by-workload
+title: Key Vault configuration changed by a monitored workload
+description: >-
+  A monitored workload identity changed a vault or its access policies. vaults/write can switch the permission model or add an access policy, which turns control-plane access into secret access.
+severity: High
+tactics: [PrivilegeEscalation, DefenseEvasion]
+covers:
+  - "way:kv-control-to-data"
+tables: [AzureActivity]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: Caller
+  AzureResource: ResourceId
+parameters:
+  monitored_identities: >-
+    KQL dynamic array of object IDs to watch, e.g. ["<guid>"] (the workload identities a contract assumes compromised)
+query: |
+  let MonitoredIdentities = dynamic({{monitored_identities}});
+  AzureActivity
+  | where OperationNameValue in~ ("MICROSOFT.KEYVAULT/VAULTS/WRITE", "MICROSOFT.KEYVAULT/VAULTS/ACCESSPOLICIES/WRITE")
+  | where ActivityStatusValue in~ ("Success", "Succeeded")
+  | where Caller in~ (MonitoredIdentities)
+  | extend ResourceId = _ResourceId
+  | project TimeGenerated, Caller, ResourceId, OperationNameValue, CorrelationId

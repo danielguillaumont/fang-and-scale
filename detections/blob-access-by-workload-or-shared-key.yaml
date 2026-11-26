@@ -1,0 +1,27 @@
+# Detection rule (M4 K3). Structural tests: tests/harden/test_detections.py
+id: blob-access-by-workload-or-shared-key
+title: Blob data accessed by a monitored workload or with an account key
+description: >-
+  Blob reads or writes by a monitored workload identity, or with a shared account key (which carries no identity). Requires StorageBlobLogs in the workspace.
+severity: Medium
+tactics: [Collection, Exfiltration]
+covers:
+  - "op:resource:blob/read"
+  - "op:resource:blob/write"
+tables: [StorageBlobLogs]
+query_frequency: PT15M
+query_period: PT1H
+entities:
+  Account: RequesterObjectId
+  AzureResource: ResourceId
+parameters:
+  monitored_identities: >-
+    KQL dynamic array of object IDs to watch, e.g. ["<guid>"] (the workload identities a contract assumes compromised)
+query: |
+  let MonitoredIdentities = dynamic({{monitored_identities}});
+  StorageBlobLogs
+  | where OperationName in ("GetBlob", "PutBlob", "PutBlock", "PutBlockList", "AppendBlock")
+  | where StatusCode between (200 .. 299)
+  | where RequesterObjectId in~ (MonitoredIdentities) or AuthenticationType == "AccountKey"
+  | extend ResourceId = _ResourceId
+  | project TimeGenerated, RequesterObjectId, AuthenticationType, ResourceId, OperationName, CorrelationId
