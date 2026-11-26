@@ -52,8 +52,12 @@ by `fns mutate` (M5) on `fixtures/lab-run-1`, hardened in the model.
     without one of them, so ownership alone adds no reach. The model sees the
     change, and the survivor's output says "owns id-verifier but holds neither
     ... (one Graph grant away)".
-- **Open (your call, in `docs/DECISIONS.md`):** whether a standing ownership of
-  the verifier should fail a contract even when it cannot be used yet.
+- **Accepted (2026-11-26 review).** The two ownership mutants are accepted,
+  explained survivors. No contract line can kill them, because ownership alone
+  allows none of the forbidden operations. A check that fails on an unusable
+  ownership would be a new kind of check, not a contract change. The Graph grant
+  that would make the ownership usable is already caught by the three
+  Graph-permission mutants.
 
 ## Research items (planned, not run)
 
