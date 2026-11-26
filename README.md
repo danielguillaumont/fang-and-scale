@@ -30,20 +30,22 @@ budget:
 
 ## 90-second demo (no tenant)
 
-Requires [uv](https://docs.astral.sh/uv/). Every line these commands print starts
-with `FIXTURE`, and none of them makes a network call.
+Requires [uv](https://docs.astral.sh/uv/) and a clone of this repository. The
+demo commands replay `fixtures/lab-run-1`, the live lab run recorded in M1 and
+sanitized. Every line they print starts with `FIXTURE`, and none of them makes a
+network call.
 
 ```
 uv sync
 uv run fns demo contain      # 1. What can a compromised billing agent reach?
 uv run fns demo prove        # 2. Freeze assertions, replay probes, verify in a separate process
 uv run fns demo mutate       # 3. Harden the lab in the model, then try to break the contract
-uv run fns demo report --fixture fixtures/lab-run-1   # 4. One HTML page: .fns/report.FIXTURE.html
+uv run fns demo report       # 4. One HTML page: .fns/report.FIXTURE.html
 ```
 
-**1. Contain.** The demo contract fails on purpose (exit 1). The agent's owner
-rights on another application lead to directory-wide role assignment (output
-shortened):
+**1. Contain.** The seeded lab contract fails on purpose (exit 1): 6 critical
+findings. The agent's owner rights on another application lead to directory-wide
+role assignment (output shortened):
 
 ```
 FIXTURE FAIL directory:tenant roleAssignments/write  modeled / modeled-only
