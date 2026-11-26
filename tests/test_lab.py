@@ -45,7 +45,9 @@ def test_lab_operations_match_the_collector_catalogue() -> None:
     assert _scope_tf_operations() == [
         *arm.ARM_OPERATIONS,
         *arm.SETTINGS_OPERATIONS,
+        *arm.PIM_OPERATIONS,
         *graph.GRAPH_OPERATIONS,
+        *graph.PIM_OPERATIONS,
     ]
 
 

@@ -393,6 +393,11 @@ def _paths(closure: Closure, hits: list[_Hit]) -> tuple[ReachPath, ...]:
     return tuple(sorted(paths.values(), key=ReachPath.sort_key)[:MAX_PATHS])
 
 
+DONE: Final = frozenset({"complete", "not-applicable"})
+"""Collector states that leave no gap: ``not-applicable`` carries its evidence in
+``coverage.not_applicable``."""
+
+
 def _gaps(closure: Closure, semantics: sem.OperationSemantics, target: Entity | None) -> list[str]:
     snapshot = closure.index.snapshot
     missing = {n.surface: n.reason for n in snapshot.coverage.not_collected}
@@ -407,7 +412,7 @@ def _gaps(closure: Closure, semantics: sem.OperationSemantics, target: Entity | 
         if surface in missing:
             out.append(f"{surface} not collected: {missing[surface]}")
     for run in snapshot.coverage.collectors:
-        if run.status != "complete":
+        if run.status not in DONE:
             codes = ", ".join(run.error_codes) or "no error code"
             out.append(f"collector {run.name} is {run.status} ({codes})")
     out.extend(sorted(closure.uncertain))

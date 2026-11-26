@@ -125,7 +125,9 @@ class SnapshotBuilder:
                 "entities": [self._annotated(e) for _, _, e in self._entities.values()],
                 "edges": edges,
                 "coverage": SnapshotCoverage(
-                    collectors=coverage.collectors, not_collected=tuple(not_collected)
+                    collectors=coverage.collectors,
+                    not_collected=tuple(not_collected),
+                    not_applicable=coverage.not_applicable,
                 ),
             }
         )

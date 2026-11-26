@@ -28,6 +28,17 @@ OP_SP_MEMBER_OF: Final = "graph:GET /servicePrincipals/{id}/memberOf"
 OP_DIR_ROLE_DEFINITIONS: Final = "graph:GET /roleManagement/directory/roleDefinitions"
 OP_DIR_ROLE_ASSIGNMENTS: Final = "graph:GET /roleManagement/directory/roleAssignments"
 
+OP_DIR_ROLE_ELIGIBILITY: Final = "graph:GET /roleManagement/directory/roleEligibilitySchedules"
+OP_SUBSCRIBED_SKUS: Final = "graph:GET /subscribedSkus"
+PIM_OPERATIONS: Final = (OP_DIR_ROLE_ELIGIBILITY, OP_SUBSCRIBED_SKUS)
+"""Entra PIM eligibility and the licences that show whether PIM exists (M3 E1)."""
+
+PIM_PLAN_IDS: Final = frozenset({"eec0eb4f-6444-4f95-aba0-50c24d67f998"})
+"""Service plan AAD_PREMIUM_P2 (Microsoft Entra ID P2), which carries PIM."""
+PIM_PLAN_MARKERS: Final = ("P2", "GOVERNANCE")
+"""Deliberately broad: any plan or SKU name containing these may carry PIM. A false
+match only keeps the surface 'not collected'; it never lets a finding pass."""
+
 GRAPH_OPERATIONS: Final = (
     OP_SERVICE_PRINCIPALS,
     OP_APPLICATIONS,
@@ -97,6 +108,21 @@ def directory_role_definitions_request() -> ApiRequest:
     return _req(
         OP_DIR_ROLE_DEFINITIONS,
         "/roleManagement/directory/roleDefinitions?$select=id,displayName,templateId,isBuiltIn",
+    )
+
+
+def directory_role_eligibility_request() -> ApiRequest:
+    return _req(
+        OP_DIR_ROLE_ELIGIBILITY,
+        "/roleManagement/directory/roleEligibilitySchedules?$select=id,principalId,"
+        "roleDefinitionId,directoryScopeId",
+    )
+
+
+def subscribed_skus_request() -> ApiRequest:
+    return _req(
+        OP_SUBSCRIBED_SKUS,
+        "/subscribedSkus?$select=skuId,skuPartNumber,capabilityStatus,servicePlans",
     )
 
 
@@ -286,3 +312,66 @@ def parse_directory_role_assignments(
         except ParseError:
             errors.append("bad-item")
     return errors
+
+
+def parse_directory_role_eligibility(
+    b: SnapshotBuilder, items: list[dict[str, Any]], prov: Provenance
+) -> tuple[int, list[str]]:
+    """Add hasEligibleRole (directory) edges for principals already in the snapshot.
+
+    Returns (rows skipped because the principal is not in the snapshot, errors).
+    """
+    skipped = 0
+    errors: list[str] = []
+    for item in items:
+        try:
+            principal = _guid(item.get("principalId"))
+            if not b.has(principal):
+                skipped += 1
+                continue
+            role = _guid(item.get("roleDefinitionId"))
+            if not b.has(role):
+                b.entity(role, "directoryRole", priority=PRIORITY_STUB)
+            b.edge(
+                {
+                    "type": "hasEligibleRole",
+                    "src": principal,
+                    "dst": role,
+                    "plane": "directory",
+                    "role_definition_id": role,
+                    "directory_scope_id": str(item.get("directoryScopeId") or "/"),
+                    "schedule_id": item.get("id") if isinstance(item.get("id"), str) else None,
+                },
+                prov,
+            )
+        except ParseError:
+            errors.append("bad-item")
+    return skipped, errors
+
+
+def pim_licences(items: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    """(SKU part numbers, plans that may carry PIM) from ``/subscribedSkus``.
+
+    A SKU counts unless its capabilityStatus is ``Deleted``; a plan counts unless
+    its provisioningStatus is ``Disabled``. Both are the conservative direction.
+    """
+    skus: set[str] = set()
+    pim: set[str] = set()
+    for sku in items:
+        part = str(sku.get("skuPartNumber") or sku.get("skuId") or "unknown-sku")
+        if str(sku.get("capabilityStatus") or "") == "Deleted":
+            continue
+        skus.add(part)
+        plans = sku.get("servicePlans")
+        if not isinstance(plans, list):
+            raise ParseError("servicePlans must be a list")
+        if any(m in part.upper() for m in PIM_PLAN_MARKERS):
+            pim.add(part)
+        for plan in plans:
+            if not isinstance(plan, dict) or plan.get("provisioningStatus") == "Disabled":
+                continue
+            name = str(plan.get("servicePlanName") or "")
+            plan_id = str(plan.get("servicePlanId") or "").lower()
+            if plan_id in PIM_PLAN_IDS or any(m in name.upper() for m in PIM_PLAN_MARKERS):
+                pim.add(f"{part}/{name or plan_id}")
+    return sorted(skus), sorted(pim)

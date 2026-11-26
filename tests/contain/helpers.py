@@ -75,6 +75,7 @@ class Snap:
     edges: list[dict[str, Any]] = field(default_factory=list)
     not_collected: list[dict[str, str]] = field(default_factory=list)
     collectors: list[dict[str, Any]] = field(default_factory=list)
+    not_applicable: list[dict[str, Any]] = field(default_factory=list)
     _n: int = 0
 
     def __post_init__(self) -> None:
@@ -182,7 +183,11 @@ class Snap:
                 "collector_version": "test",
                 "entities": list(self.entities.values()),
                 "edges": self.edges,
-                "coverage": {"collectors": self.collectors, "not_collected": self.not_collected},
+                "coverage": {
+                    "collectors": self.collectors,
+                    "not_collected": self.not_collected,
+                    "not_applicable": self.not_applicable,
+                },
             }
         )
 

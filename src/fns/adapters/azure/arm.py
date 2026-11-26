@@ -37,6 +37,11 @@ SETTINGS_OPERATIONS: Final = (OP_KEY_VAULT, OP_STORAGE_ACCOUNT)
 """Per-resource reads for settings the reach model needs (M2 C1). Optional: a scope
 that does not allow them leaves those settings uncollected (and says so)."""
 
+OP_ROLE_ELIGIBILITY: Final = "arm:Microsoft.Authorization/roleEligibilitySchedules/read"
+PIM_API: Final = "2020-10-01"
+PIM_OPERATIONS: Final = (OP_ROLE_ELIGIBILITY,)
+"""Azure resource PIM eligibility (M3 E1). Optional, like the settings reads."""
+
 SETTINGS_TYPES: Final[dict[str, str]] = {
     "microsoft.keyvault/vaults": OP_KEY_VAULT,
     "microsoft.storage/storageaccounts": OP_STORAGE_ACCOUNT,
@@ -99,6 +104,17 @@ def deny_assignments_request(subscription_id: str) -> ApiRequest:
         sub,
         f"{sub}/providers/Microsoft.Authorization/denyAssignments",
         AUTHZ_API,
+    )
+
+
+def role_eligibility_request(subscription_id: str) -> ApiRequest:
+    """Eligibility schedules at, above and below the subscription (no ``$filter``)."""
+    sub = f"/subscriptions/{subscription_id}"
+    return _req(
+        OP_ROLE_ELIGIBILITY,
+        sub,
+        f"{sub}/providers/Microsoft.Authorization/roleEligibilitySchedules",
+        PIM_API,
     )
 
 
@@ -344,3 +360,38 @@ def parse_storage_account(b: SnapshotBuilder, account_id: str, body: dict[str, A
         raise ParseError("storage response does not match the requested account")
     p = _props(body)
     b.annotate(account_id, {"allowSharedKeyAccess": _optional_bool(p, "allowSharedKeyAccess")})
+
+
+def parse_role_eligibility(
+    b: SnapshotBuilder, items: list[dict[str, Any]], prov: Provenance
+) -> tuple[int, list[str]]:
+    """Add hasEligibleRole (arm) edges for principals already in the snapshot.
+
+    Returns (rows skipped because the principal is not in the snapshot, errors). A
+    principal the snapshot does not hold cannot be controlled by the assumed
+    compromised identity, so its eligibility cannot add reach.
+    """
+    skipped = 0
+    errors: list[str] = []
+    for item in items:
+        try:
+            p = _props(item)
+            principal = _str(p, "principalId").lower()
+            if not b.has(principal):
+                skipped += 1
+                continue
+            scope = scope_entity(b, _str(p, "scope"))
+            b.edge(
+                {
+                    "type": "hasEligibleRole",
+                    "src": principal,
+                    "dst": scope,
+                    "plane": "arm",
+                    "role_definition_id": parse_arm_id(_str(p, "roleDefinitionId")).format(),
+                    "schedule_id": item.get("id") if isinstance(item.get("id"), str) else None,
+                },
+                prov,
+            )
+        except (ParseError, ArmIdError, ValueError):
+            errors.append("bad-item")
+    return skipped, errors

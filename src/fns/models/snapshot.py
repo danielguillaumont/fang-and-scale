@@ -219,6 +219,31 @@ class HasAccessPolicy(_EdgeBase):
         return _sorted_set(tuple(p.lower() for p in v))
 
 
+class HasEligibleRole(_EdgeBase):
+    """principal -> role it is *eligible* for through PIM (not active).
+
+    ``plane`` directory: dst is the Entra role definition (template GUID).
+    ``plane`` arm: dst is the ARM scope; the role definition is an attribute.
+    The reach model does not activate eligibility: it makes dependent findings
+    inconclusive instead (M3 E1).
+    """
+
+    type: Literal["hasEligibleRole"]
+    plane: Literal["directory", "arm"]
+    role_definition_id: str = Field(min_length=1)
+    directory_scope_id: str | None = None
+    """'/' or '/<objectId>' for the directory plane; None for ARM."""
+    schedule_id: str | None = None
+
+    @field_validator("role_definition_id")
+    @classmethod
+    def _lower_role(cls, v: str) -> str:
+        return v.lower()
+
+    def identity(self) -> tuple[str, ...]:
+        return (self.plane, self.role_definition_id, self.directory_scope_id or "")
+
+
 Edge = Annotated[
     MemberOf
     | Owns
@@ -229,11 +254,14 @@ Edge = Annotated[
     | HasDirectoryRole
     | HasRbacRole
     | DenyAssignment
-    | HasAccessPolicy,
+    | HasAccessPolicy
+    | HasEligibleRole,
     Field(discriminator="type"),
 ]
 
-CollectorStatus = Literal["complete", "partial", "failed", "skipped"]
+CollectorStatus = Literal["complete", "partial", "failed", "skipped", "not-applicable"]
+"""``not-applicable``: the surface the collector reads does not exist in this tenant,
+with the evidence in ``coverage.not_applicable`` (never inferred)."""
 
 
 class CollectorRun(FnsModel):
@@ -257,9 +285,39 @@ class NotCollected(FnsModel):
     reason: str = Field(min_length=1)
 
 
+class NotApplicable(FnsModel):
+    """A surface that does not exist in this tenant, and the responses that show it."""
+
+    surface: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    evidence: tuple[str, ...] = Field(min_length=1)
+    """What was observed, e.g. the status and error code of a listing, and the
+    subscribed SKUs. Order is the order of the requests."""
+
+
 class SnapshotCoverage(FnsModel):
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"not_applicable"})
+
     collectors: tuple[CollectorRun, ...] = ()
     not_collected: tuple[NotCollected, ...] = ()
+    not_applicable: tuple[NotApplicable, ...] = ()
+    """Surfaces shown not to exist; findings do not wait on them."""
+
+    @field_validator("not_applicable")
+    @classmethod
+    def _not_applicable(cls, v: tuple[NotApplicable, ...]) -> tuple[NotApplicable, ...]:
+        if len({n.surface for n in v}) != len(v):
+            raise ValueError("duplicate not_applicable surface")
+        return tuple(sorted(v, key=lambda n: n.surface))
+
+    @model_validator(mode="after")
+    def _exclusive(self) -> SnapshotCoverage:
+        both = sorted(
+            {n.surface for n in self.not_collected} & {n.surface for n in self.not_applicable}
+        )
+        if both:
+            raise ValueError(f"a surface cannot be both not collected and not applicable: {both}")
+        return self
 
     @field_validator("collectors")
     @classmethod
