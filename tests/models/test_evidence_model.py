@@ -215,3 +215,85 @@ def test_valid_findings_never_overclaim(
         assert f.coverage == (
             "verified" if top >= 3 else {1: "modeled-only", 2: "evaluated-only"}[top]
         )
+
+
+DIGEST = "a" * 64
+
+
+def ctx(rung: str, outcome: str) -> dict[str, Any]:
+    return {**ev(rung, outcome), "artifact_digest": DIGEST, "role": "context"}
+
+
+def test_context_never_backs_a_pass() -> None:
+    with pytest.raises(ValidationError, match="requires an observed denial"):
+        Finding.model_validate(
+            finding(
+                verdict="pass",
+                coverage="verified",
+                evidence=[ev("modeled", "allowed"), ctx("observed", "denied")],
+            )
+        )
+
+
+def test_context_never_raises_coverage() -> None:
+    supporting = [ev("modeled", "allowed"), ev("evaluated", "allowed")]
+    f = Finding.model_validate(
+        finding(
+            verdict="fail",
+            coverage="evaluated-only",
+            evidence=[*supporting, ctx("observed", "denied")],
+        )
+    )
+    assert len(f.context) == 1 and len(f.supporting) == 2
+    with pytest.raises(ValidationError, match="does not match highest rung"):
+        Finding.model_validate(
+            finding(
+                verdict="fail",
+                coverage="verified",
+                evidence=[*supporting, ctx("observed", "denied")],
+            )
+        )
+
+
+def test_context_alone_is_not_a_result() -> None:
+    with pytest.raises(ValidationError, match="requires evidence with outcome allowed"):
+        Finding.model_validate(
+            finding(verdict="fail", coverage="not-assessed", evidence=[ctx("observed", "allowed")])
+        )
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {**ev("modeled", "allowed"), "artifact_digest": DIGEST, "role": "context"},
+        {**ev("observed", "denied"), "role": "context"},
+    ],
+)
+def test_context_must_be_a_recorded_probe_result(bad: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError, match="recorded probe result"):
+        Finding.model_validate(
+            finding(
+                verdict="fail", coverage="modeled-only", evidence=[ev("modeled", "allowed"), bad]
+            )
+        )
+
+
+def test_unknown_roles_are_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Finding.model_validate(finding(evidence=[{**ev("observed", "denied"), "role": "supports"}]))
+
+
+def test_role_is_left_out_of_the_canonical_form_while_unset() -> None:
+    f = Finding.model_validate(
+        finding(
+            verdict="fail",
+            coverage="evaluated-only",
+            evidence=[
+                ev("modeled", "allowed"),
+                ev("evaluated", "allowed"),
+                ctx("observed", "denied"),
+            ],
+        )
+    )
+    text = f.canonical_json()
+    assert text.count('"role"') == 1 and '"role":"context"' in text

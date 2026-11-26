@@ -44,8 +44,12 @@ _COVERAGE_BY_RUNG: Final[dict[str, str]] = {
 }
 
 
+EvidenceRole = Literal["context"]
+
+
 class Evidence(FnsModel):
     __volatile__: ClassVar[frozenset[str]] = frozenset({"observed_at"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"role"})
 
     rung: Rung
     outcome: Outcome
@@ -57,9 +61,21 @@ class Evidence(FnsModel):
     notes: str | None = None
     path_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     """The escalation path this evidence rests on, in the enclosing ContainReport."""
+    role: EvidenceRole | None = None
+    """Unset: the verdict, coverage and gap rest on it. ``context``: a probe result
+    kept with the finding so no observation is dropped, which settles nothing here.
+    Example: the operation was denied when probed, but an escalation path is not
+    refuted. Context never counts toward the verdict, coverage or gap checks, so it
+    cannot strengthen a claim. Left out of the canonical JSON while unset."""
 
-    def sort_key(self) -> tuple[int, str, str, str]:
-        return (RUNG_ORDER[self.rung], self.outcome, self.source, self.artifact_digest or "")
+    def sort_key(self) -> tuple[int, str, str, str, str]:
+        return (
+            RUNG_ORDER[self.rung],
+            self.outcome,
+            self.source,
+            self.artifact_digest or "",
+            self.role or "",
+        )
 
 
 def finding_id(contract: str, item_kind: str, target: str, operation: str) -> str:
@@ -90,6 +106,15 @@ class Finding(FnsModel):
                 return {**data, "id": finding_id(*parts)}  # type: ignore[arg-type]
         return data
 
+    @property
+    def supporting(self) -> tuple[Evidence, ...]:
+        """The evidence the verdict, coverage and gap rest on (no context)."""
+        return tuple(e for e in self.evidence if e.role is None)
+
+    @property
+    def context(self) -> tuple[Evidence, ...]:
+        return tuple(e for e in self.evidence if e.role == "context")
+
     @field_validator("evidence")
     @classmethod
     def _sort_evidence(cls, v: tuple[Evidence, ...]) -> tuple[Evidence, ...]:
@@ -101,7 +126,10 @@ class Finding(FnsModel):
         if self.id != expected_id:
             raise ValueError("finding id does not match its contract/item/target/operation")
 
-        ev = self.evidence
+        for e in self.evidence:
+            if e.role == "context" and (e.rung == "modeled" or e.artifact_digest is None):
+                raise ValueError("context evidence must be a recorded probe result")
+        ev = self.supporting
 
         def has(rungs: set[str], outcome: str) -> bool:
             return any(e.rung in rungs and e.outcome == outcome for e in ev)

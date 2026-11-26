@@ -47,9 +47,10 @@ compromised.
   - Its `probes.json` holds 13 results, all `allowed` or `denied`, none omitted.
   - `test_no_real_ids`: 25 passed. `_idmap.json` is ignored.
   - The replay (`fns demo prove --fixture fixtures/lab-run-3`) gives the same
-    verdicts, exit 1, bundle `sha256:ab673d8e…`, pinned in
-    `tests/golden/lab-run-3-prove.digest`. It differs from the live bundle by
-    design.
+    verdicts, exit 1, bundle `sha256:ab673d8e…`. It differs from the live
+    bundle by design. Since denied probes are attached to their findings as
+    context (below), the pinned replay digest is `sha256:913a079f…`, with the
+    same verdicts.
 - **Two Windows hiccups in the runbook, both fixed in it.** Neither is an Azure
   API behaviour.
   - In PowerShell, `terraform apply -replace=time_offset.scope_expiry` has to be
@@ -93,8 +94,9 @@ What differs, and why:
 | `verifier` | `fns.verify as local-verifier` (the runbook's `--identity`) versus `fns.verify as fixture-replay` |
 | two evidence `notes` | Live notes end with "(same request as probe …, sent once)" where one request answered two findings. The recording keeps the answer, not the sharing, so the replay has no such note |
 
-The replay digest is deterministic: it matches the golden
-`tests/golden/lab-run-3-prove.digest` and the replay run right after the live run. Two tests guard the
+The replay digest is deterministic: it matched the golden and the replay run
+right after the live run. (The golden is now `913a079f…`, after context evidence
+was added; see the next section.) Two tests guard the
 equivalence. `tests/prove/test_live_probes.py::test_live_and_replay_bundles_agree_on_every_verdict`
 runs the live pipeline against lab-shaped answers, records it, replays the
 recording through the real verifier, and requires the same findings content.
@@ -103,6 +105,30 @@ recording through the real verifier, and requires the same findings content.
 A digest that both sides could compare would have to leave out the mode, IDs and
 timestamps. Nothing needs one yet; if the verifier gains one, it should hash
 exactly the identical fields listed above.
+
+## Denied probes are attached to their findings (2026-11-26)
+
+Decision 1 on the M3 summary. Before this change, the M3 bundle linked three
+findings only to the evidence that kept them failing: Key Vault `secrets/get`,
+`secrets/list` and payroll `blob/read`. Their reason said "denied when probed",
+but the observed `403` was only in the run's artifacts.
+
+Every probe result that came back `allowed` or `denied` is now in its finding.
+Results the verdict rests on are supporting evidence, as before. The rest carry
+`role: context`. Coverage, the verdict checks and the gap checks read
+supporting evidence only, so context cannot raise `evaluated-only` to
+`verified`, or back a pass.
+
+`tests/golden/prove-verdicts.json` was recorded from all four prove goldens
+before the change. `tests/prove/test_verdict_baseline.py` requires the same
+verdict, coverage, gap, reasons, supporting evidence and summary for every
+finding; evidence lists may only grow, with context. All four digests changed,
+for these entries only:
+
+| Golden | Findings with context | Added |
+| --- | --- | --- |
+| `demo-prove` | Key Vault `secrets/get` | observed denied, evaluated denied |
+| `lab-run-1-prove`, `lab-run-2-prove`, `lab-run-3-prove` | Key Vault `secrets/get` and `secrets/list`, payroll `blob/read`: each gets its observed `403` and the evaluated denial of the same action. Invoices `blob/read` (still-do, pass) and `blob/write` (still-do, inconclusive) each get the allowed `listKeys` hop | 3 observed denied, 3 evaluated denied, 2 evaluated allowed |
 
 ## M2 live run (2026-11-26)
 

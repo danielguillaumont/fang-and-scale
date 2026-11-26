@@ -149,6 +149,20 @@
           "description": "The escalation path this evidence rests on, in the enclosing ContainReport.",
           "title": "Path Id"
         },
+        "role": {
+          "anyOf": [
+            {
+              "const": "context",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unset: the verdict, coverage and gap rest on it. ``context``: a probe result\nkept with the finding so no observation is dropped, which settles nothing here.\nExample: the operation was denied when probed, but an escalation path is not\nrefuted. Context never counts toward the verdict, coverage or gap checks, so it\ncannot strengthen a claim. Left out of the canonical JSON while unset.",
+          "title": "Role"
+        },
         "rung": {
           "enum": [
             "modeled",

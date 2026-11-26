@@ -24,7 +24,7 @@ COVERAGE_ORDER: Final = (
 
 
 def _rung(f: Finding) -> str:
-    results = [e.rung for e in f.evidence if e.outcome in {"allowed", "denied"}]
+    results = [e.rung for e in f.supporting if e.outcome in {"allowed", "denied"}]
     return results[-1] if results else "-"
 
 

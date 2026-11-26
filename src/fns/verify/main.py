@@ -116,7 +116,7 @@ def render(bundle: EvidenceBundle, signing: dict[str, Any], out: Print) -> None:
     out("Findings")
     for f in sorted(bundle.findings, key=lambda f: (f.item_kind, f.target, f.operation)):
         rung = max(
-            (e.rung for e in f.evidence if e.outcome in {"allowed", "denied"}),
+            (e.rung for e in f.supporting if e.outcome in {"allowed", "denied"}),
             key=lambda r: ["modeled", "evaluated", "observed", "logged"].index(r),
             default="none",
         )

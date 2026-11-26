@@ -6,9 +6,15 @@ judges each assertion by the rules frozen into it:
 - ``must_not_reach`` passes only with an observed denial of the operation, every
   modeled path refuted, and no open coverage surface (E1);
 - a path that is not refuted keeps the item failing, on the evidence that still
-  supports it; a direct denial is reported but never attached as if it settled
-  the path;
+  supports it; a direct denial is reported, and attached as context, never as if
+  it settled the path;
 - ``must_still_do`` passes only with an observed success.
+
+Every probe result of an assertion ends up in its finding. Results that the
+verdict rests on are supporting evidence. Every other result that came back
+``allowed`` or ``denied`` is attached with ``role="context"``. Coverage and the
+model's checks look at supporting evidence only, so context can never change a
+verdict, a coverage state or an exit code (2026-11-26 decision).
 """
 
 from __future__ import annotations
@@ -52,6 +58,7 @@ class _Judge:
         self.a = a
         self.obs = obs
         self.spec = {p.id: p for p in a.probes}
+        self.used: set[str] = set()
 
     def outcome(self, pid: str) -> str:
         o = self.obs.get(pid)
@@ -74,10 +81,16 @@ class _Judge:
         return [p.id for p in self.a.probes if p.purpose == "direct" and p.kind == kind]
 
     def results(self, pids: list[str], *, only: str | None = None) -> list[Evidence]:
+        picked = [p for p in pids if self.outcome(p) in ({only} if only else {"allowed", "denied"})]
+        self.used.update(picked)
+        return [self.evidence(p) for p in picked]
+
+    def context(self) -> list[Evidence]:
+        """Every other probe that came back allowed or denied, marked as context."""
         return [
-            self.evidence(p)
-            for p in pids
-            if self.outcome(p) in ({only} if only else {"allowed", "denied"})
+            self.evidence(p.id).model_copy(update={"role": "context"})
+            for p in sorted(self.a.probes, key=lambda p: p.id)
+            if p.id not in self.used and self.outcome(p.id) in {"allowed", "denied"}
         ]
 
 
@@ -178,6 +191,7 @@ def judge(a: Assertion, obs: Obs, contract: str) -> Finding:
     if coverage == "not-assessed":
         verdict = "inconclusive"
         gap = None
+    evidence = [*evidence, *j.context()]
     return Finding.model_validate(
         {
             "id": a.finding_id,

@@ -9,12 +9,15 @@ contract assumes is compromised. The live run gave:
   inconclusive 1, exit 1. Invoices ``blob/read`` passed (observed, verified). The
   Key Vault ``secrets/get`` and ``secrets/list`` and payroll ``blob/read`` reads
   were denied when probed and still fail: escalation paths remain;
-- live bundle ``sha256:4b537ab6...``; this replay's bundle ``sha256:ab673d8e...``.
+- live bundle ``sha256:4b537ab6...``; its replay gave ``sha256:ab673d8e...``.
 
 The two bundle digests differ by design (``docs/FINDINGS.md``, "Live and replay
 bundle digests differ"): IDs are placeholders here, probe IDs hash the target's
 full ARM path, the mode is FIXTURE, and run IDs and timestamps differ. Verdicts,
 coverage and evidence rungs are identical, and this test pins them.
+
+The digest pinned here is after denied probes were attached to their findings as
+context (2026-11-26); the run itself gave ``ab673d8e...`` before that change.
 """
 
 from __future__ import annotations
@@ -172,14 +175,18 @@ def test_denied_when_probed_but_still_failing(
 ) -> None:
     """The direct read was denied when probed, but an escalation hop is listed.
 
-    The denial itself is in RECORDED (and the bundle's artifacts); the finding's
-    evidence holds the allowed hop that keeps it failing. Linking the denial to the
-    finding too is an open verifier question (docs/STATUS.md).
+    The allowed hop is the supporting evidence that keeps it failing. The observed
+    denial is attached as context (decision 2026-11-26), so it is in the finding
+    but cannot raise the coverage above evaluated-only.
     """
     f = next(f for f in bundle.findings if (f.target, f.operation) == item)
-    assert f.verdict == "fail"
+    assert (f.verdict, f.coverage) == ("fail", "evaluated-only")
     assert "the operation itself was denied when probed, but escalation paths remain" in f.reasons
-    assert any(e.rung == "evaluated" and e.outcome == "allowed" for e in f.evidence)
+    assert any(e.rung == "evaluated" and e.outcome == "allowed" for e in f.supporting)
+    assert not any(e.rung == "observed" for e in f.supporting)
+    (denial,) = [e for e in f.context if e.rung == "observed"]
+    assert denial.outcome == "denied" and denial.artifact_digest
+    assert "403" in (denial.notes or "")
 
 
 def test_replay_bundle_digest_is_pinned(bundle: EvidenceBundle) -> None:
