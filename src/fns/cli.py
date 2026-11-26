@@ -520,9 +520,10 @@ demo_app = typer.Typer(
 )
 app.add_typer(demo_app, name="demo")
 
-LAB_RUN = Path("fixtures/lab-run-1")
-"""The live lab run recorded in M1. The demo commands replay it by default, so they
-need a repository checkout; the hand-written demo-scout set is for tests."""
+LAB_RUN = Path("fixtures/lab-run-2")
+"""The live lab run recorded in M2 (``lab-run-1`` is the M1 one). The demo commands
+replay it by default, so they need a repository checkout; the hand-written demo-scout
+set is for tests."""
 
 
 def _need_fixture(fixture: Path, err: Any) -> None:

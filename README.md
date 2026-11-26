@@ -26,17 +26,17 @@ budget:
   max_critical_reachable: 0
 ```
 
-> **Status.** M1 is done and ran live. M2 to M5 are built and tested offline, against
-> a recorded lab run and hand-written fixtures. Their live runs are waiting on the
-> runbooks in `docs/runbooks/`. See [Real vs. fixture](#real-vs-fixture) before you
-> trust any result.
+> **Status.** M1 and M2 are done and ran live. M3 to M5 are built and tested
+> offline, against the recorded lab runs and hand-written fixtures. Their live runs
+> are waiting on approval and the runbooks in `docs/runbooks/`. See
+> [Real vs. fixture](#real-vs-fixture) before you trust any result.
 
 ## 90-second demo (no tenant)
 
 Requires [uv](https://docs.astral.sh/uv/) and a clone of this repository. The
-demo commands replay `fixtures/lab-run-1`, the live lab run recorded in M1 and
-sanitized. Every line they print starts with `FIXTURE`, and none of them makes a
-network call.
+demo commands replay `fixtures/lab-run-2`, the live lab run recorded in M2 and
+sanitized (`fixtures/lab-run-1` is the M1 run). Every line they print starts with
+`FIXTURE`, and none of them makes a network call.
 
 ```
 uv sync
@@ -203,12 +203,13 @@ Coverage states: `verified`, `evaluated-only`, `modeled-only`, `not-assessed`,
 
 | What | Evidence so far |
 | --- | --- |
-| Scout (RBAC, Graph, owners, roles) | **Live** on the lab tenant, 2026-11-26. Recorded and sanitized as `fixtures/lab-run-1`. |
-| Key Vault and storage settings collectors (M2 C1) | Mocked tests only. Live run: `docs/runbooks/m2-live-run.md`. |
-| Reach engine and contracts | Run on the live-recorded snapshot. Results are rung 1 (modeled). |
+| Scout (RBAC, Graph, owners, roles) | **Live** on the lab tenant, 2026-11-26, twice. Recorded and sanitized as `fixtures/lab-run-1` (M1) and `fixtures/lab-run-2` (M2). |
+| Key Vault and storage settings collectors (M2 C1) | **Live** in the M2 run, 2026-11-26: one vault and two storage accounts, `complete`. |
+| PIM eligibility collector | **Live** in the M2 run, as `not-applicable` with evidence: the lab tenant is Entra ID Free (0 SKUs), and Graph and ARM both answered `400 AadPremiumLicenseRequired`. The `collected` path, in a tenant with P2, is mocked tests only. |
+| Reach engine and contracts (`fns contain`) | **Live** on the M2 snapshot, signed in as the read-only scout: 11 critical reachable, 2 inconclusive, exit 1, the same as the fixture replay. Results are rung 1 (modeled). The replay of `fixtures/lab-run-2` with its contract is a committed regression test. |
 | Prove: probe results | **Hand-written** (`probes.json`), shaped like expected lab answers. Not recorded. |
 | Signing | Offline test key, labelled `TEST`. The Sigstore path is written but has never run. |
-| Harden, mutate | Model only, on the recorded snapshot and `lab/*.tf`. Nothing applied. |
+| Harden, mutate | Model only, on the recorded snapshot and `lab/*.tf`. Nothing applied. `fns mutate --harden` on the live M2 snapshot scored 6/8, with the two accepted app-owner survivors. |
 | Record mode | Hand-written sample logs. |
 | Detections | Structural lint only; never deployed. |
 | GitHub Action | Runs on this repo's PRs against `fixtures/lab-run-1`; no Azure login. |
@@ -249,7 +250,7 @@ so does an internal error, so a crash never looks like a verdict.
 | Milestone | Scope | State |
 | --- | --- | --- |
 | M1 Lab + contracts | Terraform lab, scope gate, scout, schemas | done, live |
-| M2 Contain | reach engine, escalation rules, settings collectors | built; live run pending (`docs/runbooks/m2-live-run.md`) |
+| M2 Contain | reach engine, escalation rules, settings and PIM collectors | done, live (tag `m2`) |
 | M3 Prove | freeze, probes, isolated verifier, signed bundle | built offline; live probes and Sigstore pending approval |
 | M4 Harden + detect | minimizer, record mode, KQL rules | built offline; live loop pending approval |
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
@@ -275,8 +276,8 @@ differs from `tenant_id`.
 
 ```
 uv run poe scout                                       # live, read-only
-uv run fns scout --record fixtures/lab-run-2          # also save a sanitized fixture set
-uv run fns demo scout --fixture fixtures/lab-run-2    # replay it later, no tenant needed
+uv run fns scout --record fixtures/lab-run-3          # also save a sanitized fixture set
+uv run fns demo scout --fixture fixtures/lab-run-3    # replay it later, no tenant needed
 ```
 
 ### Scout permissions

@@ -43,7 +43,11 @@ def _labelled(output: str) -> bool:
 
 @pytest.mark.parametrize(
     ("args", "golden"),
-    [(["--fixture", DEMO_SCOUT], "demo-prove"), ([], "lab-run-1-prove")],
+    [
+        (["--fixture", DEMO_SCOUT], "demo-prove"),
+        (["--fixture", str(LAB_RUN)], "lab-run-1-prove"),
+        ([], "lab-run-2-prove"),
+    ],
 )
 def test_demo_prove_is_labelled_deterministic_and_verifiable(
     tmp_path: Path, args: list[str], golden: str

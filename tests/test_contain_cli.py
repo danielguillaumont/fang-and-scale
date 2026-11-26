@@ -40,7 +40,11 @@ def _labelled(output: str) -> bool:
 
 @pytest.mark.parametrize(
     ("args", "golden"),
-    [(["--fixture", DEMO_SCOUT], "demo-contain"), ([], "lab-run-1-contain")],
+    [
+        (["--fixture", DEMO_SCOUT], "demo-contain"),
+        (["--fixture", str(LAB_RUN)], "lab-run-1-contain"),
+        ([], "lab-run-2-contain"),
+    ],
 )
 def test_demo_contain_fails_seeded_contract_with_labelled_paths(
     tmp_path: Path, args: list[str], golden: str
