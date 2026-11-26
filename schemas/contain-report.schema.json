@@ -192,9 +192,48 @@
       "title": "Finding",
       "type": "object"
     },
+    "HopCheck": {
+      "additionalProperties": false,
+      "description": "What a probe asks the platform about this hop: ``action`` at ``scope``.",
+      "properties": {
+        "action": {
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "data_plane": {
+          "title": "Data Plane",
+          "type": "boolean"
+        },
+        "scope": {
+          "minLength": 1,
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "scope",
+        "data_plane"
+      ],
+      "title": "HopCheck",
+      "type": "object"
+    },
     "PathStep": {
       "additionalProperties": false,
       "properties": {
+        "check": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HopCheck"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Set on a final hop that rests on an RBAC grant (M3 probes it)."
+        },
         "rule": {
           "description": "``assume-compromised``, ``snapshot``, an escalation rule, or the final way.",
           "maxLength": 64,

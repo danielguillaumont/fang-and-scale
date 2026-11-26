@@ -24,12 +24,22 @@ def path_id(finding_id: str, step_texts: tuple[str, ...]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+class HopCheck(FnsModel):
+    """What a probe asks the platform about this hop: ``action`` at ``scope``."""
+
+    action: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    data_plane: bool
+
+
 class PathStep(FnsModel):
     rule: str = Field(min_length=1, max_length=64)
     """``assume-compromised``, ``snapshot``, an escalation rule, or the final way."""
     text: str = Field(min_length=1)
     sources: tuple[str, ...] = ()
     """Snapshot facts this hop rests on, with the scope operation that collected them."""
+    check: HopCheck | None = None
+    """Set on a final hop that rests on an RBAC grant (M3 probes it)."""
 
 
 class ReachPath(FnsModel):

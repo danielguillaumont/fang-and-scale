@@ -11,7 +11,7 @@ from fns.console import BANNER
 
 runner = CliRunner()
 
-UNBUILT = ["strike", "harden", "prove", "molt"]
+UNBUILT = ["strike", "harden", "molt"]
 
 
 def test_version_prints_ascii_banner_and_version() -> None:
@@ -42,7 +42,7 @@ def test_scout_without_scope_manifest_exits_1(tmp_path: Path) -> None:
 def test_help_lists_every_command() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for command in ["scout", "contain", *UNBUILT]:
+    for command in ["scout", "contain", "prove", "verify", *UNBUILT]:
         assert command in result.output
 
 

@@ -62,8 +62,10 @@ def test_cli_schema_writes_lf_files(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     files = sorted(p.name for p in tmp_path.iterdir())
     assert files == [
+        "assertions.schema.json",
         "contain-report.schema.json",
         "contract.schema.json",
+        "evidence-bundle.schema.json",
         "scope.schema.json",
         "snapshot.schema.json",
     ]

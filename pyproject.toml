@@ -11,6 +11,7 @@ authors = [
 ]
 dependencies = [
     "azure-identity>=1.19",
+    "cryptography>=44",
     "pydantic>=2.10",
     "pyyaml>=6.0.2",
     "rich>=13.9",
@@ -19,6 +20,11 @@ dependencies = [
 
 [project.scripts]
 fns = "fns.cli:main"
+
+[project.optional-dependencies]
+sigstore = [
+    "sigstore>=4.6,<5",
+]
 
 [dependency-groups]
 dev = [
@@ -164,7 +170,32 @@ root_package = "fns"
 name = "Verifier is isolated from proposer, executor and adapters"
 type = "forbidden"
 source_modules = ["fns.verify"]
-forbidden_modules = ["fns.adapters", "fns.harden", "fns.strike"]
+# M3: the verifier reads only frozen assertions, the journal (its own read-only
+# SQLite connection) and probe artifacts. Nothing that proposes, executes,
+# models reach, calls an API or writes the journal.
+forbidden_modules = [
+    "fns.adapters",
+    "fns.harden",
+    "fns.strike",
+    "fns.probes",
+    "fns.prove",
+    "fns.contain",
+    "fns.contain_run",
+    "fns.inventory",
+    "fns.journal",
+    "fns.scope",
+    "fns.fixtures",
+    "fns.cli",
+    "fns.demo",
+    "fns.scout",
+    "fns.report",
+]
+
+[[tool.importlinter.contracts]]
+name = "Probes and the prove orchestrator never import the verifier"
+type = "forbidden"
+source_modules = ["fns.probes", "fns.prove"]
+forbidden_modules = ["fns.verify"]
 
 [[tool.importlinter.contracts]]
 name = "Reach engine is pure: no API access, credentials, journal, executor or proposer"

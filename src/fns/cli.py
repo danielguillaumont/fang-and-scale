@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 
 import typer
 
@@ -158,9 +158,77 @@ def harden() -> None:
 
 
 @app.command()
-def prove() -> None:
-    """Re-run assertions with separate read-only credentials; signed bundle (M3)."""
-    _not_implemented("prove")
+def prove(
+    contract: Annotated[Path, typer.Option(help="Contract file (*.fns.yaml).")],
+    snapshot: Annotated[Path, typer.Option(help="Snapshot JSON written by `fns scout`.")],
+    probes: Annotated[
+        Path,
+        typer.Option(help="Probe results to replay (FIXTURE). Live probes arrive in M3 P5."),
+    ],
+    out: Annotated[Path, typer.Option(help="Directory for runs/<run id>/.")] = Path(".fns"),
+    sign: Annotated[
+        str, typer.Option(help="offline-test (labelled TEST), sigstore (CI with OIDC), none.")
+    ] = "offline-test",
+    identity: Annotated[str, typer.Option(help="Label for who the verifier ran as.")] = (
+        "unspecified"
+    ),
+) -> None:
+    """Freeze assertions, run probes, and verify in a separate process (M3, offline).
+
+    Exit codes follow `fns contain`; 5 means the verifier refused the evidence.
+    """
+    from pydantic import ValidationError
+
+    from fns.contain_run import load_snapshot
+    from fns.models.contract import load_contract
+    from fns.probes.mock import MockProbe, load_results
+    from fns.yamlio import YamlError
+
+    err = make_console(stderr=True)
+    if sign not in {"offline-test", "sigstore", "none"}:
+        err.print(f"unknown signer {sign!r}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.USAGE)
+    try:
+        c = load_contract(contract)
+        snap = load_snapshot(snapshot)
+        results = load_results(probes)
+    except (OSError, ValidationError, YamlError) as exc:
+        err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    _run_prove(c, snap, MockProbe(results, at=snap.collected_at), out, sign, identity)
+
+
+def _run_prove(c: Any, snap: Any, probe: Any, out: Path, sign: str, identity: str) -> None:
+    from datetime import UTC, datetime
+
+    from fns.console import FixtureConsole
+    from fns.prove.run import prove as run_prove
+
+    fixed = snap.collected_at if snap.mode == "FIXTURE" or probe.mode == "FIXTURE" else None
+
+    def now() -> datetime:
+        return fixed or datetime.now(UTC)
+
+    result = run_prove(c, snap, probe, out, now=now, signer=sign, identity=identity)  # type: ignore[arg-type]
+    for line in result.output.splitlines():
+        typer.echo(line)
+    con = make_console()
+    label = FixtureConsole(con) if result.assertions.mode == "FIXTURE" else con
+    label.print(f"run directory {result.run_dir.as_posix()}", style="fns.muted", markup=False)
+    raise typer.Exit(result.exit_code)
+
+
+@app.command()
+def verify(
+    run: Annotated[Path, typer.Argument(help="A run directory written by `fns prove`.")],
+) -> None:
+    """Re-verify a prove run: signature, subject digests, and re-derived verdicts."""
+    from fns.prove.run import check_run
+
+    code, output = check_run(run)
+    for line in output.splitlines():
+        typer.echo(line)
+    raise typer.Exit(code)
 
 
 @app.command()
@@ -364,6 +432,63 @@ def demo_contain(
     path = write_report(report, json_out, out)
     con.print(f"wrote {path.as_posix()}", style="fns.muted", markup=False)
     raise typer.Exit(report.summary.exit_code)
+
+
+@demo_app.command("prove")
+def demo_prove(
+    out: Annotated[Path, typer.Option(help="Directory for the journal, snapshot and run.")] = Path(
+        ".fns"
+    ),
+    fixture: Annotated[
+        Path | None,
+        typer.Option(help="Replay a recorded fixture set (uses its contract and probes.json)."),
+    ] = None,
+    sign: Annotated[str, typer.Option(help="offline-test or none.")] = "offline-test",
+) -> None:
+    """Replay a fixture, freeze assertions, replay probe results, verify (FIXTURE).
+
+    The probe results are hand-written, not recorded. Exit 1 is the expected result.
+    """
+    from pydantic import ValidationError
+
+    from fns.console import FixtureConsole
+    from fns.contain_run import demo_contract
+    from fns.demo import DEMO_FIXTURE, run_demo_scout
+    from fns.fixtures.replay import FixtureError, bundled
+    from fns.journal.sqlite import JournalError
+    from fns.models.scope import ScopeExpiredError
+    from fns.probes.mock import RESULTS_FILE, MockProbe, MockResults
+    from fns.yamlio import YamlError
+
+    err = FixtureConsole(make_console(stderr=True))
+    if sign not in {"offline-test", "none"}:
+        err.print("the demo signs offline only (offline-test or none)", style="fns.fail")
+        raise typer.Exit(ExitCode.USAGE)
+    try:
+        scout_result = run_demo_scout(out, fixture)
+        c = demo_contract(fixture)
+        root = fixture if fixture is not None else bundled(DEMO_FIXTURE)
+        results = MockResults.model_validate_json(
+            root.joinpath(RESULTS_FILE).read_text(encoding="utf-8")
+        )
+    except (
+        FixtureError,
+        JournalError,
+        ScopeExpiredError,
+        ValidationError,
+        YamlError,
+        OSError,
+    ) as exc:
+        err.print(f"demo failed: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
+    source = fixture.as_posix() if fixture else DEMO_FIXTURE
+    FixtureConsole(make_console()).print(
+        f"Replaying fixture {source!r} with hand-written probe results; no network calls.",
+        style="fns.muted",
+        markup=False,
+    )
+    snap = scout_result.snapshot
+    _run_prove(c, snap, MockProbe(results, at=snap.collected_at), out, sign, "fixture-replay")
 
 
 def _is_read(op: str) -> bool:
