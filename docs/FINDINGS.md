@@ -56,6 +56,44 @@ compromised.
 - **Cleanup:** the agent's and the scout's certificates were deleted and
   verified, and the temporary CLI profiles were removed.
 
+## Live and replay bundle digests differ (2026-11-26)
+
+The M3 live bundle is `sha256:4b537ab6…`. Its replay,
+`fns demo prove --fixture fixtures/lab-run-3`, gives `sha256:ab673d8e…`.
+**This is by design, not a bug: no verdict content differs.**
+
+I compared the two bundles and their `assertions.json` locally, after mapping
+the live run's real IDs to the recording's placeholders through `_idmap.json`.
+Neither the live run directory nor the mapping is committed. Ignoring list
+order, these are identical:
+
+- all 13 finding IDs;
+- every verdict, coverage state, gap and reason;
+- every evidence rung, outcome and source;
+- the summary, the contract digest and the tenant.
+
+What differs, and why:
+
+| Field | Why it differs |
+| --- | --- |
+| `mode` | `LIVE` versus `FIXTURE` |
+| `snapshot_digest` (and `report_digest`, `assertions_digest`) | The live snapshot holds the real tenant, subscription and object IDs; the recording holds placeholders. This is the same reason the M1 and M2 scout digests differ from their replays |
+| probe IDs, artifact `sha256`, list order | A probe ID is `sha256(finding, kind, target, action)`, and the target is the full ARM path, which contains the subscription GUID. So every probe ID differs. Artifacts hash their probe ID, and lists sorted by probe ID come out in a different order |
+| `run_id`, `generated_at`, `observed_at` | The run ID hashes the report digest and the freeze time. The live run freezes at the time it runs; the replay freezes at the recording's `recorded_at` |
+| `verifier` | `fns.verify as local-verifier` (the runbook's `--identity`) versus `fns.verify as fixture-replay` |
+| two evidence `notes` | Live notes end with "(same request as probe …, sent once)" where one request answered two findings. The recording keeps the answer, not the sharing, so the replay has no such note |
+
+The replay digest is deterministic: it matches the golden
+`tests/golden/lab-run-3-prove.digest` and the replay run right after the live run. Two tests guard the
+equivalence. `tests/prove/test_live_probes.py::test_live_and_replay_bundles_agree_on_every_verdict`
+runs the live pipeline against lab-shaped answers, records it, replays the
+recording through the real verifier, and requires the same findings content.
+`tests/fixtures/test_lab_run_3.py` pins the M3 verdicts.
+
+A digest that both sides could compare would have to leave out the mode, IDs and
+timestamps. Nothing needs one yet; if the verifier gains one, it should hash
+exactly the identical fields listed above.
+
 ## M2 live run (2026-11-26)
 
 Run from `docs/runbooks/m2-live-run.md`. Every result matched the runbook tables.

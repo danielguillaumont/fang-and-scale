@@ -654,3 +654,54 @@ def test_scope_file_round_trip(tmp_path: Path) -> None:
     m = load_scope(_scope_file(tmp_path), now=NOW)
     assert m.test_identities[0].app_id is not None
     assert len(m.data_objects) == 3
+
+
+def test_live_and_replay_bundles_agree_on_every_verdict(
+    tmp_path: Path, live_snapshot: Snapshot
+) -> None:
+    """Item 3 (2026-11-26): a replay of a live recording must reach the same verdicts.
+
+    The bundle digests differ by design (mode, IDs, run ID, timestamps, verifier
+    label, artifact digests). Everything a verdict rests on must not.
+    """
+    from fns.models.bundle import EvidenceBundle
+    from fns.probes.mock import MockProbe, load_results
+    from fns.prove.run import prove
+
+    rec = _recording(tmp_path)
+    live = _run(tmp_path, live_snapshot, lab_routes(), record=rec)
+    fixture_snap = live_snapshot.model_copy(update={"mode": "FIXTURE"})
+    probe = MockProbe(load_results(rec / "probes.json"), at=fixture_snap.collected_at)
+    replay = prove(
+        demo_contract(LAB_RUN),
+        fixture_snap,
+        probe,
+        tmp_path / "replay",
+        now=lambda: NOW,
+        identity="fixture-replay",
+    )
+
+    def load(run_dir: Path) -> EvidenceBundle:
+        return EvidenceBundle.model_validate_json((run_dir / "bundle.json").read_bytes())
+
+    lb, rb = load(live.result.run_dir), load(replay.run_dir)
+    assert lb.digest() != rb.digest()
+    assert (lb.mode, rb.mode) == ("LIVE", "FIXTURE")
+    assert lb.summary == rb.summary
+    assert lb.contract_digest == rb.contract_digest
+
+    def content(b: EvidenceBundle) -> dict[str, Any]:
+        out = {}
+        for f in b.findings:
+            evidence = sorted(
+                (e.rung, e.outcome, e.source, (e.notes or "").split(" (same request as probe")[0])
+                for e in f.evidence
+            )
+            out[f.id] = (f.target, f.operation, f.verdict, f.coverage, f.gap, f.reasons, evidence)
+        return out
+
+    assert content(lb) == content(rb)
+    # The one content difference: live notes say when a request was shared.
+    shared = [e.notes for f in lb.findings for e in f.evidence if "sent once" in (e.notes or "")]
+    assert shared
+    assert not [e for f in rb.findings for e in f.evidence if "sent once" in (e.notes or "")]
