@@ -1,0 +1,191 @@
+{
+  "$defs": {
+    "ContractThresholds": {
+      "additionalProperties": false,
+      "description": "Contract-level limits (YAML key ``budget``). Semantics are applied in M2.",
+      "properties": {
+        "max_critical_reachable": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Max Critical Reachable",
+          "type": "integer"
+        },
+        "max_inconclusive": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Max Inconclusive",
+          "type": "integer"
+        }
+      },
+      "title": "ContractThresholds",
+      "type": "object"
+    },
+    "DirectoryTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "const": "tenant",
+          "description": "The Entra directory of the pinned tenant.",
+          "title": "Directory",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "description": "Capability, e.g. secrets/get, listKeys, blob/read, roleAssignments/write",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9]*(/[A-Za-z][A-Za-z0-9]*)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "directory",
+        "operations"
+      ],
+      "title": "DirectoryTarget",
+      "type": "object"
+    },
+    "ResourceTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "operations": {
+          "items": {
+            "description": "Capability, e.g. secrets/get, listKeys, blob/read, roleAssignments/write",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9]*(/[A-Za-z][A-Za-z0-9]*)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        },
+        "resource": {
+          "description": "Resource name or full ARM ID",
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9/._\\-()$~]+$",
+          "title": "Resource",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource",
+        "operations"
+      ],
+      "title": "ResourceTarget",
+      "type": "object"
+    },
+    "StillDoItem": {
+      "additionalProperties": false,
+      "properties": {
+        "operations": {
+          "items": {
+            "description": "Capability, e.g. secrets/get, listKeys, blob/read, roleAssignments/write",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9]*(/[A-Za-z][A-Za-z0-9]*)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        },
+        "resource": {
+          "description": "Resource name or full ARM ID",
+          "maxLength": 2048,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9/._\\-()$~]+$",
+          "title": "Resource",
+          "type": "string"
+        },
+        "source": {
+          "default": "declared",
+          "description": "declared by hand, or recorded from the workload's own logged activity (M4).",
+          "enum": [
+            "declared",
+            "recorded"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource",
+        "operations"
+      ],
+      "title": "StillDoItem",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A blast-radius contract.",
+  "properties": {
+    "assume_compromised": {
+      "description": "sp:<name or appId>, mi:<name>, or objectId:<guid>",
+      "pattern": "^((sp|mi):[A-Za-z0-9][A-Za-z0-9._\\-]{0,255}|objectId:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})$",
+      "title": "Assume Compromised",
+      "type": "string"
+    },
+    "budget": {
+      "$ref": "#/$defs/ContractThresholds",
+      "default": {
+        "max_critical_reachable": 0,
+        "max_inconclusive": 0
+      }
+    },
+    "contract": {
+      "description": "Contract name (lowercase slug).",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$",
+      "title": "Contract",
+      "type": "string"
+    },
+    "must_not_reach": {
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ResourceTarget"
+          },
+          {
+            "$ref": "#/$defs/DirectoryTarget"
+          }
+        ]
+      },
+      "minItems": 1,
+      "title": "Must Not Reach",
+      "type": "array"
+    },
+    "must_still_do": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StillDoItem"
+      },
+      "title": "Must Still Do",
+      "type": "array"
+    },
+    "on_inconclusive": {
+      "default": "fail",
+      "enum": [
+        "fail",
+        "warn"
+      ],
+      "title": "On Inconclusive",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "contract",
+    "assume_compromised",
+    "must_not_reach"
+  ],
+  "title": "Contract",
+  "type": "object"
+}

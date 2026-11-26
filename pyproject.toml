@@ -66,7 +66,13 @@ imports.help = "Enforce package boundaries (verifier isolation)"
 test.cmd = "pytest"
 test.help = "Run the test suite"
 
-check.sequence = ["lint", "typecheck", "imports", "test"]
+schema.cmd = "fns schema"
+schema.help = "Regenerate JSON Schemas in schemas/"
+
+schema-check.cmd = "fns schema --check"
+schema-check.help = "Fail if committed schemas drift from the models"
+
+check.sequence = ["lint", "typecheck", "imports", "schema-check", "test"]
 check.help = "Everything that must pass before a commit"
 
 lab-up.sequence = [
@@ -131,6 +137,7 @@ warn_required_dynamic_aliases = true
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 xfail_strict = true
 filterwarnings = ["error"]

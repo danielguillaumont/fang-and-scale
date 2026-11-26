@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "ScopeBudget": {
+      "additionalProperties": false,
+      "description": "Per-run limits enforced by the gate.",
+      "properties": {
+        "max_api_calls": {
+          "exclusiveMinimum": 0,
+          "title": "Max Api Calls",
+          "type": "integer"
+        },
+        "max_minutes": {
+          "exclusiveMinimum": 0,
+          "title": "Max Minutes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_api_calls",
+        "max_minutes"
+      ],
+      "title": "ScopeBudget",
+      "type": "object"
+    },
+    "TestIdentity": {
+      "additionalProperties": false,
+      "description": "An identity the executor may act as (``strike``).",
+      "properties": {
+        "kind": {
+          "enum": [
+            "servicePrincipal",
+            "managedIdentity"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "object_id": {
+          "description": "Entra object ID of the service principal or managed identity.",
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+          "title": "Object Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "kind",
+        "name"
+      ],
+      "title": "TestIdentity",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The scope manifest (``scope.yaml``).",
+  "properties": {
+    "allowed_operations": {
+      "additionalProperties": {
+        "items": {
+          "description": "arm:<Namespace>/<type>/<read|write|delete|action> or graph:<METHOD> /<path>",
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "description": "Exact operations per verb. A missing verb allows nothing.",
+      "propertyNames": {
+        "enum": [
+          "scout",
+          "contain",
+          "strike",
+          "harden",
+          "prove",
+          "molt"
+        ]
+      },
+      "title": "Allowed Operations",
+      "type": "object"
+    },
+    "allowed_resource_groups": {
+      "default": [],
+      "description": "Full resource group IDs (/subscriptions/<id>/resourceGroups/<name>).",
+      "items": {
+        "minLength": 2,
+        "pattern": "^/(subscriptions|providers)/",
+        "type": "string"
+      },
+      "title": "Allowed Resource Groups",
+      "type": "array"
+    },
+    "budget": {
+      "$ref": "#/$defs/ScopeBudget"
+    },
+    "expires_at": {
+      "description": "After this instant the manifest allows nothing.",
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "subscription_ids": {
+      "default": [],
+      "items": {
+        "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+        "type": "string"
+      },
+      "title": "Subscription Ids",
+      "type": "array"
+    },
+    "tenant_id": {
+      "description": "The only tenant any call may target. The signed-in tenant must match.",
+      "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "test_identities": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TestIdentity"
+      },
+      "title": "Test Identities",
+      "type": "array"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "tenant_id",
+    "budget",
+    "expires_at"
+  ],
+  "title": "ScopeManifest",
+  "type": "object"
+}

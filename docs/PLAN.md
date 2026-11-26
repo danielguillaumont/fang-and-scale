@@ -58,12 +58,14 @@ field means deny.
 
 ### Contract example
 ```yaml
+version: 1
 contract: billing-agent-blast-radius
 assume_compromised: sp:billing-agent
 must_not_reach:
   - resource: kv-crown-jewels
     operations: [secrets/get, secrets/list]
-  - directory: [roleAssignments/write, applications/credentials/update]
+  - directory: tenant
+    operations: [roleAssignments/write, applications/credentials/update]
   - resource: st-payroll
     operations: [listKeys, blob/read]
 must_still_do:
@@ -75,6 +77,11 @@ budget:
   max_inconclusive: 2
 on_inconclusive: fail
 ```
+Every `must_not_reach` / `must_still_do` item has the same shape: one target
+(`resource: <name or ARM ID>` or `directory: tenant`) plus `operations`. Short
+names are resolved against the snapshot; ambiguous or unresolved means `inconclusive`.
+Schema: `schemas/contract.schema.json`.
+
 Results: `pass`, `fail`, `inconclusive`, each with its evidence rung.
 
 ## 4. Evidence ladder

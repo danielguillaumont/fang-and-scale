@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../../schemas/contract.schema.json
+#
+# Blast-radius contract for the lab's billing agent (docs/PLAN.md section 3).
+# Assume sp-billing-agent is compromised: it must never reach the crown-jewel
+# vault, payroll storage or directory write paths, and must still be able to
+# read and write invoices.
+version: 1
+contract: billing-agent-blast-radius
+assume_compromised: sp:sp-billing-agent
+
+must_not_reach:
+  - resource: kv-crown-jewels
+    operations: [secrets/get, secrets/list]
+  - directory: tenant
+    operations: [roleAssignments/write, applications/credentials/update]
+  - resource: st-payroll
+    operations: [listKeys, blob/read]
+
+must_still_do:
+  - resource: st-invoices
+    operations: [blob/read, blob/write]
+    source: declared
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 2
+on_inconclusive: fail

@@ -54,3 +54,11 @@ def test_color_applied_on_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
     con = c.make_console(file=buf, force_terminal=True)
     con.print("ok", style="fns.pass")
     assert "\x1b[" in buf.getvalue()
+
+
+def test_long_lines_are_not_wrapped_off_terminal() -> None:
+    buf = io.StringIO()
+    con = c.make_console(file=buf)
+    long_path = "/runner/work/" + "x" * 150 + "/contract.schema.json"
+    con.print(f"stale {long_path}")
+    assert long_path in buf.getvalue()
