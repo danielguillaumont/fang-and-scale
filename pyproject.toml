@@ -165,3 +165,16 @@ name = "Verifier is isolated from proposer, executor and adapters"
 type = "forbidden"
 source_modules = ["fns.verify"]
 forbidden_modules = ["fns.adapters", "fns.harden", "fns.strike"]
+
+[[tool.importlinter.contracts]]
+name = "Reach engine is pure: no API access, credentials, journal, executor or proposer"
+type = "forbidden"
+source_modules = ["fns.contain"]
+forbidden_modules = [
+    "fns.adapters",
+    "fns.scope",
+    "fns.inventory",
+    "fns.journal",
+    "fns.strike",
+    "fns.harden",
+]
