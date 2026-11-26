@@ -38,7 +38,7 @@ azuread), pytest + hypothesis, ruff, mypy --strict.
 Tasks are poethepoet tasks in `pyproject.toml`; they run the same on Windows
 (PowerShell) and Linux (CI). No Makefile, no shell-specific commands.
 
-- `uv run poe setup`  install deps with uv, install pre-commit hooks
+- `uv run poe setup`  `uv sync --all-groups --all-extras` (sigstore is an extra), install pre-commit hooks
 - `uv run poe check`  ruff + mypy + import boundaries + pytest (must pass before every commit)
 - `uv run poe schema`  regenerate committed JSON Schemas in `schemas/`
 - `uv run poe lab-up` / `uv run poe lab-down`  apply / destroy the Terraform lab

@@ -21,6 +21,11 @@ dependencies = [
 [project.scripts]
 fns = "fns.cli:main"
 
+# An extra, not a dependency group: `fns prove --sign sigstore` is a feature of the
+# installed tool (`pip install fang-and-scale[sigstore]`), and groups are never
+# published. `uv sync --all-groups` alone removes extras, so development syncs
+# with `--all-groups --all-extras` (`poe setup`, CI), and the tests that use the
+# real sigstore API then run instead of skipping.
 [project.optional-dependencies]
 sigstore = [
     "sigstore>=4.6,<5",
@@ -53,10 +58,10 @@ module-name = "fns"
 # ---------------------------------------------------------------------------
 [tool.poe.tasks]
 setup.sequence = [
-    { cmd = "uv sync --all-groups" },
+    { cmd = "uv sync --all-groups --all-extras" },
     { cmd = "pre-commit install" },
 ]
-setup.help = "Install dependencies and pre-commit hooks"
+setup.help = "Install all dependency groups and extras (sigstore), and pre-commit hooks"
 
 lint.sequence = [{ cmd = "ruff check ." }, { cmd = "ruff format --check ." }]
 lint.help = "Ruff lint and format check"

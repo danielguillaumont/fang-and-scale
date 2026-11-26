@@ -77,8 +77,45 @@ def test_unsigned_and_unknown_signers_never_verify() -> None:
         verify_envelope(u.envelope, {"signer": "trust-me"})
 
 
-def test_sigstore_without_the_extra_says_how_to_get_it() -> None:
-    if importlib.util.find_spec("sigstore") is not None:  # pragma: no cover
-        pytest.skip("sigstore is installed; keyless signing needs OIDC (CI only)")
-    with pytest.raises(SignatureError, match="optional extra"):
+def test_sigstore_without_the_extra_says_how_to_get_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Runs whether or not the extra is installed: the import failure is simulated."""
+    real = importlib.import_module
+
+    def no_sigstore(name: str, package: str | None = None) -> object:
+        if name.split(".")[0] == "sigstore":
+            raise ModuleNotFoundError(f"No module named {name!r}")
+        return real(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", no_sigstore)
+    monkeypatch.delenv("FNS_SIGSTORE_INSTANCE", raising=False)
+    with pytest.raises(SignatureError, match="optional extra: uv sync --extra sigstore"):
         sign(PAYLOAD, "sigstore")
+
+
+def test_the_sigstore_api_we_call_exists() -> None:
+    """Offline: the pinned sigstore has every name sign_sigstore and verify_envelope use.
+
+    Nothing is constructed (staging() would fetch the trust root). Skips only
+    without the extra; poe setup and CI install it (pyproject.toml).
+    """
+    pytest.importorskip("sigstore", reason="needs the sigstore extra: uv run poe setup")
+    sign_mod, models, oidc, dsse, verify, policy = (
+        importlib.import_module(m)
+        for m in (
+            "sigstore.sign",
+            "sigstore.models",
+            "sigstore.oidc",
+            "sigstore.dsse",
+            "sigstore.verify",
+            "sigstore.verify.policy",
+        )
+    )
+    assert callable(models.ClientTrustConfig.staging)
+    assert callable(models.ClientTrustConfig.production)
+    assert callable(models.Bundle.from_json)
+    assert callable(sign_mod.SigningContext.from_trust_config)
+    assert callable(oidc.IdentityToken) and callable(oidc.detect_credential)
+    assert callable(dsse.Statement)
+    assert callable(verify.Verifier.staging) and callable(verify.Verifier.production)
+    assert callable(verify.Verifier.verify_dsse)
+    assert callable(policy.Identity)
