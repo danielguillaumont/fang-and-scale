@@ -21,6 +21,40 @@ request (sanitized), the response, the date, and what the code does about it.
   `tests/fixtures/test_no_real_ids.py` passed, and the replay digest is pinned in
   `tests/golden/lab-run-1.digest`.
 
+## Mutation testing found a gap in our own contract (2026-11-26)
+
+Not Microsoft behaviour, but a finding about this project's own contract, found
+by `fns mutate` (M5) on `fixtures/lab-run-1`, hardened in the model.
+
+- **First run: 5 of 8.** The seeded contract (version 1) missed three mutants:
+  - `listKeys` on the invoices account. The contract simply did not forbid it.
+  - The agent becoming an owner of `id-verifier`.
+  - The agent becoming an owner of `sp-fns-scout`.
+
+  Version 1 could not name one application as a target, so the contract had no
+  way to say "the agent must never control the verifier". This was a gap in the
+  model, not just a missing line.
+- **Fix: contract version 2** (approved in the morning review).
+  - `must_not_reach` can name an `application` or a `service_principal`, with
+    `credentials/update` and `owners/update`.
+  - The seeded contract now forbids both operations on `id-verifier` and
+    `sp-fns-scout`, and `listKeys` on the invoices account.
+  - A new detection rule, `object-owner-added-by-workload`, covers owner changes.
+- **Second run: 6 of 8.**
+  - `listKeys` on invoices is killed.
+  - Every Graph-permission mutant now also fails the four new items. On the
+    unhardened lab, the agent reaches both applications through the self-grant
+    chain (owner adds a credential, then `AppRoleAssignment.ReadWrite.All` grants
+    `Application.ReadWrite.All`).
+  - The two ownership mutants still survive, for a real reason. In the hardened
+    lab the agent holds neither `Application.ReadWrite.OwnedBy` nor
+    `Application.ReadWrite.All`. An app-only caller cannot use an ownership
+    without one of them, so ownership alone adds no reach. The model sees the
+    change, and the survivor's output says "owns id-verifier but holds neither
+    ... (one Graph grant away)".
+- **Open (your call, in `docs/DECISIONS.md`):** whether a standing ownership of
+  the verifier should fail a contract even when it cannot be used yet.
+
 ## Research items (planned, not run)
 
 - **R1. Does ARM authorize before it validates?** If so, a deliberately
