@@ -1,4 +1,4 @@
-# Status after the 2026-11-26 morning review
+# Status after the M3 live run (2026-11-26)
 
 ## Milestone results
 
@@ -9,12 +9,55 @@
 | M3 Prove | 2026-11-26, probes as `sp-billing-agent` | passed 1 (invoices `blob/read`, observed and verified), critical reachable 11, still-do failed 0, inconclusive 1, exit 1. The Key Vault and payroll reads were denied when probed and still fail: escalation paths remain | `tests/fixtures/test_lab_run_3.py` |
 
 
+## After the M3 live run
+
+Each item from the M3 run report got its own branch and PR. CI passed on ubuntu
+and windows, and all six are merged to `main`. `m3` is tagged on `main`. No Azure
+call, `az` command or Terraform apply was made after the run.
+
+| PR | Item | Change |
+| --- | --- | --- |
+| #36 | 1 | `fixtures/lab-run-3` is committed as the M3 regression test (`tests/fixtures/test_lab_run_3.py`): the recorded probe outcomes, every verdict and coverage state, the summary, the observed pass and the replay digest. Every `fns demo` command, and `prove-sign`, default to it. README, STATUS and FINDINGS record the run |
+| #37 | 2 | `probes.json` carries `source`. The replay banner says "recorded live probe results" for lab-run-3, and "hand-written probe results" for lab-run-1, lab-run-2 and `demo-scout` |
+| #38 | 3 | FINDINGS, "Live and replay bundle digests differ": **not a bug**. Verdicts, coverage, reasons and evidence rungs are identical. The digests differ by mode, real vs placeholder IDs (which also change every probe ID, since it hashes the full ARM path), run ID and timestamps, the verifier label, and a live-only "sent once" note. A new test replays a live recording and requires the same findings |
+| #39 | 4 | The PIM licence matcher uses service plan IDs only. `not-applicable` needs every plan of every live SKU on `graph.PIM_FREE_PLAN_IDS`, which starts empty; any unknown SKU or plan keeps the surface not collected, so findings stay inconclusive. Resolves the M2 FINDINGS open item. No digest changed |
+| #40 | 6 | Runbooks quote `"-replace=time_offset.scope_expiry"` for PowerShell, and retry removing the temporary `AZURE_CONFIG_DIR` up to 5 times |
+| #41 | 5 | `sigstore` stays an extra. `poe setup`, CI and the runbook sync with `--all-groups --all-extras`. Both sigstore tests now run in CI (1152 passed, 0 skipped) |
+
+Tests: 1128 before these PRs, 1152 after.
+
+## Decisions waiting for you
+
+1. **Denied probes are not linked to their finding.** For Key Vault
+   `secrets/get` and `secrets/list` and payroll `blob/read`, the finding's reason
+   says "the operation itself was denied when probed, but escalation paths
+   remain". Its evidence lists only the modeled path and the *allowed* hop.
+   The observed denial is in the bundle's artifacts, but not in the finding
+   (`src/fns/verify/verdict.py`, the unrefuted `must_not_reach` branch).
+   Linking it is more honest, but it changes the evidence model and every
+   prove golden, so it needs a plan and your approval. The verdicts would not
+   change.
+2. **Sigstore production (Rekor).** Still refused in code
+   (`PRODUCTION_APPROVED = False`). `prove-sign` signs `fixtures/lab-run-3` on
+   staging on every push to `main`.
+3. **`PIM_FREE_PLAN_IDS` is empty.** Until it holds verified plan IDs, any tenant
+   with licences gets `pim-eligibility` not collected when an eligibility listing
+   fails, and its findings stay inconclusive. Filling it means checking IDs
+   against Microsoft's licensing list. The lab is unaffected.
+
+## Next
+
+M4 (Harden + detect) is built offline; its live loop is pending approval
+(`docs/milestones/M4.md`). It starts with a plan for your approval.
+
+## The morning review (before the M2 and M3 runs)
+
 Every item from the morning review of `docs/OVERNIGHT.md` is done. Each one got
 its own branch and PR. CI passed on ubuntu and windows on the first run every
 time, and all of them are merged to `main`. No Azure call, `az` command or
 Terraform apply was made. Everything was tested with fixtures and mocks.
 
-## What changed
+### What changed
 
 | PR | Review item | Change |
 | --- | --- | --- |
@@ -31,9 +74,9 @@ Terraform apply was made. Everything was tested with fixtures and mocks.
 Tests: 804 before the review, 888 after, plus 1 Linux-only test of the Action's
 bash script.
 
-## Your two follow-up questions
+### Your two follow-up questions
 
-### 1. Which two mutants survive, and can a contract change kill them?
+#### 1. Which two mutants survive, and can a contract change kill them?
 
 There are eight mutants:
 
@@ -75,7 +118,7 @@ rule or what "reach" means:
   object;
 - **(c)** a compound "ownership plus OwnedBy" mutant.
 
-### 2. Is `LicenseAssignment.Read.All` needed, given `Directory.Read.All`?
+#### 2. Is `LicenseAssignment.Read.All` needed, given `Directory.Read.All`?
 
 Not today: `Directory.Read.All` already covers `/subscribedSkus`, so the extra
 grant adds no access. I kept it because it is needed to drop `Directory.Read.All`
@@ -96,17 +139,18 @@ later.
 
 The reasoning is in `docs/DECISIONS.md`.
 
-## Still open for your review
+### Still open for your review
 
 - **PIM eligibility is handled coarsely.** Any eligibility of a controlled
   principal leaves *every* finding open. Narrowing it by scope or by operation
   can come later.
 
-## Not verified yet
+### Not verified yet
 
 These depend on the live run:
 
-- **Eligibility in a tenant without P2.** What Graph and ARM actually return is
+- **Eligibility in a tenant without P2.** *Answered in the M2 run: see the first
+  two rows of `docs/FINDINGS.md`.* What Graph and ARM actually return was
   unknown. The tests use an illustrative `AadPremiumLicenseRequired`; the
   collector records whatever code comes back and does not depend on that one.
 - **Audit activity names.** The names in the two credential and owner detection
@@ -120,12 +164,7 @@ These depend on the live run:
   M4 strikes, or to the R1 probe if ARM-style authorize-before-validate also holds
   for Graph.
 
-## Next
+### Next (done)
 
-Run `docs/runbooks/m2-live-run.md`, then:
-
-- commit `fixtures/lab-run-2` as the C4 regression test;
-- record the PIM responses in `docs/FINDINGS.md`;
-- tag `m2`.
-
-I stopped here, as asked.
+The M2 run is done, `fixtures/lab-run-2` is its regression test, the PIM
+responses are in `docs/FINDINGS.md`, and `m2` is tagged.
