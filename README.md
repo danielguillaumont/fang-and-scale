@@ -77,7 +77,9 @@ the verifier and scout applications and the invoice account's keys. It catches 6
 of 8. The two survivors make the agent an owner of `id-verifier` or `sp-fns-scout`.
 In the hardened lab the agent holds no Graph permission that can use an ownership,
 so the model gains no reach, and the output says exactly that
-(`docs/FINDINGS.md`).
+(`docs/FINDINGS.md`). They are accepted as explained survivors: no contract line
+can kill them, and the Graph grant that would make the ownership usable is
+already caught.
 
 **4. Report.** Coverage comes first, then the reach graph, findings and paths, the
 proof bundle and the mutation results. It is one self-contained HTML file with
