@@ -46,7 +46,7 @@ def _labelled(output: str) -> bool:
     [
         (["--fixture", DEMO_SCOUT], "demo-prove"),
         (["--fixture", str(LAB_RUN)], "lab-run-1-prove"),
-        ([], "lab-run-2-prove"),
+        ([], "lab-run-3-prove"),
     ],
 )
 def test_demo_prove_is_labelled_deterministic_and_verifiable(

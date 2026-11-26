@@ -12,6 +12,50 @@ request (sanitized), the response, the date, and what the code does about it.
 | 2026-11-26 | ARM `Microsoft.Authorization/roleEligibilitySchedules` (`api-version=2020-10-01`, Reader on the subscription) | `GET https://management.azure.com/subscriptions/<sub>/providers/Microsoft.Authorization/roleEligibilitySchedules?api-version=2020-10-01` in the same tenant | As above | **The same status and code from a second API**, with a different message: `400` `{"error": {"code": "AadPremiumLicenseRequired", "message": "The tenant needs to have Microsoft Entra Permissions Management or <GUID> or Microsoft Entra ID P2 or Microsoft Entra ID Governance license."}}`. ARM accepts more licences than Graph names, and it names one of them only by a GUID. The sanitizer replaced that GUID with a placeholder (`...-000000001049`), which appears nowhere else in the recording, so it is not the tenant, the subscription or any object in it. No `innerError` | Handled the same way as Graph. **Open:** the licence match (`PIM_PLAN_IDS`, and SKU or plan names containing `P2` or `GOVERNANCE`) does not know Permissions Management or the GUID-named licence. That makes no difference in this tenant, which has no SKUs. Take a tenant that has only one of those licences. Its Graph listing fails for lack of P2. If its ARM listing also failed for some other reason (a 403, a 5xx), the collector would report `not-applicable`, although Azure-resource eligibility could exist there. Widening the match is an evidence-model change, so it waits for a decision |
 | 2026-11-26 | Graph v1.0 `subscribedSkus` (app-only, `sp-fns-scout`) | `GET https://graph.microsoft.com/v1.0/subscribedSkus?$select=skuId,skuPartNumber,capabilityStatus,servicePlans` in the same tenant | Lists the tenant's commercial subscriptions | `200` with `"value": []`: an Entra ID Free tenant (here on an Azure for Students subscription) has **no subscribed SKUs at all**, not even a free one | **0 SKUs is a valid not-applicable signal.** A successful, empty answer is positive evidence that no licence carries PIM. It is different from a failed call, which leaves `pim-eligibility` not collected. The evidence line reads `GET /subscribedSkus -> ok: 0 SKU(s) [none]; plans that may carry PIM: none` |
 
+## M3 live run (2026-11-26)
+
+Run from `docs/runbooks/m3-live-run.md`. The scout ran as `sp-fns-scout`, and the
+probes ran as `sp-billing-agent`, the identity the contract assumes is
+compromised.
+
+- **Scout:** digest
+  `sha256:68a0208d9c91330bd187a1f4f9b284d801e7fa7c224006edb9399bf2a179b129`,
+  identical to M2, after 34 gated calls. The lab did not change between the runs.
+- **`fns prove --live`:** passed 1, critical reachable 11, still-do failed 0,
+  inconclusive 1, exit 1. The live bundle is `sha256:4b537ab6…`, signed with the
+  offline test key.
+  - Invoices `blob/read` passed, observed and verified. This is M3's first
+    verdict backed by an observed probe.
+  - Key Vault `secrets/get` and `secrets/list`, and payroll `blob/read`, were
+    denied when probed. They still fail, because escalation paths remain:
+    Contributor lists `vaults/write` and `listKeys`.
+- **The data-plane answers matched the documentation exactly.** There is no new
+  API row in the table above.
+  - Key Vault `GET` of the secret and of the list both returned `403`
+    `Forbidden`, inner code `ForbiddenByRbac`.
+  - Blob `HEAD` on payroll returned `403`, `x-ms-error-code:
+    AuthorizationPermissionMismatch`. On invoices it returned `200`.
+  - The 9 `permissions` reads all returned `200` and listed exactly the actions
+    the hand-written `probes.json` predicted.
+
+  The V6 pre-flight (the ARM metadata read of the secret) saw the tag
+  `fns-data = synthetic`, so the Key Vault `GET` was sent. No secret value was
+  returned, read or stored.
+- **Recorded as `fixtures/lab-run-3`.**
+  - Its scout half replays to the M2 digest,
+    `da85272752f74a1bc99a966743abe0657f226f28aede542b9dfe75ec61ab549c`.
+  - Its `probes.json` holds 13 results, all `allowed` or `denied`, none omitted.
+  - `test_no_real_ids`: 25 passed. `_idmap.json` is ignored.
+  - The replay (`fns demo prove --fixture fixtures/lab-run-3`) gives the same
+    verdicts, exit 1, bundle `sha256:ab673d8e…`, pinned in
+    `tests/golden/lab-run-3-prove.digest`. It differs from the live bundle by
+    design.
+- **The M3 regression test is `tests/fixtures/test_lab_run_3.py`:** the recorded
+  probe outcomes, every verdict and coverage state, the summary, the observed
+  pass, and the replay digest.
+- **Cleanup:** the agent's and the scout's certificates were deleted and
+  verified, and the temporary CLI profiles were removed.
+
 ## M2 live run (2026-11-26)
 
 Run from `docs/runbooks/m2-live-run.md`. Every result matched the runbook tables.

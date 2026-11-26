@@ -1,0 +1,111 @@
+{
+  "description": "Recorded from the lab by fns prove --live on 2026-11-26, sanitized: status and allowlisted error codes only; no request IDs, bodies or principals.",
+  "format": 1,
+  "label": "FIXTURE",
+  "results": [
+    {
+      "action": "Microsoft.KeyVault/vaults/secrets/getSecret/action",
+      "detail": "Microsoft.KeyVault/vaults/secrets/getSecret/action not listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/secrets/readMetadata/action",
+      "detail": "Microsoft.KeyVault/vaults/secrets/readMetadata/action not listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.KeyVault/vaults/write",
+      "detail": "Microsoft.KeyVault/vaults/write listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action",
+      "detail": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+      "detail": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+      "detail": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/listKeys/action",
+      "detail": "Microsoft.Storage/storageAccounts/listKeys/action listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+      "detail": "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read not listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "denied",
+      "resource": "stpayrolltiin02"
+    },
+    {
+      "action": "Microsoft.Storage/storageAccounts/listKeys/action",
+      "detail": "Microsoft.Storage/storageAccounts/listKeys/action listed in permissions at the scope",
+      "http_status": 200,
+      "kind": "arm-permissions",
+      "outcome": "allowed",
+      "resource": "stpayrolltiin02"
+    },
+    {
+      "action": "secrets/get",
+      "detail": "HTTP 403 Forbidden/ForbiddenByRbac (authorization denied)",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "secrets/list",
+      "detail": "HTTP 403 Forbidden/ForbiddenByRbac (authorization denied)",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "kv-crown-tiin02"
+    },
+    {
+      "action": "blob/read",
+      "detail": "HTTP 200",
+      "http_status": 200,
+      "kind": "data-read",
+      "outcome": "allowed",
+      "resource": "stinvoicestiin02"
+    },
+    {
+      "action": "blob/read",
+      "detail": "HTTP 403 AuthorizationPermissionMismatch (authorization denied)",
+      "http_status": 403,
+      "kind": "data-read",
+      "outcome": "denied",
+      "resource": "stpayrolltiin02"
+    }
+  ]
+}
