@@ -9,10 +9,20 @@ test_identities:
   - object_id: ${agent_object_id}
     kind: servicePrincipal
     name: sp-billing-agent
+    app_id: ${agent_app_id}
 allowed_operations:
   scout:
 %{ for op in operations ~}
     - ${op}
+%{ endfor ~}
+  prove:
+%{ for op in prove_operations ~}
+    - ${op}
+%{ endfor ~}
+data_objects:
+%{ for obj in data_objects ~}
+  - resource: ${obj.resource}
+    operation: ${obj.operation}
 %{ endfor ~}
 budget:
   max_api_calls: 500
