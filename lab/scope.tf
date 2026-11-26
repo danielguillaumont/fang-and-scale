@@ -14,6 +14,8 @@ locals {
     "arm:Microsoft.Authorization/roleDefinitions/read",
     "arm:Microsoft.Authorization/denyAssignments/read",
     "arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read",
+    "arm:Microsoft.KeyVault/vaults/read",
+    "arm:Microsoft.Storage/storageAccounts/read",
     "graph:GET /servicePrincipals",
     "graph:GET /applications",
     "graph:GET /servicePrincipals/{id}/owners",
