@@ -12,10 +12,12 @@ import pytest
 from typer.testing import CliRunner
 
 from fns.cli import app
+from fns.fixtures.replay import bundled
 from fns.prove import run as prove_run
 from tests.prove.helpers import LAB_RUN
 
 ROOT = Path(__file__).resolve().parent
+DEMO_SCOUT = str(bundled("demo-scout"))  # hand-written, for tests
 runner = CliRunner()
 
 
@@ -41,7 +43,7 @@ def _labelled(output: str) -> bool:
 
 @pytest.mark.parametrize(
     ("args", "golden"),
-    [([], "demo-prove"), (["--fixture", str(LAB_RUN)], "lab-run-1-prove")],
+    [(["--fixture", DEMO_SCOUT], "demo-prove"), ([], "lab-run-1-prove")],
 )
 def test_demo_prove_is_labelled_deterministic_and_verifiable(
     tmp_path: Path, args: list[str], golden: str

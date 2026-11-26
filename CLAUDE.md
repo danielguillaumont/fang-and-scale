@@ -42,7 +42,7 @@ Tasks are poethepoet tasks in `pyproject.toml`; they run the same on Windows
 - `uv run poe check`  ruff + mypy + import boundaries + pytest (must pass before every commit)
 - `uv run poe schema`  regenerate committed JSON Schemas in `schemas/`
 - `uv run poe lab-up` / `uv run poe lab-down`  apply / destroy the Terraform lab
-- `uv run poe demo`  replay the bundled fixture through `fns demo scout`
+- `uv run poe demo`  replay the recorded `fixtures/lab-run-1` through `fns demo scout`
 - `uv run fns --help`
 
 ## Working style

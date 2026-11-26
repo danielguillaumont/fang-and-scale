@@ -15,10 +15,12 @@ from typer.testing import CliRunner
 
 from fns.cli import app
 from fns.contain_run import run_demo_contain
+from fns.fixtures.replay import bundled
 
 ROOT = Path(__file__).resolve().parent
 LAB_RUN = ROOT.parent / "fixtures" / "lab-run-1"
 LAB_CONTRACT = LAB_RUN / "contract.fns.yaml"
+DEMO_SCOUT = str(bundled("demo-scout"))  # hand-written, for tests
 runner = CliRunner()
 
 
@@ -38,7 +40,7 @@ def _labelled(output: str) -> bool:
 
 @pytest.mark.parametrize(
     ("args", "golden"),
-    [([], "demo-contain"), (["--fixture", str(LAB_RUN)], "lab-run-1-contain")],
+    [(["--fixture", DEMO_SCOUT], "demo-contain"), ([], "lab-run-1-contain")],
 )
 def test_demo_contain_fails_seeded_contract_with_labelled_paths(
     tmp_path: Path, args: list[str], golden: str

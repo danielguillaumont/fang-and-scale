@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 
 from fns.cli import app
 from fns.contain_run import demo_contract, run_demo_contain
+from fns.fixtures.replay import bundled
 from fns.models.report import ContainReport
 from fns.mutate_cli import run as run_mutation
 from fns.report.html import (
@@ -160,7 +161,11 @@ def test_cli_report_from_files(tmp_path: Path) -> None:
 
     demo_contain = tmp_path / "demo-contain.json"
     runner.invoke(
-        app, ["demo", "contain", "--out", str(tmp_path / "d"), "--json", str(demo_contain)]
+        app,
+        [
+            *("demo", "contain", "--out", str(tmp_path / "d")),
+            *("--json", str(demo_contain), "--fixture", str(bundled("demo-scout"))),
+        ],
     )
     mixed = runner.invoke(app, ["report", "--contain", str(demo_contain), "--prove", str(run_dir)])
     assert mixed.exit_code == 2
