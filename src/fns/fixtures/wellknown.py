@@ -2,9 +2,10 @@
 
 These are the same in every tenant (built-in role definitions, first-party
 app IDs, Graph app role IDs, directory role templates), so replacing them
-would destroy the meaning of a fixture without hiding anything. Values must be
-confirmed against the lab tenant in M1 Phase B; record any mismatch in
-docs/FINDINGS.md.
+would destroy the meaning of a fixture without hiding anything. The values
+that appear in ``fixtures/lab-run-1`` were confirmed against the lab tenant on
+2026-11-26 (``tests/fixtures/test_lab_fixture.py`` keeps them checked); record
+any mismatch in docs/FINDINGS.md.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ READER: Final = "acdd72a7-3385-48ef-bd42-f606fba81ae7"
 USER_ACCESS_ADMINISTRATOR: Final = "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9"
 KEY_VAULT_SECRETS_USER: Final = "4633458b-17de-408a-b874-0445c86b69e6"
 KEY_VAULT_ADMINISTRATOR: Final = "00482a5a-887f-4fb3-b363-3b7fe8e74483"
+KEY_VAULT_SECRETS_OFFICER: Final = "b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
 STORAGE_BLOB_DATA_READER: Final = "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1"
 STORAGE_BLOB_DATA_CONTRIBUTOR: Final = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
 STORAGE_ACCOUNT_CONTRIBUTOR: Final = "17d1049b-9a84-46fb-8f53-869881c3d3ab"
@@ -30,7 +32,7 @@ EVERYONE: Final = "00000000-0000-0000-0000-000000000000"
 
 # Microsoft Graph application permissions (app role IDs).
 APPLICATION_READ_ALL: Final = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"
-APPLICATION_READWRITE_ALL: Final = "1bfefb4e-e0b5-418b-a88f-73c6d2b2e8db"
+APPLICATION_READWRITE_ALL: Final = "1bfefb4e-e0b5-418b-a88f-73c46d2cc8e9"
 APPLICATION_READWRITE_OWNEDBY: Final = "18a4783c-866b-4cc7-a460-3d5e5662c884"
 APPROLEASSIGNMENT_READWRITE_ALL: Final = "06b708a9-e830-4db3-a914-8e69da51d44f"
 DIRECTORY_READ_ALL: Final = "7ab1d382-f21e-4acd-a863-ba3e13f7da61"

@@ -13,6 +13,15 @@ from fns.fixtures.sanitize import IdMap, sanitize, sanitize_text
 from fns.models.ids import utc_isoformat
 
 IDMAP_FILE = "_idmap.json"
+SCOPE_HEADER = "# Sanitized copy recorded by `fns scout --record`. Placeholder IDs only.\n"
+
+
+def _strip_leading_comments(text: str) -> str:
+    """Drop the live file's header comment; it describes the live file, not this copy."""
+    lines = text.splitlines(keepends=True)
+    while lines and lines[0].lstrip().startswith("#"):
+        lines.pop(0)
+    return "".join(lines)
 
 
 class Recorder:
@@ -68,7 +77,10 @@ class Recorder:
             "description": self.description,
         }
         write("exchanges.json", json.dumps(self.exchanges, indent=2, sort_keys=True) + "\n")
-        write("scope.yaml", sanitize_text(scope_yaml, self.idmap))
+        write(
+            "scope.yaml",
+            SCOPE_HEADER + _strip_leading_comments(sanitize_text(scope_yaml, self.idmap)),
+        )
         write("manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         self.idmap.save(self.out_dir / IDMAP_FILE)
         return self.out_dir

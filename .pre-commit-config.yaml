@@ -12,6 +12,7 @@ repos:
       - id: detect-private-key
       - id: check-added-large-files
         args: [--maxkb=500]
+        exclude: ^fixtures/  # recorded lab runs; scanned by test_no_real_ids instead
       - id: check-merge-conflict
   # Ruff runs from the project environment so its version comes from uv.lock.
   - repo: local
