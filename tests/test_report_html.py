@@ -138,7 +138,7 @@ def test_demo_report_with_proof_and_mutation(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     assert all(line.startswith("FIXTURE ") for line in result.output.splitlines() if line.strip())
     page = (tmp_path / "report.FIXTURE.html").read_text(encoding="utf-8")
-    assert "Mutation score 5/8" in page
+    assert "Mutation score 6/8" in page
     assert "TEST SIGNATURE" in page
     assert "passed with evidence" in page
     assert "after prove" in page

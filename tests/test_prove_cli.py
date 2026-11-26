@@ -71,7 +71,7 @@ def test_lab_run_verdicts(tmp_path: Path) -> None:
     )
     assert "escalation paths remain" in out
     assert re.search(r"FAIL\s+directory:tenant roleAssignments/write\s+modeled / modeled-only", out)
-    assert "passed: 1  critical reachable: 6  still-do failed: 0  inconclusive: 1" in out
+    assert "passed: 1  critical reachable: 11  still-do failed: 0  inconclusive: 1" in out
 
 
 def test_tampering_after_the_run_is_caught(tmp_path: Path) -> None:

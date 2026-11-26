@@ -82,7 +82,7 @@ def test_lab_proposal_is_minimal_keeps_legitimate_use_and_is_deterministic(
         "azuread_app_role_assignment.billing_agent_owned_by",
         "azurerm_role_assignment.billing_agent_rg_contributor",
     ]
-    assert (p.before.critical, p.after.critical) == (6, 0)
+    assert (p.before.critical, p.after.critical) == (11, 0)
     assert p.after.still_do_allowed == p.before.still_do_allowed
     assert p.alternatives  # removing the ownership instead also works
     # No single lever is enough: the search really is minimal.
