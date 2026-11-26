@@ -16,6 +16,7 @@ locals {
     "arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read",
     "arm:Microsoft.KeyVault/vaults/read",
     "arm:Microsoft.Storage/storageAccounts/read",
+    "arm:Microsoft.Authorization/roleEligibilitySchedules/read",
     "graph:GET /servicePrincipals",
     "graph:GET /applications",
     "graph:GET /servicePrincipals/{id}/owners",
@@ -24,6 +25,8 @@ locals {
     "graph:GET /servicePrincipals/{id}/memberOf",
     "graph:GET /roleManagement/directory/roleDefinitions",
     "graph:GET /roleManagement/directory/roleAssignments",
+    "graph:GET /roleManagement/directory/roleEligibilitySchedules",
+    "graph:GET /subscribedSkus",
   ]
 }
 

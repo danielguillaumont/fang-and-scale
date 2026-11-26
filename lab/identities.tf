@@ -88,7 +88,7 @@ resource "azuread_service_principal" "scout" {
 
 resource "azuread_app_role_assignment" "scout_graph" {
   for_each = toset(concat(
-    ["Application.Read.All", "RoleManagement.Read.Directory"],
+    ["Application.Read.All", "LicenseAssignment.Read.All", "RoleManagement.Read.Directory"],
     var.scout_directory_read_all ? ["Directory.Read.All"] : [],
   ))
 
