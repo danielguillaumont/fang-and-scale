@@ -219,6 +219,22 @@ by `fns mutate` (M5) on `fixtures/lab-run-1`, hardened in the model.
 
 ## Open questions from Phase B
 
+- **TODO: fill `graph.PIM_FREE_PLAN_IDS` (decision 3, 2026-11-26; owner
+  decision: leave it empty for now).** It starts empty, so any tenant with a
+  licence gets `pim-eligibility` not collected when an eligibility listing fails.
+  Populate it **only** from Microsoft's official reference, "Product names and
+  service plan identifiers for licensing" (Microsoft Learn, Entra ID, under
+  enterprise users; it is also published as a CSV). Each entry needs:
+  - the `servicePlanId` GUID, the `servicePlanName`, and a SKU that carries it,
+    copied from that reference, which is cited with the date it was read;
+  - a reason the plan cannot carry PIM. Entra ID P2, ID Governance and any plan
+    that includes them never qualify;
+  - a test that pins the entry (and its citation) in `tests/inventory/test_pim.py`,
+    replacing `test_the_pim_free_list_starts_empty`, plus a collector test where a
+    tenant with only listed plans is `not-applicable`.
+
+  Never infer an entry from a name, and never add one from a tenant's own
+  `/subscribedSkus` response.
 - **Is `Directory.Read.All` needed?** Partly answered. The full set is
   sufficient, but nothing has tested whether it is minimal: the lab's owners are
   one user and three service principals, and no service principal is a member of
