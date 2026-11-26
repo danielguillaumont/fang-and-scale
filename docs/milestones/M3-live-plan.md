@@ -456,7 +456,7 @@ Expected plan: **1 to add, 0 to change, 1 to destroy**, `local_file.scope` only.
 If it shows anything else, type `no` and send the plan.
 
 The scope expires 2026-12-03. If that date has passed, also run
-`terraform -chdir=lab apply -replace=time_offset.scope_expiry`.
+`terraform -chdir=lab apply "-replace=time_offset.scope_expiry"`.
 
 ```powershell
 uv run fns scope check scope.lab.yaml    # not expired; the table lists 17 scout and 5 prove operations

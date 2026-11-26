@@ -88,7 +88,7 @@ The scope expires 7 days after the lab was created (2026-12-03 for the first
 lab). If `fns scope check` below reports it expired, renew it:
 
 ```powershell
-terraform -chdir=lab apply -replace=time_offset.scope_expiry
+terraform -chdir=lab apply "-replace=time_offset.scope_expiry"
 ```
 
 Check the result:

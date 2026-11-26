@@ -70,7 +70,9 @@ uv run poe check
 
 The scope from M1 expires on **2026-12-03**. A gate refuses every call once the
 scope has expired, including a call in the middle of a run. So this apply also
-renews it, to 7 days from now, with `-replace=time_offset.scope_expiry`.
+renews it, to 7 days from now, with `-replace=time_offset.scope_expiry`. Keep
+the quotes in PowerShell: unquoted, PowerShell does not pass the argument through
+intact (the M3 run needed the quotes).
 
 ```powershell
 az login --tenant <TENANT_ID>
@@ -78,7 +80,7 @@ az account set --subscription <SUBSCRIPTION_ID>
 $tenant = az account show --query tenantId -o tsv
 uv run poe lab-check
 terraform -chdir=lab init -input=false
-terraform -chdir=lab apply -replace=time_offset.scope_expiry
+terraform -chdir=lab apply "-replace=time_offset.scope_expiry"
 ```
 
 Review the plan before typing `yes`. It should show **2 to add, 1 to change, 2
@@ -158,7 +160,12 @@ snapshot.
 ```powershell
 az logout
 Remove-Item Env:AZURE_CONFIG_DIR
-Remove-Item -Recurse -Force $scoutDir
+foreach ($i in 1..5) {   # Windows can hold the profile briefly; in M3 it went 10 s later
+    Remove-Item -Recurse -Force $scoutDir -ErrorAction SilentlyContinue
+    if (-not (Test-Path $scoutDir)) { break }
+    Start-Sleep -Seconds 3
+}
+Test-Path $scoutDir                                                    # must print False
 az account show --query "user.name" -o tsv                        # you again, not the scout
 # step 3 checked the list was empty first, so every certificate here is this run's
 foreach ($k in @(az ad app credential list --id $scoutId --cert --query "[].keyId" -o tsv)) {
@@ -275,7 +282,12 @@ In both cases go to step 7 now. Do not retry as another identity.
 ```powershell
 az logout
 Remove-Item Env:AZURE_CONFIG_DIR
-Remove-Item -Recurse -Force $agentDir
+foreach ($i in 1..5) {   # Windows can hold the profile briefly; in M3 it went 10 s later
+    Remove-Item -Recurse -Force $agentDir -ErrorAction SilentlyContinue
+    if (-not (Test-Path $agentDir)) { break }
+    Start-Sleep -Seconds 3
+}
+Test-Path $agentDir                                                    # must print False
 az account show --query "user.name" -o tsv                        # you again, not the agent
 
 # step 5 checked the list was empty first, so every certificate here is this run's
@@ -383,7 +395,13 @@ nothing was created.
    ```powershell
    Remove-Item Env:AZURE_CONFIG_DIR -ErrorAction SilentlyContinue
    foreach ($d in @("fns-agent-az", "fns-scout-az")) {
-       Remove-Item -Recurse -Force (Join-Path $env:TEMP $d) -ErrorAction SilentlyContinue
+       $p = Join-Path $env:TEMP $d
+       foreach ($i in 1..5) {   # Windows can hold a profile briefly; retry
+           Remove-Item -Recurse -Force $p -ErrorAction SilentlyContinue
+           if (-not (Test-Path $p)) { break }
+           Start-Sleep -Seconds 3
+       }
+       if (Test-Path $p) { Write-Warning "still there: $p (close other az windows, rerun)" }
    }
    az account list --query "[?user.type=='servicePrincipal'].user.name" -o tsv   # must print nothing
    ```

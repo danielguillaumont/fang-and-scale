@@ -50,6 +50,16 @@ compromised.
     verdicts, exit 1, bundle `sha256:ab673d8e…`, pinned in
     `tests/golden/lab-run-3-prove.digest`. It differs from the live bundle by
     design.
+- **Two Windows hiccups in the runbook, both fixed in it.** Neither is an Azure
+  API behaviour.
+  - In PowerShell, `terraform apply -replace=time_offset.scope_expiry` has to be
+    quoted (`"-replace=time_offset.scope_expiry"`); unquoted, it did not reach
+    Terraform intact, most likely because PowerShell parses the `-name=a.b` form
+    itself. All runbooks and `lab/scope.tf` now quote it.
+  - `Remove-Item -Recurse -Force` on a temporary `AZURE_CONFIG_DIR` failed once,
+    on a file Windows still held after `az logout`, and worked 10 s later. The
+    runbook now retries up to 5 times, 3 s apart, and then checks the folder is
+    gone.
 - **The M3 regression test is `tests/fixtures/test_lab_run_3.py`:** the recorded
   probe outcomes, every verdict and coverage state, the summary, the observed
   pass, and the replay digest.
