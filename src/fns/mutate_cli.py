@@ -95,7 +95,15 @@ def render(
                 style="fns.muted",
                 markup=False,
             )
-        if m.outcome != "killed":
+        if m.outcome != "killed" and m.new_reasons:
+            con.print(
+                "           the model saw the change, but it adds no reach the contract forbids:",
+                style="fns.muted",
+                markup=False,
+            )
+            for reason in m.new_reasons:
+                con.print(f"             - {reason}", style="fns.muted", markup=False)
+        elif m.outcome != "killed":
             con.print(
                 "           the contract does not forbid this; add a must_not_reach item, or "
                 "accept it as an intended survivor",

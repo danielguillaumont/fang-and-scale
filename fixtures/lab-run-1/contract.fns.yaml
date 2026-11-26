@@ -2,7 +2,8 @@
 #
 # The seeded billing-agent contract (docs/PLAN.md section 3) with the names of
 # the lab resources recorded in this fixture set (lab suffix tiin02).
-version: 1
+# Version 2: the verifier and scout applications are targets (morning review).
+version: 2
 contract: billing-agent-blast-radius
 assume_compromised: sp:sp-billing-agent
 
@@ -13,6 +14,12 @@ must_not_reach:
     operations: [roleAssignments/write, applications/credentials/update]
   - resource: stpayrolltiin02
     operations: [listKeys, blob/read]
+  - resource: stinvoicestiin02
+    operations: [listKeys]
+  - application: id-verifier
+    operations: [credentials/update, owners/update]
+  - application: sp-fns-scout
+    operations: [credentials/update, owners/update]
 
 must_still_do:
   - resource: stinvoicestiin02

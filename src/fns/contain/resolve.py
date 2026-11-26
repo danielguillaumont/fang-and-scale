@@ -70,3 +70,25 @@ def resolve_resource(snapshot: Snapshot, ref: str) -> Resolved:
             return Resolved(None, f"{what} is not a valid ARM ID: {exc}")
         return _one([e for e in snapshot.entities if e.id == rid and e.type == "resource"], what)
     return _one(_by_name(snapshot, ref, frozenset({"resource"})), what)
+
+
+_GUID_LEN = 36
+
+
+def resolve_object(snapshot: Snapshot, kind: str, ref: str) -> Resolved:
+    """``application`` or ``servicePrincipal`` by object id, appId, or display name.
+
+    An object id wins, then an appId, then the display name; several matches at
+    the same step is ambiguous.
+    """
+    what = f"{'service principal' if kind == 'servicePrincipal' else kind} {ref}"
+    of_kind = [e for e in snapshot.entities if e.type == kind]
+    value = ref.lower()
+    if len(value) == _GUID_LEN:
+        by_id = [e for e in of_kind if e.id == value]
+        if by_id:
+            return _one(by_id, what)
+        by_app_id = [e for e in of_kind if str(e.properties.get("appId", "")).lower() == value]
+        if by_app_id:
+            return _one(by_app_id, what)
+    return _one(_by_name(snapshot, ref, frozenset({kind})), what)

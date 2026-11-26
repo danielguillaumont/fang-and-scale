@@ -42,6 +42,10 @@ class MutantResult(FnsModel):
     new_failures: tuple[str, ...] = ()
     """``<target> <operation>`` for each must_not_reach finding that newly fails."""
     new_inconclusive: tuple[str, ...] = ()
+    new_reasons: tuple[str, ...] = ()
+    """For a mutant that was not killed: finding reasons that appear only with it. The
+    model saw the change but it gave no failing finding (for example ownership without
+    the Graph permission to use it)."""
     terraform_file: str | None = None
     terraform_diff: str | None = None
     terraform_note: str | None = None

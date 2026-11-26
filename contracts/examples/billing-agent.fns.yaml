@@ -2,9 +2,10 @@
 #
 # Blast-radius contract for the lab's billing agent (docs/PLAN.md section 3).
 # Assume sp-billing-agent is compromised: it must never reach the crown-jewel
-# vault, payroll storage or directory write paths, and must still be able to
-# read and write invoices.
-version: 1
+# vault, payroll storage, the invoice account's keys or directory write paths,
+# must never gain control of the verifier or scout identities (version 2
+# targets), and must still be able to read and write invoices.
+version: 2
 contract: billing-agent-blast-radius
 assume_compromised: sp:sp-billing-agent
 
@@ -15,6 +16,12 @@ must_not_reach:
     operations: [roleAssignments/write, applications/credentials/update]
   - resource: st-payroll
     operations: [listKeys, blob/read]
+  - resource: st-invoices
+    operations: [listKeys]
+  - application: id-verifier
+    operations: [credentials/update, owners/update]
+  - application: sp-fns-scout
+    operations: [credentials/update, owners/update]
 
 must_still_do:
   - resource: st-invoices

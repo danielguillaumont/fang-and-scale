@@ -78,7 +78,7 @@ def test_exit_0_within_budget_is_never_called_a_pass(tmp_path: Path) -> None:
     lenient = tmp_path / "lenient.fns.yaml"
     text = LAB_CONTRACT.read_text(encoding="utf-8")
     lenient.write_text(
-        text.replace("max_critical_reachable: 0", "max_critical_reachable: 6"), encoding="utf-8"
+        text.replace("max_critical_reachable: 0", "max_critical_reachable: 11"), encoding="utf-8"
     )
     args = ["contain", "--contract", str(lenient), "--snapshot", str(scout.snapshot_path)]
     result = runner.invoke(app, [*args, "--out", str(tmp_path)])

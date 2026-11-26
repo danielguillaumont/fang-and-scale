@@ -15,7 +15,12 @@ EXAMPLE = Path(__file__).resolve().parents[2] / "contracts" / "examples" / "bill
 def test_example_contract_loads() -> None:
     c = load_contract(EXAMPLE)
     assert c.contract == "billing-agent-blast-radius"
-    assert {type(i).__name__ for i in c.must_not_reach} == {"ResourceTarget", "DirectoryTarget"}
+    assert c.version == 2
+    assert {type(i).__name__ for i in c.must_not_reach} == {
+        "ResourceTarget",
+        "DirectoryTarget",
+        "ApplicationTarget",
+    }
     assert any(isinstance(i, DirectoryTarget) for i in c.must_not_reach)
     assert c.on_inconclusive == "fail"
     assert c.budget.max_inconclusive == 2
@@ -58,7 +63,10 @@ def test_identity_refs(ref: str) -> None:
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"version": 2},
+        {"version": 3},
+        {"must_not_reach": [{"application": "id-verifier", "operations": ["owners/update"]}]},
+        {"must_not_reach": [{"service_principal": "a b", "operations": ["owners/update"]}]},
+        {"must_still_do": [{"application": "x", "operations": ["owners/update"]}]},
         {"contract": "Has Spaces"},
         {"contract": "UPPER"},
         {"assume_compromised": "billing-agent"},

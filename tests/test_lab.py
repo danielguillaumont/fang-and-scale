@@ -97,6 +97,8 @@ def test_rendered_lab_contract_matches_the_example_and_validates() -> None:
         "vault": "kv-crown-jewels",
         "payroll": "st-payroll",
         "invoices": "st-invoices",
+        "verifier": "id-verifier",
+        "scout": "sp-fns-scout",
     }
     for key, value in names.items():
         text = text.replace("${" + key + "}", value)

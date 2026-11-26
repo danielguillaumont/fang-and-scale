@@ -29,6 +29,15 @@
           "title": "New Inconclusive",
           "type": "array"
         },
+        "new_reasons": {
+          "default": [],
+          "description": "For a mutant that was not killed: finding reasons that appear only with it. The\nmodel saw the change but it gave no failing finding (for example ownership without\nthe Graph permission to use it).",
+          "items": {
+            "type": "string"
+          },
+          "title": "New Reasons",
+          "type": "array"
+        },
         "operator": {
           "enum": [
             "owner-at-rg",

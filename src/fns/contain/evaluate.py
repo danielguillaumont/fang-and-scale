@@ -24,9 +24,16 @@ from typing import Final, Literal
 from fns.contain import rbac
 from fns.contain import semantics as sem
 from fns.contain.closure import Closure, Derivation, Fact, SnapshotIndex, app_perm, controls
-from fns.contain.resolve import resolve_identity, resolve_resource
+from fns.contain.resolve import resolve_identity, resolve_object, resolve_resource
 from fns.exitcodes import ExitCode
-from fns.models.contract import Contract, DirectoryTarget, ResourceTarget
+from fns.models.contract import (
+    ApplicationTarget,
+    Contract,
+    DirectoryTarget,
+    ReachTarget,
+    ResourceTarget,
+    ServicePrincipalTarget,
+)
 from fns.models.evidence import CoverageState, Evidence, Finding, ItemKind, Outcome, Verdict
 from fns.models.snapshot import Entity, Snapshot
 
@@ -280,6 +287,83 @@ def _directory_hits(closure: Closure, semantics: sem.OperationSemantics) -> list
     return hits
 
 
+def _object_hits(
+    closure: Closure, semantics: sem.OperationSemantics, target: Entity
+) -> tuple[list[_Hit], list[str]]:
+    """Hits on one application or service principal, and notes for the reasons.
+
+    A service principal is also covered through its application: a credential on
+    the application signs in as the service principal.
+    """
+    ix = closure.index
+    op = semantics.operation
+    covered = {target.id}
+    if target.type == "servicePrincipal":
+        covered.update(
+            app for app, edges in ix.sps_of_app.items() if any(e.src == target.id for e in edges)
+        )
+    name = ix.name(target.id)
+    hits: list[_Hit] = []
+    notes: list[str] = []
+    for p in closure.controlled():
+        eff = closure.effective(p)
+        perms = closure.app_perms(p)
+        owned = [e for e in ix.owns.get(p, ()) if e.dst in covered]
+        for way in semantics.ways:
+            if way.kind == "appPerm":
+                hits.extend(
+                    _Hit(
+                        p,
+                        way,
+                        (controls(p), app_perm(p, value)),
+                        f"{value} allows {op} on {name} (and every other object in the tenant)",
+                    )
+                    for value in way.values
+                    if value in perms
+                )
+            elif way.kind == "dirRole":
+                for f in closure.facts_of("dir-role", eff):
+                    role, scope = f.args
+                    if role not in way.values or (scope != "/" and scope.strip("/") not in covered):
+                        continue
+                    hits.append(
+                        _Hit(
+                            p,
+                            way,
+                            (controls(p), *closure.membership(p, f.principal), f),
+                            f"the directory role {ix.name(role)} allows {op} on {name}",
+                        )
+                    )
+            elif way.kind == "ownedObjectPerm":
+                held = [v for v in way.values if v in perms]
+                for edge in owned:
+                    if not held:
+                        notes.append(
+                            f"{ix.name(p)} owns {ix.name(edge.dst)} but holds neither "
+                            f"{sem.APP_READWRITE_OWNEDBY} nor {sem.APP_READWRITE_ALL}, so an "
+                            "app-only caller cannot use the ownership (one Graph grant away)"
+                        )
+                    hits.extend(
+                        _Hit(
+                            p,
+                            way,
+                            (controls(p), app_perm(p, value)),
+                            f"{ix.name(p)} owns {ix.name(edge.dst)}; {value} allows {op} on "
+                            "objects it owns",
+                            sources=(ix.source(edge),),
+                        )
+                        for value in held
+                    )
+    return hits, sorted(set(notes))
+
+
+_KIND: Final[dict[type, sem.TargetKind]] = {
+    DirectoryTarget: "directory",
+    ApplicationTarget: "application",
+    ServicePrincipalTarget: "servicePrincipal",
+}
+
+
 def _unwind(closure: Closure, premises: tuple[Fact, ...]) -> list[Derivation]:
     seen: set[Fact] = set()
     out: list[Derivation] = []
@@ -372,7 +456,7 @@ def _evaluate_op(
     contract: Contract,
     closure: Closure | None,
     kind: ItemKind,
-    item: ResourceTarget | DirectoryTarget,
+    item: ReachTarget,
     op: str,
     target: Entity | None,
     context: list[str],
@@ -395,19 +479,22 @@ def _evaluate_op(
 
     if closure is None:
         return unassessed("the compromised identity could not be resolved")
-    target_kind: sem.TargetKind = "directory" if isinstance(item, DirectoryTarget) else "resource"
+    target_kind = _KIND.get(type(item), "resource")
     semantics = sem.lookup(target_kind, op)
     if semantics is None:
         return unassessed(f"unknown operation semantics: {target_kind} {op}")
-    if target_kind == "resource":
-        if target is None:
-            return unassessed("the target could not be resolved")
+    if target_kind == "directory":
+        hits = _directory_hits(closure, semantics)
+    elif target is None:
+        return unassessed("the target could not be resolved")
+    elif target_kind == "resource":
         rtype = str(target.properties.get("resourceType", ""))
         if not semantics.ways_for(rtype):
             return unassessed(f"unknown operation semantics: {op} on {rtype or 'this type'}")
         hits = _resource_hits(closure, semantics, target)
     else:
-        hits = _directory_hits(closure, semantics)
+        hits, notes = _object_hits(closure, semantics, target)
+        context = [*context, *notes]
 
     firm = [h for h in hits if not h.conditional]
     paths = _paths(closure, firm)
@@ -531,15 +618,21 @@ def evaluate(contract: Contract, snapshot: Snapshot) -> Evaluation:
     who = resolve_identity(snapshot, contract.assume_compromised)
     closure = Closure(index, who.entity.id) if who.entity is not None else None
     outcomes: list[ItemOutcome] = []
-    items: list[tuple[ItemKind, ResourceTarget | DirectoryTarget]] = [
+    items: list[tuple[ItemKind, ReachTarget]] = [
         *(("must_not_reach", i) for i in contract.must_not_reach),
         *(("must_still_do", i) for i in contract.must_still_do),
     ]
     for kind, item in items:
         context = [who.reason]
         target: Entity | None = None
+        res = None
         if isinstance(item, ResourceTarget):
             res = resolve_resource(snapshot, item.resource)
+        elif isinstance(item, ApplicationTarget):
+            res = resolve_object(snapshot, "application", item.application)
+        elif isinstance(item, ServicePrincipalTarget):
+            res = resolve_object(snapshot, "servicePrincipal", item.service_principal)
+        if res is not None:
             target = res.entity
             context.append(res.reason)
         for op in item.operations:

@@ -10,12 +10,15 @@ fix, proves the result with signed evidence, and fails CI if it regresses.
 
 ```yaml
 # contracts/examples/billing-agent.fns.yaml (shortened)
+version: 2
 assume_compromised: sp:sp-billing-agent
 must_not_reach:
   - resource: kv-crown-jewels
     operations: [secrets/get, secrets/list]
   - directory: tenant
     operations: [roleAssignments/write, applications/credentials/update]
+  - application: id-verifier
+    operations: [credentials/update, owners/update]
 must_still_do:
   - resource: st-invoices
     operations: [blob/read, blob/write]
@@ -43,7 +46,7 @@ uv run fns demo mutate       # 3. Harden the lab in the model, then try to break
 uv run fns demo report       # 4. One HTML page: .fns/report.FIXTURE.html
 ```
 
-**1. Contain.** The seeded lab contract fails on purpose (exit 1): 6 critical
+**1. Contain.** The seeded lab contract fails on purpose (exit 1): 11 critical
 findings. The agent's owner rights on another application lead to directory-wide
 role assignment (output shortened):
 
@@ -67,8 +70,14 @@ uses an offline key, and the output labels it `TEST SIGNATURE`. Run
 **3. Harden and mutate.** `fns harden` finds the smallest Terraform removal that
 takes the lab to 0 critical findings while keeping legitimate use: drop the agent's
 `Application.ReadWrite.OwnedBy` and its resource-group `Contributor`. Mutation
-testing then puts back one dangerous grant at a time. The contract catches 5 of 8;
-the 3 survivors are real gaps in the contract (see `docs/DECISIONS.md`).
+testing then puts back one dangerous grant at a time. **Mutation testing found a
+gap in our own contract:** the first run caught 5 of 8, because contract version 1
+could not name one application. Version 2 can, and the seeded contract now guards
+the verifier and scout applications and the invoice account's keys. It catches 6
+of 8. The two survivors make the agent an owner of `id-verifier` or `sp-fns-scout`.
+In the hardened lab the agent holds no Graph permission that can use an ownership,
+so the model gains no reach, and the output says exactly that
+(`docs/FINDINGS.md`).
 
 **4. Report.** Coverage comes first, then the reach graph, findings and paths, the
 proof bundle and the mutation results. It is one self-contained HTML file with

@@ -10,5 +10,7 @@ resource "local_file" "contract" {
     vault    = azurerm_key_vault.crown_jewels.name
     payroll  = azurerm_storage_account.payroll.name
     invoices = azurerm_storage_account.invoices.name
+    verifier = azuread_application.verifier.display_name
+    scout    = azuread_application.scout.display_name
   })
 }

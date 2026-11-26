@@ -52,7 +52,7 @@ def test_hardened_lab_kills_what_the_contract_forbids(lab_snapshot: Snapshot) ->
     outcome = {m.id: m.outcome for m in r.mutants}
     assert outcome == {
         "owner-at-rg:rg-fns-lab": "killed",
-        "listkeys:stinvoicestiin02": "survived",
+        "listkeys:stinvoicestiin02": "killed",
         "listkeys:stpayrolltiin02": "killed",
         "graph-app-permission:AppRoleAssignment.ReadWrite.All": "killed",
         "graph-app-permission:Application.ReadWrite.All": "killed",
@@ -60,7 +60,13 @@ def test_hardened_lab_kills_what_the_contract_forbids(lab_snapshot: Snapshot) ->
         "app-owner:id-verifier": "survived",
         "app-owner:sp-fns-scout": "survived",
     }
-    assert r.score == "5/8"
+    assert r.score == "6/8"
+    # Ownership without Application.ReadWrite.OwnedBy adds no app-only reach: the model
+    # sees it (a new reason on the v2 items) but nothing fails, so these two survive.
+    for mid in ("app-owner:id-verifier", "app-owner:sp-fns-scout"):
+        (m,) = [m for m in r.mutants if m.id == mid]
+        assert m.new_reasons and all("holds neither" in x for x in m.new_reasons)
+    assert all(not m.new_reasons for m in r.mutants if m.outcome == "killed")
     assert all(m.rung == "modeled" for m in r.mutants)
     assert all(m.terraform_diff and m.terraform_diff.startswith("--- a/lab/") for m in r.mutants)
     assert [n.operator for n in r.not_applicable] == ["remove-deny-assignment"]
@@ -70,7 +76,7 @@ def test_hardened_lab_kills_what_the_contract_forbids(lab_snapshot: Snapshot) ->
 
 def test_unhardened_baseline_cannot_score(lab_snapshot: Snapshot) -> None:
     r = _run(demo_contract(LAB_RUN), lab_snapshot, LAB, False)
-    assert r.baseline_failures == 6
+    assert r.baseline_failures == 11
     assert r.killed == 0
     assert exit_code(r, 99) == 1
 
@@ -155,9 +161,9 @@ def test_cli_demo_and_file_mode(lab_snapshot: Snapshot, tmp_path: Path) -> None:
     )
     assert result.exit_code == 1, result.output
     assert all(line.startswith("FIXTURE ") for line in result.output.splitlines() if line.strip())
-    assert "Mutation score 5/8" in result.output
+    assert "Mutation score 6/8" in result.output
     report = MutationReport.model_validate(json.loads(out.read_text(encoding="utf-8")))
-    assert report.score == "5/8"
+    assert report.score == "6/8"
 
     snap = tmp_path / "s.json"
     snap.write_text(lab_snapshot.canonical_json(), encoding="utf-8")

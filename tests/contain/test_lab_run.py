@@ -31,6 +31,12 @@ EXPECTED = {
     ("resource:stpayrolltiin02", "blob/read"): ("fail", "listkeys-data"),
     ("directory:tenant", "roleAssignments/write"): ("fail", "graph-permission"),
     ("directory:tenant", "applications/credentials/update"): ("fail", "owned-object-permission"),
+    ("resource:stinvoicestiin02", "listKeys"): ("fail", "rbac-action"),
+    # Contract v2: through the self-grant chain, Application.ReadWrite.All reaches both apps.
+    ("application:id-verifier", "credentials/update"): ("fail", "graph-permission"),
+    ("application:id-verifier", "owners/update"): ("fail", "graph-permission"),
+    ("application:sp-fns-scout", "credentials/update"): ("fail", "graph-permission"),
+    ("application:sp-fns-scout", "owners/update"): ("fail", "graph-permission"),
     ("resource:stinvoicestiin02", "blob/read"): ("inconclusive", "rbac-data-action"),
     ("resource:stinvoicestiin02", "blob/write"): ("inconclusive", "rbac-data-action"),
 }
@@ -47,7 +53,7 @@ def test_seeded_contract_verdicts(lab: Evaluation) -> None:
 
 def test_seeded_contract_fails_with_exit_1(lab: Evaluation) -> None:
     s = lab.summary
-    assert (s.critical, s.still_do_failed, s.inconclusive, s.exit_code) == (6, 0, 2, 1)
+    assert (s.critical, s.still_do_failed, s.inconclusive, s.exit_code) == (11, 0, 2, 1)
     assert lab.snapshot.mode == "FIXTURE"
 
 

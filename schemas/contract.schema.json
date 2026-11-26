@@ -1,5 +1,36 @@
 {
   "$defs": {
+    "ApplicationTarget": {
+      "additionalProperties": false,
+      "description": "One application object (contract version 2).",
+      "properties": {
+        "application": {
+          "description": "Display name, appId or object id",
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._\\-]*$",
+          "title": "Application",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "description": "Capability, e.g. secrets/get, listKeys, blob/read, roleAssignments/write",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9]*(/[A-Za-z][A-Za-z0-9]*)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "application",
+        "operations"
+      ],
+      "title": "ApplicationTarget",
+      "type": "object"
+    },
     "ContractThresholds": {
       "additionalProperties": false,
       "description": "Contract-level limits (YAML key ``budget``). Semantics are applied in M2.",
@@ -78,6 +109,37 @@
       "title": "ResourceTarget",
       "type": "object"
     },
+    "ServicePrincipalTarget": {
+      "additionalProperties": false,
+      "description": "One service principal (contract version 2).",
+      "properties": {
+        "operations": {
+          "items": {
+            "description": "Capability, e.g. secrets/get, listKeys, blob/read, roleAssignments/write",
+            "maxLength": 200,
+            "pattern": "^[A-Za-z][A-Za-z0-9]*(/[A-Za-z][A-Za-z0-9]*)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        },
+        "service_principal": {
+          "description": "Display name, appId or object id",
+          "maxLength": 256,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._\\-]*$",
+          "title": "Service Principal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_principal",
+        "operations"
+      ],
+      "title": "ServicePrincipalTarget",
+      "type": "object"
+    },
     "StillDoItem": {
       "additionalProperties": false,
       "properties": {
@@ -150,6 +212,12 @@
           },
           {
             "$ref": "#/$defs/DirectoryTarget"
+          },
+          {
+            "$ref": "#/$defs/ApplicationTarget"
+          },
+          {
+            "$ref": "#/$defs/ServicePrincipalTarget"
           }
         ]
       },
@@ -175,7 +243,11 @@
       "type": "string"
     },
     "version": {
-      "const": 1,
+      "description": "2 allows ``application`` and ``service_principal`` targets in ``must_not_reach``.",
+      "enum": [
+        1,
+        2
+      ],
       "title": "Version",
       "type": "integer"
     }

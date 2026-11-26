@@ -83,11 +83,11 @@ def lab_report(tmp_path_factory: pytest.TempPathFactory) -> ContainReport:
 
 def test_comment_headline_delta_and_labels(lab_report: ContainReport) -> None:
     base = lab_report.model_copy(
-        update={"summary": lab_report.summary.model_copy(update={"critical": 4})}
+        update={"summary": lab_report.summary.model_copy(update={"critical": 9})}
     )
     text = render_comment(Inputs(lab_report), base)
     assert text.startswith(MARKER + "\n")
-    assert "**Blast radius: 6 critical reachable (+2 vs base)**" in text
+    assert "**Blast radius: 11 critical reachable (+2 vs base)**" in text
     assert "(FIXTURE)" in text and "> FIXTURE:" in text
     assert "Result: **contract failed** (exit 1)" in text
     assert "no change vs base" in render_comment(Inputs(lab_report), lab_report)
@@ -161,5 +161,5 @@ def test_action_script_on_the_lab_fixture(tmp_path: Path) -> None:
     lines = dict(line.split("=", 1) for line in outputs.read_text(encoding="utf-8").splitlines())
     assert lines["exit-code"] == "1"
     body = Path(lines["comment-file"]).read_text(encoding="utf-8")
-    assert "mutation 5/8" in body and "TEST signature" in body
+    assert "mutation 6/8" in body and "TEST signature" in body
     assert summary.read_text(encoding="utf-8") == body
