@@ -33,6 +33,9 @@ GRAPH_ENTITY_TYPES: Final[frozenset[str]] = frozenset(
 )
 ARM_ENTITY_TYPES: Final[frozenset[str]] = frozenset({"roleDefinition", "resource", "scope"})
 
+TENANT_ROOT_SCOPE: Final = "/"
+"""ARM's root scope (above the tenant root management group), e.g. elevated access."""
+
 EVERYONE_PRINCIPAL_ID: Final = "00000000-0000-0000-0000-000000000000"
 """ARM deny assignments that apply to all principals use the all-zeros principal ID."""
 
@@ -70,6 +73,8 @@ class Entity(FnsModel):
             if not GUID_RE.fullmatch(raw):
                 raise ValueError(f"{etype} id must be an object GUID, got {raw!r}")
             return {**data, "id": raw.lower()}
+        if etype == "scope" and raw == TENANT_ROOT_SCOPE:
+            return data
         if etype in ARM_ENTITY_TYPES:
             try:
                 return {**data, "id": normalize_arm_id(raw)}

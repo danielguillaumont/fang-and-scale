@@ -101,6 +101,12 @@ def test_rerecording_reuses_the_idmap(tmp_path: Path) -> None:
     assert outs[0] == outs[1]
 
 
+def test_unknown_request_raises_instead_of_returning_empty() -> None:
+    fixture = FixtureSet.load(bundled("demo-scout"))
+    with pytest.raises(FixtureMissError, match="no recorded response"):
+        FixtureTransport(fixture).fetch(_req("https://graph.microsoft.com/v1.0/users"))
+
+
 def test_bundled_rejects_unknown_set() -> None:
     with pytest.raises(FixtureError):
         bundled("no-such-set")
