@@ -47,8 +47,11 @@ class TokenCheckingTransport:
 
 @pytest.fixture
 def scope_file(tmp_path: Path) -> Path:
+    # The bundled scope expires 2026-12-02; a live scout checks the real clock.
     path = tmp_path / "scope.lab.yaml"
-    path.write_text(FIXTURE.scope_yaml, encoding="utf-8")
+    path.write_text(
+        FIXTURE.scope_yaml.replace("2026-12-02T12:00:00Z", "2099-01-01T00:00:00Z"), encoding="utf-8"
+    )
     return path
 
 
@@ -129,13 +132,13 @@ def test_cli_tenant_mismatch_exits_4_without_network(
     assert "tenant pinning" in result.output
 
 
-def test_cli_expired_scope_exits_1(tmp_path: Path) -> None:
+def test_cli_expired_scope_exits_2(tmp_path: Path) -> None:
     path = tmp_path / "scope.yaml"
     path.write_text(
         FIXTURE.scope_yaml.replace("2026-12-02T12:00:00Z", "2020-01-01T00:00:00Z"), encoding="utf-8"
     )
     result = CliRunner().invoke(app, ["scout", "--scope", str(path)])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "invalid scope manifest" in result.output
 
 

@@ -33,9 +33,9 @@ def test_unbuilt_commands_exit_2(command: str) -> None:
     assert "not implemented in M1" in result.output
 
 
-def test_scout_without_scope_manifest_exits_1(tmp_path: Path) -> None:
+def test_scout_without_scope_manifest_exits_2(tmp_path: Path) -> None:
     result = runner.invoke(app, ["scout", "--scope", str(tmp_path / "missing.yaml")])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "scope manifest not found" in result.output
 
 

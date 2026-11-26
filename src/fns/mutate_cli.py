@@ -27,8 +27,10 @@ def run(
     harden: bool,
     now: datetime | None = None,
 ) -> MutationReport:
-    from fns.mutate import mutate
+    from fns.mutate import MutateError, mutate
 
+    if lab is not None and not lab.is_dir():
+        raise MutateError(f"lab directory not found: {lab.as_posix()}")
     return mutate(
         contract,
         snapshot,

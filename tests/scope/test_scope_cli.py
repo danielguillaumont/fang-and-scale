@@ -50,10 +50,10 @@ def test_empty_operations_warn_everything_denied(tmp_path: Path) -> None:
     assert "every call will be denied" in result.output
 
 
-def test_invalid_scope_exits_1_with_location(tmp_path: Path) -> None:
+def test_invalid_scope_exits_2_with_location(tmp_path: Path) -> None:
     bad = _fresh(allowed_resource_groups=["rg-fns-lab"])
     result = runner.invoke(app, ["scope", "check", str(_write(tmp_path, bad))])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "allowed_resource_groups" in result.output
 
 
@@ -62,27 +62,27 @@ def test_write_under_scout_rejected(tmp_path: Path) -> None:
         allowed_operations={"scout": ["arm:Microsoft.Authorization/roleAssignments/write"]}
     )
     result = runner.invoke(app, ["scope", "check", str(_write(tmp_path, bad))])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "read-only" in result.output
 
 
-def test_expired_scope_exits_1(tmp_path: Path) -> None:
+def test_expired_scope_exits_2(tmp_path: Path) -> None:
     old = scope_dict(expires_at="2020-01-01T00:00:00Z")
     result = runner.invoke(app, ["scope", "check", str(_write(tmp_path, old))])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "expired" in result.output
 
 
-def test_duplicate_key_exits_1(tmp_path: Path) -> None:
+def test_duplicate_key_exits_2(tmp_path: Path) -> None:
     path = _write(tmp_path, _fresh(), extra="tenant_id: 00000000-0000-4000-8000-000000000002\n")
     result = runner.invoke(app, ["scope", "check", str(path)])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "duplicate key" in result.output
 
 
-def test_missing_file_exits_1(tmp_path: Path) -> None:
+def test_missing_file_exits_2(tmp_path: Path) -> None:
     result = runner.invoke(app, ["scope", "check", str(tmp_path / "nope.yaml")])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "not found" in result.output
 
 

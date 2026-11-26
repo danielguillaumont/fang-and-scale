@@ -37,13 +37,19 @@ def harden(
     except (OSError, ValidationError, YamlError) as exc:
         err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         return int(ExitCode.INVALID_INPUT)
+    if not lab_dir.is_dir():
+        err.print(f"lab directory not found: {lab_dir.as_posix()}", style="fns.fail", markup=False)
+        return int(ExitCode.INVALID_INPUT)
     if snapshot.mode == "FIXTURE" and not isinstance(con, FixtureConsole):
         con = FixtureConsole(con)
     try:
         p = minimize(contract, snapshot, lab_dir)
-    except (NoProposalError, TfParseError, OSError) as exc:
+    except NoProposalError as exc:
         con.print(f"no proposal: {exc}", style="fns.fail", markup=False)
         return int(ExitCode.CONTRACT_FAILED)
+    except (TfParseError, OSError) as exc:
+        err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
+        return int(ExitCode.INVALID_INPUT)
     con.print("Proposal (modeled: rung 1 until `fns prove` confirms it)", style="bold")
     con.print(
         f"before: critical reachable {p.before.critical}; "
@@ -149,7 +155,7 @@ def record(
             dumps_yaml(m.contract.model_dump(mode="json")), encoding="utf-8", newline="\n"
         )
         con.print(f"wrote {out.as_posix()}", style="fns.muted", markup=False)
-    return 1 if m.conflicts else 0
+    return int(ExitCode.CONTRACT_FAILED) if m.conflicts else 0
 
 
 def detections_check(con: Console, directory: Path) -> int:
@@ -168,7 +174,7 @@ def detections_check(con: Console, directory: Path) -> int:
     for e in errors:
         con.print(f"  {e}", style="fns.fail", markup=False)
     con.print(f"{len(rules)} rule(s), {len(errors)} problem(s)", markup=False)
-    return 1 if errors else 0
+    return int(ExitCode.CHECK_FAILED) if errors else 0
 
 
 def detections_export(con: Console, directory: Path, params: list[str], out: Path) -> int:

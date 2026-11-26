@@ -69,7 +69,7 @@ def test_demo_failure_is_labelled_on_stderr(tmp_path: Path) -> None:
     blocker = tmp_path / "file"
     blocker.write_text("not a directory", encoding="utf-8")
     result = runner.invoke(app, ["demo", "scout", "--out", str(blocker)])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     lines = [line for line in result.output.splitlines() if line.strip()]
     assert lines
     assert all(line.startswith("FIXTURE ") for line in lines)
