@@ -55,7 +55,9 @@ jobs:
         env:
           SNAPSHOT: ${{ steps.snap.outputs.snapshot }}
         run: |
-          set -uo pipefail
+          # GitHub runs this with bash -eo pipefail: errexit must be off until the
+          # exit code is read, or the expected 1 ends the step before the check.
+          set +e -uo pipefail
           uv run --frozen fns prove \
             --contract "$FIXTURE/contract.fns.yaml" \
             --snapshot "$SNAPSHOT" \
@@ -64,6 +66,7 @@ jobs:
             --identity "github-actions prove-sign.yml (Sigstore staging)" \
             --out "$RUNNER_TEMP/fns" | tee "$RUNNER_TEMP/prove.txt"
           code=${PIPESTATUS[0]}
+          set -e
           # The fixture contract fails on purpose: 1 is the expected verdict.
           # Anything else (2 input, 4 scope, 5 evidence or signing) fails the job.
           if [ "$code" -ne 1 ]; then
