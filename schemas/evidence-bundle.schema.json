@@ -1,0 +1,382 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "probe_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Probe Id",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "probe_id",
+        "finding_id"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "BundleSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "description": "Failed must_not_reach findings.",
+          "minimum": 0,
+          "title": "Critical",
+          "type": "integer"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            1,
+            3
+          ],
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "inconclusive": {
+          "minimum": 0,
+          "title": "Inconclusive",
+          "type": "integer"
+        },
+        "passed": {
+          "minimum": 0,
+          "title": "Passed",
+          "type": "integer"
+        },
+        "still_do_failed": {
+          "minimum": 0,
+          "title": "Still Do Failed",
+          "type": "integer"
+        },
+        "warning": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Warning"
+        }
+      },
+      "required": [
+        "passed",
+        "critical",
+        "still_do_failed",
+        "inconclusive",
+        "exit_code"
+      ],
+      "title": "BundleSummary",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "sha256 of the stored request/response artifact.",
+          "title": "Artifact Digest"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "observed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observed At"
+        },
+        "outcome": {
+          "enum": [
+            "allowed",
+            "denied",
+            "unknown",
+            "not-run"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "path_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The escalation path this evidence rests on, in the enclosing ContainReport.",
+          "title": "Path Id"
+        },
+        "rung": {
+          "enum": [
+            "modeled",
+            "evaluated",
+            "observed",
+            "logged"
+          ],
+          "title": "Rung",
+          "type": "string"
+        },
+        "source": {
+          "description": "What produced it: a scope operation, probe name, or log query name.",
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rung",
+        "outcome",
+        "source"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "minLength": 1,
+          "title": "Contract",
+          "type": "string"
+        },
+        "coverage": {
+          "enum": [
+            "verified",
+            "evaluated-only",
+            "modeled-only",
+            "not-assessed",
+            "out-of-scope"
+          ],
+          "title": "Coverage",
+          "type": "string"
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "gap": {
+          "anyOf": [
+            {
+              "enum": [
+                "model-gap",
+                "platform-gap",
+                "detection-gap"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gap"
+        },
+        "id": {
+          "description": "sha256 of (contract, item_kind, target, operation); computed if omitted.",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "item_kind": {
+          "enum": [
+            "must_not_reach",
+            "must_still_do"
+          ],
+          "title": "Item Kind",
+          "type": "string"
+        },
+        "operation": {
+          "minLength": 1,
+          "title": "Operation",
+          "type": "string"
+        },
+        "reasons": {
+          "description": "Human-readable explanation; at least one, in the order they apply.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "target": {
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "contract",
+        "item_kind",
+        "target",
+        "operation",
+        "verdict",
+        "coverage",
+        "reasons"
+      ],
+      "title": "Finding",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ArtifactRef"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "assertions_digest": {
+      "description": "sha256 of ``assertions.json`` as frozen and journaled.",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Assertions Digest",
+      "type": "string"
+    },
+    "contract": {
+      "minLength": 1,
+      "title": "Contract",
+      "type": "string"
+    },
+    "contract_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Digest",
+      "type": "string"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "report_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Report Digest",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[0-9a-f]{16,64}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "snapshot_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Digest",
+      "type": "string"
+    },
+    "summary": {
+      "$ref": "#/$defs/BundleSummary"
+    },
+    "tenant_id": {
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "tool_version": {
+      "title": "Tool Version",
+      "type": "string"
+    },
+    "verifier": {
+      "description": "Who verified: ``fns.verify`` plus the identity label it ran as.",
+      "minLength": 1,
+      "title": "Verifier",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "mode",
+    "run_id",
+    "contract",
+    "tenant_id",
+    "assertions_digest",
+    "contract_digest",
+    "snapshot_digest",
+    "report_digest",
+    "verifier",
+    "generated_at",
+    "tool_version",
+    "findings",
+    "summary"
+  ],
+  "title": "EvidenceBundle",
+  "type": "object"
+}

@@ -16,3 +16,5 @@ class ExitCode(IntEnum):
     NOT_IMPLEMENTED = 2
     INCONCLUSIVE_OVER_BUDGET = 3
     SCOPE_DENIED = 4
+    EVIDENCE_INVALID = 5
+    """The verifier refused a run directory (tampered or incomplete input)."""

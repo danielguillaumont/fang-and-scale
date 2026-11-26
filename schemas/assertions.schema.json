@@ -1,0 +1,321 @@
+{
+  "$defs": {
+    "Assertion": {
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "item_kind": {
+          "enum": [
+            "must_not_reach",
+            "must_still_do"
+          ],
+          "title": "Item Kind",
+          "type": "string"
+        },
+        "modeled_outcome": {
+          "description": "What the model said: ``allowed`` (reachable), ``denied`` or ``unknown``.",
+          "enum": [
+            "allowed",
+            "denied",
+            "unknown",
+            "not-run"
+          ],
+          "title": "Modeled Outcome",
+          "type": "string"
+        },
+        "modeled_reasons": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Modeled Reasons",
+          "type": "array"
+        },
+        "open_surfaces": {
+          "default": [],
+          "description": "Uncollected surfaces that could add reach for this operation (blocks a pass, E1).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Surfaces",
+          "type": "array"
+        },
+        "operation": {
+          "minLength": 1,
+          "title": "Operation",
+          "type": "string"
+        },
+        "paths": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PathAssertion"
+          },
+          "title": "Paths",
+          "type": "array"
+        },
+        "probes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ProbeSpec"
+          },
+          "title": "Probes",
+          "type": "array"
+        },
+        "target": {
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "finding_id",
+        "item_kind",
+        "target",
+        "operation",
+        "modeled_outcome"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "PathAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "path_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Path Id",
+          "type": "string"
+        },
+        "refuted_by": {
+          "default": [],
+          "description": "Probe ids; any one of them returning ``denied`` refutes this path. Empty: the\npath cannot be refuted by a non-destructive probe (an escalation hop).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Refuted By",
+          "type": "array"
+        },
+        "summary": {
+          "description": "The path's rules, e.g. ``assume-compromised -> kv-control-to-data``.",
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path_id",
+        "summary"
+      ],
+      "title": "PathAssertion",
+      "type": "object"
+    },
+    "ProbeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "description": "RBAC (data) action for ``arm-permissions``; the contract operation for ``data-read``.",
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "data_plane": {
+          "default": false,
+          "title": "Data Plane",
+          "type": "boolean"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "arm-permissions",
+            "data-read"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "purpose": {
+          "description": "``direct`` asks about the contract operation itself; ``hop`` about a path's action.",
+          "enum": [
+            "direct",
+            "hop"
+          ],
+          "title": "Purpose",
+          "type": "string"
+        },
+        "rung": {
+          "enum": [
+            "evaluated",
+            "observed"
+          ],
+          "title": "Rung",
+          "type": "string"
+        },
+        "scope_operation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The scope-gate operation a live probe calls; None while none exists (M3 E3).",
+          "title": "Scope Operation"
+        },
+        "target": {
+          "description": "ARM ID the probe addresses (the permissions scope, or the data-plane resource).",
+          "minLength": 1,
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "rung",
+        "purpose",
+        "target",
+        "action"
+      ],
+      "title": "ProbeSpec",
+      "type": "object"
+    },
+    "Thresholds": {
+      "additionalProperties": false,
+      "properties": {
+        "max_critical_reachable": {
+          "minimum": 0,
+          "title": "Max Critical Reachable",
+          "type": "integer"
+        },
+        "max_inconclusive": {
+          "minimum": 0,
+          "title": "Max Inconclusive",
+          "type": "integer"
+        },
+        "on_inconclusive": {
+          "enum": [
+            "fail",
+            "warn"
+          ],
+          "title": "On Inconclusive",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_critical_reachable",
+        "max_inconclusive",
+        "on_inconclusive"
+      ],
+      "title": "Thresholds",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assertions": {
+      "items": {
+        "$ref": "#/$defs/Assertion"
+      },
+      "title": "Assertions",
+      "type": "array"
+    },
+    "compromised": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Compromised"
+    },
+    "compromised_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Compromised Name"
+    },
+    "contract": {
+      "minLength": 1,
+      "title": "Contract",
+      "type": "string"
+    },
+    "contract_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Digest",
+      "type": "string"
+    },
+    "frozen_at": {
+      "format": "date-time",
+      "title": "Frozen At",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "report_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Report Digest",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[0-9a-f]{16,64}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "snapshot_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Digest",
+      "type": "string"
+    },
+    "tenant_id": {
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "thresholds": {
+      "$ref": "#/$defs/Thresholds"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "mode",
+    "run_id",
+    "contract",
+    "contract_digest",
+    "snapshot_digest",
+    "report_digest",
+    "tenant_id",
+    "compromised",
+    "thresholds",
+    "frozen_at",
+    "assertions"
+  ],
+  "title": "AssertionSet",
+  "type": "object"
+}
