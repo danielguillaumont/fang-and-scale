@@ -227,12 +227,18 @@ can write:
 | --- | --- | --- |
 | Azure RBAC **Reader** | lab subscription | role assignments and definitions, deny assignments, resources, and Key Vault and storage settings (access policies, permission model, shared-key access) |
 | Graph **Application.Read.All** (application) | tenant | service principals, applications, their owners, app role assignments |
-| Graph **RoleManagement.Read.Directory** (application) | tenant | directory role definitions and assignments |
+| Graph **RoleManagement.Read.Directory** (application) | tenant | directory role definitions, assignments and PIM eligibility schedules |
+| Graph **LicenseAssignment.Read.All** (application) | tenant | `/subscribedSkus`: the evidence that a tenant without PIM has no PIM |
 | Graph **Directory.Read.All** (application) | tenant | `memberOf`, and resolving owners and members that are users or groups |
 
 - **Reader** is `*/read` only: no actions (so no `listKeys`) and no data plane.
-- The two Graph read permissions are the least-privileged ones documented for
+  It also covers Azure resource PIM eligibility (`roleEligibilitySchedules/read`).
+- The three Graph read permissions are the least-privileged ones documented for
   those endpoints.
+- **PIM eligibility.** When the scope allows it, the scout lists eligible role
+  assignments. If the tenant has no PIM licence, it records `pim-eligibility` as
+  *not applicable*, with the responses as evidence. It never infers this from a
+  failure alone. Otherwise every finding stays inconclusive on PIM.
 - **Directory.Read.All** is the broadest grant here. The first live run showed the
   set is sufficient. Whether it can be dropped is the next live test
   (`docs/runbooks/m1-live-run.md`, `docs/FINDINGS.md`).
