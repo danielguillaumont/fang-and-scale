@@ -104,11 +104,12 @@ select = [
     "S",     # bandit
     "T20",   # no print(); use the Rich console
     "TID",   # banned imports (Azure SDKs only in adapters)
+    "BLE",   # broad except only where it fails closed (annotated)
     "N",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "S311"]  # asserts; seeded random for fuzzing
 # The only places allowed to import Azure SDKs (see banned-api below).
 "src/fns/adapters/**" = ["TID251"]
 "src/fns/scope/credentials.py" = ["TID251"]
