@@ -36,10 +36,23 @@ EVIDENCE_SOURCE: Final = "fns.contain"
 
 
 @dataclass(frozen=True, slots=True)
+class HopCheck:
+    """The RBAC (data) action a final hop rests on, at the scope it was granted for.
+
+    M3 asks the platform about exactly this (rung 2) to refute or confirm the hop.
+    """
+
+    action: str
+    scope: str
+    data_plane: bool
+
+
+@dataclass(frozen=True, slots=True)
 class PathStep:
     rule: str
     text: str
     sources: tuple[str, ...] = ()
+    check: HopCheck | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +85,7 @@ class _Hit:
     assumptions: tuple[str, ...] = ()
     partial: bool = False
     conditional: bool = False
+    check: HopCheck | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +186,7 @@ def _resource_hits(
                         assumptions=tuple(notes),
                         partial=rel == "descendant",
                         conditional=bool(condition),
+                        check=HopCheck(action, at, data),
                     )
                 )
     return hits
@@ -287,7 +302,7 @@ def _paths(closure: Closure, hits: list[_Hit]) -> tuple[ReachPath, ...]:
     paths: dict[tuple[PathStep, ...], ReachPath] = {}
     for hit in hits:
         unwound = [PathStep(d.rule, d.text, d.sources) for d in _unwind(closure, hit.premises)]
-        steps = (*unwound, PathStep(hit.way.rule, hit.text, hit.sources))
+        steps = (*unwound, PathStep(hit.way.rule, hit.text, hit.sources, hit.check))
         path = ReachPath(steps, tuple(dict.fromkeys(hit.assumptions)), hit.partial)
         if steps not in paths or path.sort_key() < paths[steps].sort_key():
             paths[steps] = path

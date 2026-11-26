@@ -207,3 +207,14 @@ def graph_permissions_in_use() -> frozenset[str]:
             if way.kind in {"appPerm", "ownedObjectPerm"}:
                 values.update(way.values)
     return frozenset(values)
+
+
+# -- path shapes (M3 freezing) ------------------------------------------------------------
+
+NON_ESCALATION_RULES: Final = frozenset({"assume-compromised", "member-of", "snapshot"})
+"""Path steps that only state current facts; any other non-final rule is an escalation
+that needs a write (a credential, a grant, a role assignment, running code)."""
+
+INDIRECT_WAYS: Final = frozenset({"kv-control-to-data", "listkeys-data"})
+"""Final ways that do not grant the operation itself but an action that leads to it
+(``vaults/write``, ``listKeys``): a denied direct read does not refute them."""

@@ -7,7 +7,14 @@ from datetime import datetime
 from fns.contain import semantics as sem
 from fns.contain.evaluate import Evaluation
 from fns.models.evidence import Finding
-from fns.models.report import ContainReport, PathStep, ReachPath, ReportSummary, path_id
+from fns.models.report import (
+    ContainReport,
+    HopCheck,
+    PathStep,
+    ReachPath,
+    ReportSummary,
+    path_id,
+)
 
 
 def build_report(
@@ -22,7 +29,21 @@ def build_report(
                 id=path_id(f.id, tuple(s.text for s in p.steps)),
                 finding_id=f.id,
                 rank=rank,
-                steps=tuple(PathStep(rule=s.rule, text=s.text, sources=s.sources) for s in p.steps),
+                steps=tuple(
+                    PathStep(
+                        rule=s.rule,
+                        text=s.text,
+                        sources=s.sources,
+                        check=None
+                        if s.check is None
+                        else HopCheck(
+                            action=s.check.action,
+                            scope=s.check.scope,
+                            data_plane=s.check.data_plane,
+                        ),
+                    )
+                    for s in p.steps
+                ),
                 assumptions=p.assumptions,
                 partial=p.partial,
             )
