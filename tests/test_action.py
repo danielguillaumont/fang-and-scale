@@ -169,7 +169,11 @@ def test_codeql_is_read_only_apart_from_its_results() -> None:
     doc = _load(WORKFLOWS / "codeql.yml")
     assert doc["permissions"] == {}
     (job,) = doc["jobs"].values()
-    assert job["permissions"] == {"contents": "read", "security-events": "write"}
+    assert job["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "security-events": "write",
+    }
     assert set(job["strategy"]["matrix"]["language"]) == {"python", "actions"}
 
 
