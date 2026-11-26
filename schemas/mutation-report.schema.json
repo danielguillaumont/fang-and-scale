@@ -1,0 +1,280 @@
+{
+  "$defs": {
+    "MutantResult": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "new_failures": {
+          "default": [],
+          "description": "``<target> <operation>`` for each must_not_reach finding that newly fails.",
+          "items": {
+            "type": "string"
+          },
+          "title": "New Failures",
+          "type": "array"
+        },
+        "new_inconclusive": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "New Inconclusive",
+          "type": "array"
+        },
+        "operator": {
+          "enum": [
+            "owner-at-rg",
+            "listkeys",
+            "graph-app-permission",
+            "app-owner",
+            "remove-deny-assignment"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "killed",
+            "survived",
+            "inconclusive"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "rung": {
+          "const": "modeled",
+          "default": "modeled",
+          "title": "Rung",
+          "type": "string"
+        },
+        "terraform_diff": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terraform Diff"
+        },
+        "terraform_file": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terraform File"
+        },
+        "terraform_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why there is no Terraform for this mutant, when there is none.",
+          "title": "Terraform Note"
+        }
+      },
+      "required": [
+        "id",
+        "operator",
+        "description",
+        "outcome"
+      ],
+      "title": "MutantResult",
+      "type": "object"
+    },
+    "NotApplicable": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "enum": [
+            "owner-at-rg",
+            "listkeys",
+            "graph-app-permission",
+            "app-owner",
+            "remove-deny-assignment"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operator",
+        "reason"
+      ],
+      "title": "NotApplicable",
+      "type": "object"
+    },
+    "OperatorScore": {
+      "additionalProperties": false,
+      "properties": {
+        "killed": {
+          "minimum": 0,
+          "title": "Killed",
+          "type": "integer"
+        },
+        "operator": {
+          "enum": [
+            "owner-at-rg",
+            "listkeys",
+            "graph-app-permission",
+            "app-owner",
+            "remove-deny-assignment"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "operator",
+        "killed",
+        "total"
+      ],
+      "title": "OperatorScore",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "baseline_exit_code": {
+      "title": "Baseline Exit Code",
+      "type": "integer"
+    },
+    "baseline_failures": {
+      "description": "Failing findings before mutation. Above 0, a mutant can only add to them.",
+      "minimum": 0,
+      "title": "Baseline Failures",
+      "type": "integer"
+    },
+    "baseline_inconclusive": {
+      "minimum": 0,
+      "title": "Baseline Inconclusive",
+      "type": "integer"
+    },
+    "by_operator": {
+      "items": {
+        "$ref": "#/$defs/OperatorScore"
+      },
+      "title": "By Operator",
+      "type": "array"
+    },
+    "contract": {
+      "title": "Contract",
+      "type": "string"
+    },
+    "contract_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Contract Digest",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "hardened_with": {
+      "default": [],
+      "description": "Terraform addresses removed (in the model) before mutating, from `fns harden`.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Hardened With",
+      "type": "array"
+    },
+    "killed": {
+      "minimum": 0,
+      "title": "Killed",
+      "type": "integer"
+    },
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "mutants": {
+      "items": {
+        "$ref": "#/$defs/MutantResult"
+      },
+      "title": "Mutants",
+      "type": "array"
+    },
+    "not_applicable": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/NotApplicable"
+      },
+      "title": "Not Applicable",
+      "type": "array"
+    },
+    "snapshot_digest": {
+      "description": "The input snapshot, before any hardening.",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Snapshot Digest",
+      "type": "string"
+    },
+    "tool_version": {
+      "title": "Tool Version",
+      "type": "string"
+    },
+    "total": {
+      "minimum": 0,
+      "title": "Total",
+      "type": "integer"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "mode",
+    "contract",
+    "contract_digest",
+    "snapshot_digest",
+    "baseline_exit_code",
+    "baseline_failures",
+    "baseline_inconclusive",
+    "killed",
+    "total",
+    "by_operator",
+    "mutants",
+    "generated_at",
+    "tool_version"
+  ],
+  "title": "MutationReport",
+  "type": "object"
+}
