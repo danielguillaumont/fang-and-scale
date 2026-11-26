@@ -11,6 +11,7 @@ from enum import IntEnum
 class ExitCode(IntEnum):
     OK = 0
     CONTRACT_FAILED = 1
+    INVALID_INPUT = 1
     USAGE = 2
     NOT_IMPLEMENTED = 2
     INCONCLUSIVE_OVER_BUDGET = 3

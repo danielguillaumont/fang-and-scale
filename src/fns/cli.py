@@ -115,5 +115,91 @@ def schema(
         con.print(f"wrote {path.as_posix()}")
 
 
+scope_app = typer.Typer(help="Validate and inspect scope manifests.", no_args_is_help=True)
+app.add_typer(scope_app, name="scope")
+
+
+@scope_app.command("check")
+def scope_check(
+    path: Annotated[Path, typer.Argument(help="Path to scope.yaml.")],
+) -> None:
+    """Validate scope.yaml and print what it allows. Exit 1 if invalid or expired."""
+    from datetime import UTC, datetime
+
+    from pydantic import ValidationError
+    from rich.table import Table
+
+    from fns.models.scope import ScopeExpiredError, load_scope
+    from fns.yamlio import YamlError
+
+    con = make_console()
+    err = make_console(stderr=True)
+    now = datetime.now(UTC)
+    try:
+        m = load_scope(path, now=now)
+    except FileNotFoundError:
+        err.print(f"[fns.fail]invalid[/] {path.as_posix()}: file not found")
+        raise typer.Exit(ExitCode.INVALID_INPUT) from None
+    except (YamlError, ScopeExpiredError) as exc:
+        err.print(f"[fns.fail]invalid[/] {path.as_posix()}: ", end="")
+        err.print(str(exc), markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from None
+    except ValidationError as exc:
+        err.print(f"[fns.fail]invalid[/] {path.as_posix()}: {exc.error_count()} error(s)")
+        for e in exc.errors():
+            loc = ".".join(str(x) for x in e["loc"]) or "(root)"
+            err.print(f"  {loc}: {e['msg']}", markup=False)
+        raise typer.Exit(ExitCode.INVALID_INPUT) from None
+
+    remaining = m.expires_at - now
+    con.print(f"[fns.pass]valid[/] {path.as_posix()}")
+    con.print(f"tenant        {m.tenant_id}")
+    con.print(
+        f"expires       {m.expires_at.isoformat()} ({_human(remaining.total_seconds())} left)"
+    )
+    con.print(
+        f"budget        {m.budget.max_api_calls} API calls, {m.budget.max_minutes} min per run"
+    )
+    con.print(f"subscriptions {len(m.subscription_ids)}")
+    for sub in m.subscription_ids:
+        con.print(f"  {sub}")
+    con.print(f"resource groups {len(m.allowed_resource_groups)}")
+    for rg in m.allowed_resource_groups:
+        con.print(f"  {rg}")
+    con.print(f"test identities {len(m.test_identities)}")
+    for ident in m.test_identities:
+        con.print(f"  {ident.object_id} {ident.kind} {ident.name}", markup=False)
+
+    table = Table(title="allowed operations", show_lines=False)
+    table.add_column("verb")
+    table.add_column("operation")
+    table.add_column("kind")
+    verbs = sorted(m.allowed_operations)
+    for verb in verbs:
+        for op in m.allowed_operations[verb]:
+            table.add_row(verb, op, "read" if _is_read(op) else "write")
+    if not verbs:
+        table.add_row("-", "(none: every call will be denied)", "-")
+    con.print(table)
+
+
+def _is_read(op: str) -> bool:
+    from fns.models.operations import parse_operation
+
+    return parse_operation(op).is_read
+
+
+def _human(seconds: float) -> str:
+    seconds = int(seconds)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
 def main() -> None:
     app()

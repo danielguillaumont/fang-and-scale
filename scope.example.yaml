@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=./schemas/scope.schema.json
+#
+# Example scope manifest (placeholder GUIDs). Copy to scope.lab.yaml (gitignored)
+# and fill in your lab tenant. Anything missing, empty or expired is denied.
+version: 1
+tenant_id: 00000000-0000-4000-8000-000000000001
+subscription_ids:
+  - 00000000-0000-4000-8000-000000000010
+allowed_resource_groups:
+  - /subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab
+test_identities:
+  - object_id: 00000000-0000-4000-8000-000000000100
+    kind: servicePrincipal
+    name: sp-billing-agent
+allowed_operations:
+  scout:
+    - arm:Microsoft.Authorization/roleAssignments/read
+    - arm:Microsoft.Authorization/roleDefinitions/read
+    - arm:Microsoft.Authorization/denyAssignments/read
+    - arm:Microsoft.Resources/subscriptions/resourceGroups/read
+    - arm:Microsoft.Resources/subscriptions/resources/read
+    - graph:GET /servicePrincipals
+    - graph:GET /servicePrincipals/{id}/owners
+    - graph:GET /servicePrincipals/{id}/appRoleAssignments
+    - graph:GET /applications
+    - graph:GET /applications/{id}/owners
+    - graph:GET /roleManagement/directory/roleAssignments
+    - graph:GET /roleManagement/directory/roleDefinitions
+budget:
+  max_api_calls: 500
+  max_minutes: 15
+expires_at: "2026-12-31T23:59:59Z"
