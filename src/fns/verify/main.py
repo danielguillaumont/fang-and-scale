@@ -20,7 +20,7 @@ from pydantic import ValidationError
 
 from fns import __version__
 from fns.exitcodes import ExitCode
-from fns.models.bundle import ArtifactRef, EvidenceBundle
+from fns.models.bundle import ArtifactRef, EvidenceBundle, StrikeArtifactRef
 from fns.models.evidence import Finding
 from fns.verify.inputs import ARTIFACTS_DIR, ASSERTIONS_FILE, Inputs, IntegrityError, load_inputs
 from fns.verify.signing import (
@@ -31,7 +31,7 @@ from fns.verify.signing import (
     statement,
     verify_envelope,
 )
-from fns.verify.verdict import judge, summarize
+from fns.verify.verdict import judge, summarize, with_strikes
 
 BUNDLE_FILE: Final = "bundle.json"
 STATEMENT_FILE: Final = "statement.intoto.json"
@@ -56,7 +56,20 @@ def build(inputs: Inputs, *, identity: str, now: datetime) -> tuple[EvidenceBund
         obs = {
             pid: o for pid, o in inputs.observations.items() if any(p.id == pid for p in a.probes)
         }
-        findings.append(judge(a, obs, aset.contract))
+        f = judge(a, obs, aset.contract)
+        mine = [
+            (o, sha)
+            for o, sha in inputs.strikes
+            if (o.target, o.operation) == (f.target, f.operation)
+        ]
+        findings.append(with_strikes(f, mine))
+    by_item = {(f.target, f.operation): f.id for f in findings}
+    strike_refs = tuple(
+        StrikeArtifactRef(
+            sha256=sha, write_key=o.write_key, finding_id=by_item.get((o.target, o.operation))
+        )
+        for o, sha in inputs.strikes
+    )
     artifacts = tuple(
         ArtifactRef(sha256=sha, probe_id=pid, finding_id=o.finding_id)
         for pid, (o, sha) in sorted(inputs.observations.items())
@@ -76,10 +89,12 @@ def build(inputs: Inputs, *, identity: str, now: datetime) -> tuple[EvidenceBund
         tool_version=__version__,
         findings=tuple(findings),
         artifacts=artifacts,
+        strike_artifacts=strike_refs,
         summary=summarize(findings, aset.thresholds),
     )
     subjects = {ASSERTIONS_FILE: inputs.assertions_digest}
     subjects.update({f"{ARTIFACTS_DIR}/{a.sha256}.json": a.sha256 for a in artifacts})
+    subjects.update({f"{ARTIFACTS_DIR}/{a.sha256}.json": a.sha256 for a in strike_refs})
     return bundle, statement(bundle, subjects)
 
 

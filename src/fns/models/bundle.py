@@ -27,6 +27,15 @@ class ArtifactRef(FnsModel):
     finding_id: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class StrikeArtifactRef(FnsModel):
+    """A strike observation the verifier read (``fns prove --after-strike``, D6)."""
+
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    write_key: str = Field(min_length=1)
+    finding_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    """The finding it was attached to; unset when no contract item matched."""
+
+
 class BundleSummary(FnsModel):
     passed: NonNegativeInt
     critical: NonNegativeInt
@@ -39,6 +48,7 @@ class BundleSummary(FnsModel):
 
 class EvidenceBundle(FnsModel):
     __volatile__: ClassVar[frozenset[str]] = frozenset({"generated_at", "tool_version"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"strike_artifacts"})
 
     version: Literal[1]
     mode: Literal["LIVE", "FIXTURE"]
@@ -56,12 +66,20 @@ class EvidenceBundle(FnsModel):
     tool_version: str
     findings: tuple[Finding, ...]
     artifacts: tuple[ArtifactRef, ...] = ()
+    strike_artifacts: tuple[StrikeArtifactRef, ...] = ()
+    """After-harden strike observations (D6). Left out of the canonical JSON while
+    empty, so every bundle made without ``--after-strike`` keeps its digest."""
     summary: BundleSummary
 
     @field_validator("findings")
     @classmethod
     def _sort_findings(cls, v: tuple[Finding, ...]) -> tuple[Finding, ...]:
         return tuple(sorted(v, key=lambda f: f.id))
+
+    @field_validator("strike_artifacts")
+    @classmethod
+    def _sort_strikes(cls, v: tuple[StrikeArtifactRef, ...]) -> tuple[StrikeArtifactRef, ...]:
+        return tuple(sorted(v, key=lambda a: (a.sha256, a.write_key, a.finding_id or "")))
 
     @field_validator("artifacts")
     @classmethod

@@ -288,6 +288,42 @@
       ],
       "title": "Finding",
       "type": "object"
+    },
+    "StrikeArtifactRef": {
+      "additionalProperties": false,
+      "description": "A strike observation the verifier read (``fns prove --after-strike``, D6).",
+      "properties": {
+        "finding_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The finding it was attached to; unset when no contract item matched.",
+          "title": "Finding Id"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "write_key": {
+          "minLength": 1,
+          "title": "Write Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sha256",
+        "write_key"
+      ],
+      "title": "StrikeArtifactRef",
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -351,6 +387,15 @@
       "pattern": "^[0-9a-f]{64}$",
       "title": "Snapshot Digest",
       "type": "string"
+    },
+    "strike_artifacts": {
+      "default": [],
+      "description": "After-harden strike observations (D6). Left out of the canonical JSON while\nempty, so every bundle made without ``--after-strike`` keeps its digest.",
+      "items": {
+        "$ref": "#/$defs/StrikeArtifactRef"
+      },
+      "title": "Strike Artifacts",
+      "type": "array"
     },
     "summary": {
       "$ref": "#/$defs/BundleSummary"

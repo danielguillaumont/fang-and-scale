@@ -126,6 +126,7 @@ def run_live_prove(
     tokens: PinnedTokens | None = None,
     arm_transport_factory: Callable[[TokenProvider], Transport] = HttpTransport,
     data_transport_factory: Callable[[TokenProvider], DataTransport] = DataPlaneTransport,
+    after_strike: Path | None = None,
 ) -> LiveProve:
     clock = clock or SystemClock()
     manifest = load_scope(scope_path, now=clock.now())
@@ -165,7 +166,14 @@ def run_live_prove(
         return SharedRequests(routed)
 
     result = prove(
-        contract, snapshot, make_probe, out_dir, now=clock.now, signer=signer, identity=identity
+        contract,
+        snapshot,
+        make_probe,
+        out_dir,
+        now=clock.now,
+        signer=signer,
+        identity=identity,
+        after_strike=after_strike,
     )
     recorded: Path | None = None
     omitted: tuple[str, ...] = ()

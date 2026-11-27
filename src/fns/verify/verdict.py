@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fns.models.assertions import Assertion, ProbeObservation, Thresholds
+from fns.models.assertions import Assertion, ProbeObservation, StrikeObservation, Thresholds
 from fns.models.bundle import BundleSummary
 from fns.models.evidence import RUNG_ORDER, CoverageState, Evidence, Finding, Gap, Verdict
 
@@ -206,6 +206,61 @@ def judge(a: Assertion, obs: Obs, contract: str) -> Finding:
             "gap": gap,
         }
     )
+
+
+STRIKE_SOURCE = "fns.strike/after-harden"
+VERDICT_RANK: dict[str, int] = {"fail": 0, "inconclusive": 1, "pass": 2}
+"""Higher is looser. Strike evidence may only keep a verdict or lower its rank."""
+
+
+class GuardrailError(AssertionError):
+    """Strike evidence would have moved a finding toward pass (must never happen)."""
+
+
+def with_strikes(f: Finding, strikes: list[tuple[StrikeObservation, str]]) -> Finding:
+    """Add after-harden strike observations to a judged finding (D6, 2026-11-27).
+
+    The guardrail: verdicts may only gain evidence or become stricter, never looser.
+
+    - A denied attempt is attached as ``context``: it settles nothing, so the
+      verdict, coverage and gap stay exactly as judged from the probes.
+    - A successful attempt against a ``must_not_reach`` item is supporting
+      evidence that the operation is reachable: the finding fails.
+    - A successful attempt on a ``must_still_do`` item is context only.
+    """
+    if not strikes:
+        return f
+    added: list[Evidence] = []
+    succeeded: list[StrikeObservation] = []
+    for o, sha in sorted(strikes, key=lambda x: (x[0].write_key, x[1])):
+        e = Evidence(
+            rung="observed",
+            outcome=o.outcome,
+            source=STRIKE_SOURCE,
+            artifact_digest=sha,
+            observed_at=o.observed_at,
+            notes=f"{o.strike} {o.write_key}: HTTP {o.http_status}"[:500],
+        )
+        if o.outcome == "allowed" and f.item_kind == "must_not_reach":
+            succeeded.append(o)
+            added.append(e)
+        else:
+            added.append(e.model_copy(update={"role": "context"}))
+    data = f.model_dump()
+    data["evidence"] = [*f.evidence, *added]
+    if succeeded:
+        names = ", ".join(sorted({o.strike for o in succeeded}))
+        data["verdict"] = "fail"
+        data["gap"] = f.gap if f.verdict == "fail" else None
+        data["reasons"] = [
+            f"an after-harden strike attempt succeeded ({names}; observed)",
+            *f.reasons,
+        ]
+        data["coverage"] = coverage_for([e for e in data["evidence"] if e.role is None])
+    new = Finding.model_validate(data)
+    if VERDICT_RANK[new.verdict] > VERDICT_RANK[f.verdict]:
+        raise GuardrailError(f"strike evidence moved {f.target} {f.operation} toward pass")
+    return new
 
 
 def summarize(findings: list[Finding], t: Thresholds) -> BundleSummary:

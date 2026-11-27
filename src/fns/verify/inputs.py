@@ -21,13 +21,14 @@ from typing import Final
 
 from pydantic import ValidationError
 
-from fns.models.assertions import AssertionSet, ProbeObservation
+from fns.models.assertions import AssertionSet, ProbeObservation, StrikeObservation
 
 ASSERTIONS_FILE: Final = "assertions.json"
 JOURNAL_FILE: Final = "journal.sqlite"
 ARTIFACTS_DIR: Final = "artifacts"
 FREEZE_STEP: Final = "freeze-assertions"
 PROBE_PREFIX: Final = "probe:"
+STRIKE_PREFIX: Final = "strike:"
 
 
 class IntegrityError(RuntimeError):
@@ -43,6 +44,8 @@ class Inputs:
     """probe id -> (observation, artifact sha256), for probe steps that succeeded."""
     unfinished: tuple[str, ...]
     """Probe ids whose step failed or never finished: no evidence."""
+    strikes: tuple[tuple[StrikeObservation, str], ...] = ()
+    """After-harden strike observations (D6) and their artifact sha256, by step key."""
 
 
 def open_read_only(path: Path) -> sqlite3.Connection:
@@ -93,8 +96,14 @@ def load_inputs(run_dir: Path) -> Inputs:
     frozen_at = frozen[0][0]
 
     last: dict[str, tuple[str, str | None]] = {}
+    strike_last: dict[str, tuple[str, str | None]] = {}
     for event_id, key, status, response_digest in events:
         if key == FREEZE_STEP:
+            continue
+        if key.startswith(STRIKE_PREFIX):
+            if event_id < frozen_at or event_id < first_freeze:
+                raise IntegrityError("strike evidence was recorded before the freeze")
+            strike_last[key] = (status, response_digest)
             continue
         if not key.startswith(PROBE_PREFIX):
             raise IntegrityError(f"unexpected journal step {key!r}")
@@ -112,7 +121,12 @@ def load_inputs(run_dir: Path) -> Inputs:
             unfinished.append(pid)
             continue
         observations[pid] = (_artifact(run_dir, aset, pid, response_digest), response_digest)
-    return Inputs(run_dir, aset, digest, observations, tuple(unfinished))
+    strikes = tuple(
+        (_strike_artifact(run_dir, aset, key, response_digest), response_digest)
+        for key, (status, response_digest) in sorted(strike_last.items())
+        if status == "succeeded" and response_digest is not None
+    )
+    return Inputs(run_dir, aset, digest, observations, tuple(unfinished), strikes)
 
 
 def _read(path: Path) -> bytes:
@@ -140,4 +154,19 @@ def _artifact(run_dir: Path, aset: AssertionSet, pid: str, digest: str) -> Probe
         raise IntegrityError(f"artifact {digest[:12]} claims a different probe kind or rung")
     if obs.mode != aset.mode:
         raise IntegrityError(f"artifact {digest[:12]} has a different mode than the run")
+    return obs
+
+
+def _strike_artifact(run_dir: Path, aset: AssertionSet, key: str, digest: str) -> StrikeObservation:
+    data = _read(run_dir / ARTIFACTS_DIR / f"{digest}.json")
+    if _sha256(data) != digest:
+        raise IntegrityError(f"artifact {digest[:12]} does not match its digest")
+    try:
+        obs = StrikeObservation.model_validate_json(data)
+    except ValidationError as exc:
+        raise IntegrityError(f"strike artifact {digest[:12]} is invalid") from exc
+    if obs.step_key != key:
+        raise IntegrityError(f"strike artifact {digest[:12]} belongs to another step")
+    if obs.mode != aset.mode:
+        raise IntegrityError(f"strike artifact {digest[:12]} has a different mode than the run")
     return obs
