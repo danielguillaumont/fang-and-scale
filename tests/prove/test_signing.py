@@ -99,7 +99,7 @@ def test_the_sigstore_api_we_call_exists() -> None:
     without the extra; poe setup and CI install it (pyproject.toml).
     """
     pytest.importorskip("sigstore", reason="needs the sigstore extra: uv run poe setup")
-    sign_mod, models, oidc, dsse, verify, policy = (
+    sign_mod, models, oidc, dsse, verify, policy, errors = (
         importlib.import_module(m)
         for m in (
             "sigstore.sign",
@@ -108,8 +108,13 @@ def test_the_sigstore_api_we_call_exists() -> None:
             "sigstore.dsse",
             "sigstore.verify",
             "sigstore.verify.policy",
+            "sigstore.errors",
         )
     )
+    # signing.py turns these into SignatureError (exit 5): they must share one base.
+    assert issubclass(errors.VerificationError, errors.Error)
+    assert issubclass(models.InvalidBundle, errors.Error)
+    assert issubclass(oidc.IdentityError, errors.Error)
     assert callable(models.ClientTrustConfig.staging)
     assert callable(models.ClientTrustConfig.production)
     assert callable(models.Bundle.from_json)
