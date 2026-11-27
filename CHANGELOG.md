@@ -9,6 +9,10 @@ version may change file formats; each change is listed here.
 
 ### Added
 
+- M6 design notes: `docs/milestones/M6-agent-id.md` (what Agent ID changes about
+  blast radius, the gap in today's collector, and six lab checks) and
+  `docs/milestones/M6-bakeoff.md` (how an LLM proposer would be compared with
+  `fns harden`, and kept a proposer). Nothing is built yet.
 - `fns mcp serve`: a read-only MCP server on stdio. Its five tools list and read
   fixture sets, list and read contain reports, and run `fns contain` on a
   fixture. It has no write tool and makes no network call. Fixture files come
