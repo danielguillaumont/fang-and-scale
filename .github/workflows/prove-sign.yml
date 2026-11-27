@@ -3,15 +3,18 @@ name: prove-sign
 # M3 P5.4, decision V3: run the verifier on recorded inputs and sign its evidence
 # bundle with Sigstore keyless signing, using this workflow's own OIDC identity.
 #
-# STAGING ONLY. Sigstore production (Fulcio and the public Rekor log) needs the
-# owner's explicit approval first (docs/DECISIONS.md); the code refuses it too.
-# Staging log entries are public as well: they carry this repository's name, the
+# A push to main signs on Sigstore PRODUCTION (Fulcio and the public Rekor log);
+# the code refuses production from anywhere else (fns.verify.signing). Pull
+# requests from branches of this repository and manual runs sign on STAGING.
+# Fork and Dependabot pull requests do not run this job: they get no OIDC token.
+# Log entries are public and permanent: they carry this repository's name, the
 # workflow path, the ref and the commit SHA, and digests of placeholder-only inputs.
 #
 # Fixtures only: no Azure login and no secrets. The statement says mode FIXTURE.
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions: {}
@@ -22,18 +25,23 @@ concurrency:
 
 jobs:
   sign:
-    name: prove and sign (Sigstore staging)
-    # The signing identity below names refs/heads/main; nothing else may sign.
-    if: github.ref == 'refs/heads/main'
+    name: prove and sign (Sigstore)
+    # main (push or manual), or a pull request from a branch of this repository.
+    if: >-
+      github.ref == 'refs/heads/main' || (github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       id-token: write
     env:
-      FNS_SIGSTORE_INSTANCE: staging
+      # Production only for a push to main; everything else stays on staging.
+      FNS_SIGSTORE_INSTANCE: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'production' || 'staging' }}
       FIXTURE: fixtures/lab-run-3
-      SIGSTORE_IDENTITY: https://github.com/danielguillaumont/fang-and-scale/.github/workflows/prove-sign.yml@refs/heads/main
+      # On main the verifiers pin this fixed identity, not one taken from the run.
+      SIGSTORE_IDENTITY: ${{ github.ref == 'refs/heads/main' && 'https://github.com/danielguillaumont/fang-and-scale/.github/workflows/prove-sign.yml@refs/heads/main' || format('https://github.com/{0}', github.workflow_ref) }}
       SIGSTORE_ISSUER: https://token.actions.githubusercontent.com
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,7 +58,7 @@ jobs:
           set -euo pipefail
           uv run --frozen fns demo scout --fixture "$FIXTURE" --out "$RUNNER_TEMP/scout"
           echo "snapshot=$(ls "$RUNNER_TEMP"/scout/snapshots/*.json | head -n 1)" >> "$GITHUB_OUTPUT"
-      - name: Prove and sign (Sigstore staging)
+      - name: Prove and sign
         id: prove
         env:
           SNAPSHOT: ${{ steps.snap.outputs.snapshot }}
@@ -63,7 +71,7 @@ jobs:
             --snapshot "$SNAPSHOT" \
             --probes "$FIXTURE/probes.json" \
             --sign sigstore \
-            --identity "github-actions prove-sign.yml (Sigstore staging)" \
+            --identity "github-actions prove-sign.yml (Sigstore $FNS_SIGSTORE_INSTANCE)" \
             --out "$RUNNER_TEMP/fns" | tee "$RUNNER_TEMP/prove.txt"
           code=${PIPESTATUS[0]}
           set -e
@@ -82,12 +90,26 @@ jobs:
           set -euo pipefail
           uv run --frozen python -m fns.verify check --run "$RUN_DIR" \
             --sigstore-identity "$SIGSTORE_IDENTITY" \
-            --sigstore-issuer "$SIGSTORE_ISSUER"
+            --sigstore-issuer "$SIGSTORE_ISSUER" \
+            --sigstore-instance "$FNS_SIGSTORE_INSTANCE"
+      - name: Verify with the sigstore CLI, as the README shows
+        env:
+          RUN_DIR: ${{ steps.prove.outputs.run_dir }}
+        run: |
+          set -euo pipefail
+          flag=()
+          if [ "$FNS_SIGSTORE_INSTANCE" = staging ]; then flag=(--staging); fi
+          uv run --frozen python -m sigstore "${flag[@]}" verify github \
+            --bundle "$RUN_DIR/bundle.sigstore.json" \
+            --cert-identity "$SIGSTORE_IDENTITY" \
+            --repository "$GITHUB_REPOSITORY" \
+            --trigger "$GITHUB_EVENT_NAME" \
+            "$RUN_DIR/assertions.json" > /dev/null
       - name: Upload the signed run
         if: always() && steps.prove.outputs.run_dir != ''
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: prove-sign-staging-${{ github.sha }}
+          name: prove-sign-${{ env.FNS_SIGSTORE_INSTANCE }}-${{ github.sha }}
           path: ${{ steps.prove.outputs.run_dir }}
           if-no-files-found: error
           retention-days: 30

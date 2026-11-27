@@ -24,11 +24,20 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--run", type=Path, required=True)
     c.add_argument("--sigstore-identity")
     c.add_argument("--sigstore-issuer")
+    c.add_argument(
+        "--sigstore-instance",
+        choices=["staging", "production"],
+        help="the Sigstore instance to verify against (default: $FNS_SIGSTORE_INSTANCE, "
+        "else staging)",
+    )
     args = parser.parse_args(argv)
     if args.command == "run":
         return run(args.run, signer=args.sign, identity=args.identity)
     return check(
-        args.run, sigstore_identity=args.sigstore_identity, sigstore_issuer=args.sigstore_issuer
+        args.run,
+        sigstore_identity=args.sigstore_identity,
+        sigstore_issuer=args.sigstore_issuer,
+        sigstore_instance=args.sigstore_instance,
     )
 
 
