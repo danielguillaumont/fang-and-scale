@@ -253,7 +253,7 @@ role *for the agent*, stays on the roadmap after v0.1.
 | Key Vault diagnostic setting: `AuditEvent` | `AzureDiagnostics` | secret access |
 | Blob service diagnostic settings on both accounts: StorageRead, StorageWrite | `StorageBlobLogs` | blob access or shared key |
 | Entra diagnostic setting: `AuditLogs` and `ServicePrincipalSignInLogs` (step 1 showed both arrive on Entra ID Free) | `AuditLogs` | credential added, owner added, app role assignment, directory role assigned |
-| The 10 rules from `detections/`, rendered by `fns detections export` | Sentinel scheduled rules | |
+| The 11 rules from `detections/` (10, plus the S4 sign-in rule added after step 1), rendered by `fns detections export` | Sentinel scheduled rules | |
 
 Tests (offline): every table a rule names has a diagnostic setting that feeds
 it; the rules deployed are exactly the files in `detections/`; nothing in it
@@ -352,7 +352,7 @@ Azure pricing calculator for your region on the day.
 | The lab (1 Key Vault, 2 LRS storage accounts) | every session | cents per day | until `lab-down` |
 | Log Analytics workspace | session B on | pay-as-you-go Analytics logs: the first 5 GB a month per billing account are free, then roughly $2 to $3 per GB (one Q&A cites $2.30 for East US). 31 days of retention included, 90 with Sentinel. Queries are free | none; it bills until deleted |
 | Activity Log into Log Analytics | 4 rules | free to ingest, as far as I know; **verify** on the Azure Monitor pricing page | |
-| Microsoft Sentinel | the 10 rules and alerts | **31-day free trial** from enabling it on the workspace: Log Analytics ingestion and Sentinel analysis are waived up to 10 GB a day. Automation and data lake charges still apply (we use neither). After the trial, Sentinel's per-GB price on top of Log Analytics | 31 days; at most 20 trial workspaces per tenant |
+| Microsoft Sentinel | the 11 rules and alerts | **31-day free trial** from enabling it on the workspace: Log Analytics ingestion and Sentinel analysis are waived up to 10 GB a day. Automation and data lake charges still apply (we use neither). After the trial, Sentinel's per-GB price on top of Log Analytics | 31 days; at most 20 trial workspaces per tenant |
 | Entra ID P2 trial | only if step 1 fails and you choose option b | free | **30 days, one trial per tenant.** Community reports say activation can need a payment method, or can fail on tenants created from a personal Microsoft account. Unverified until you try |
 | Key Vault operations, storage transactions | probes, strikes, legitimate use | well under $1 | |
 

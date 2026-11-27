@@ -1,0 +1,78 @@
+# Sample rows for detections/app-role-assignment-by-workload.yaml, checked by `fns detections check` and
+# tests/harden/test_detections.py through fns.harden.kql (a model of KQL, not Kusto).
+# Placeholder IDs only. Shapes follow the rows seen in the 2026-11-27 log path check
+# (docs/FINDINGS.md) and Microsoft's documented table columns.
+cases:
+- name: 'S4: the escalated identity grants a marker role to the agent'
+  alert: true
+  expect:
+    InitiatingAppId: 00000000-0000-4000-8000-000000000302
+    SelfGrant: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add app role assignment to service principal
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000302
+        displayName: app-escalation-target
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000301
+      displayName: sp-billing-agent
+      type: ServicePrincipal
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000907
+- name: a workload grants a role to itself
+  alert: true
+  expect:
+    SelfGrant: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add app role assignment to service principal
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000301
+        displayName: sp-billing-agent
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000301
+      displayName: sp-billing-agent
+      type: ServicePrincipal
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000908
+- name: the admin grants a role (Terraform)
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add app role assignment to service principal
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      user:
+        id: 00000000-0000-4000-8000-000000000304
+        displayName: null
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000301
+      displayName: sp-billing-agent
+      type: ServicePrincipal
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000909
+- name: 'the S4 undo: the assignment is removed'
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Remove app role assignment from service principal
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000302
+        displayName: app-escalation-target
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000301
+      displayName: sp-billing-agent
+      type: ServicePrincipal
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000910

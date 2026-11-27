@@ -1,0 +1,52 @@
+# Sample rows for detections/keyvault-control-plane-write-by-workload.yaml, checked by `fns detections check` and
+# tests/harden/test_detections.py through fns.harden.kql (a model of KQL, not Kusto).
+# Placeholder IDs only. Shapes follow the rows seen in the 2026-11-27 log path check
+# (docs/FINDINGS.md) and Microsoft's documented table columns.
+params:
+  monitored_identities: '["00000000-0000-4000-8000-000000000301", "00000000-0000-4000-8000-000000000302"]'
+cases:
+- name: 'S2: the agent tags the vault'
+  alert: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.KEYVAULT/VAULTS/WRITE
+    ActivityStatusValue: Success
+    Caller: 00000000-0000-4000-8000-000000000301
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-sample
+    CorrelationId: 00000000-0000-4000-8000-000000000919
+- name: the same, in the casing the portal shows
+  alert: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: Microsoft.KeyVault/vaults/write
+    ActivityStatusValue: Succeeded
+    Caller: 00000000-0000-4000-8000-000000000301
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-sample
+    CorrelationId: 00000000-0000-4000-8000-000000000920
+- name: the Start event of the same write
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.KEYVAULT/VAULTS/WRITE
+    ActivityStatusValue: Start
+    Caller: 00000000-0000-4000-8000-000000000301
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-sample
+    CorrelationId: 00000000-0000-4000-8000-000000000921
+- name: the admin writes the vault (Terraform)
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.KEYVAULT/VAULTS/WRITE
+    ActivityStatusValue: Success
+    Caller: 00000000-0000-4000-8000-000000000304
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-sample
+    CorrelationId: 00000000-0000-4000-8000-000000000922
+- name: the agent reads the vault
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.KEYVAULT/VAULTS/READ
+    ActivityStatusValue: Success
+    Caller: 00000000-0000-4000-8000-000000000301
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-sample
+    CorrelationId: 00000000-0000-4000-8000-000000000923

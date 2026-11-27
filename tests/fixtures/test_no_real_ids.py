@@ -15,7 +15,12 @@ from fns.fixtures.sanitize import EMAIL_RE, GUID_RE, JWT_RE, PLACEHOLDER_RE, SAF
 from fns.fixtures.wellknown import WELL_KNOWN_GUIDS
 
 ROOT = Path(__file__).resolve().parents[2]
-SCANNED = [ROOT / "fixtures", ROOT / "src" / "fns" / "fixtures" / "data", ROOT / "contracts"]
+SCANNED = [
+    ROOT / "fixtures",
+    ROOT / "src" / "fns" / "fixtures" / "data",
+    ROOT / "contracts",
+    ROOT / "detections",
+]
 SCANNED_FILES = [ROOT / "scope.example.yaml"]
 SECRET_KEY_RE = re.compile(
     r'"(secretText|clientSecret|client_secret|password|access_token|refresh_token)"\s*:\s*"(?!REDACTED)'

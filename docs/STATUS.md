@@ -12,13 +12,15 @@ Terraform run. To resume, read this section first.
 | PR | Queue item | Change | Tests after |
 | --- | --- | --- | --- |
 | #60 | 1 | **M4 step 1 passed; D1 stands.** FINDINGS rows and section "M4 log path check" (both categories export on Entra ID Free; `clientAssertion`; a key's add and delete share one operation name). Runbook corrections (`az group show -n rg-fns-lab`, the expected values, an audit query that tells add from delete, prompting commands pasted alone). M4-plan step 1 marked passed | 1404 |
+| #61 | 2 (part 1) | **Detection rules tested against sample rows.** `fns.harden.kql`, a small KQL evaluator that refuses anything it doesn't model; `detections/samples/<id>.yaml` for every rule, each with rows that must alert and rows that must not; `fns detections check` runs them. `app-credential-added-by-workload` no longer fires on a key delete. New rule `workload-sign-in-with-secret` for S4. Mutation tests show the samples catch the delete, a certificate sign-in, and an ignored failure | 1471 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
 ### Queue position
 
 1. ~~Log path check results~~ (#60)
-2. **Next:** detection rules as Terraform (D2)
+2. Detection rules: ~~sample-row tests~~ (#61); **next:** the rules and log
+   plumbing as Terraform, `lab/monitoring.tf` (D2)
 3. Lab group (D3)
 4. Strike engine
 5. M4 live runbook
@@ -35,7 +37,13 @@ Nothing yet.
 ### Pending review
 
 Choices made where the plans are silent, marked "pending review" in
-`docs/DECISIONS.md`: none yet.
+`docs/DECISIONS.md`:
+
+- our own KQL subset evaluator for the rule samples (#61);
+- `app-credential-added-by-workload` alerts when it can't tell an add from a
+  delete (#61);
+- `workload-sign-in-with-secret` alerts on any credential type other than the
+  three key-based ones, rather than only on `clientSecret` (#61).
 
 # Status after the M3 live run (2026-11-26)
 

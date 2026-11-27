@@ -1,0 +1,58 @@
+# Sample rows for detections/directory-role-assigned-by-workload.yaml, checked by `fns detections check` and
+# tests/harden/test_detections.py through fns.harden.kql (a model of KQL, not Kusto).
+# Placeholder IDs only. Shapes follow the rows seen in the 2026-11-27 log path check
+# (docs/FINDINGS.md) and Microsoft's documented table columns.
+cases:
+- name: a workload adds a member to a directory role
+  alert: true
+  expect:
+    RoleName: Application Administrator
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add member to role
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000301
+        displayName: sp-billing-agent
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000308
+      displayName: Application Administrator
+      type: Role
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000916
+- name: a workload adds an eligible member
+  alert: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add eligible member to role
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000301
+        displayName: sp-billing-agent
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000308
+      displayName: Application Administrator
+      type: Role
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000917
+- name: the admin assigns a role
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add member to role
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      user:
+        id: 00000000-0000-4000-8000-000000000304
+        displayName: null
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000308
+      displayName: Application Administrator
+      type: Role
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000918
