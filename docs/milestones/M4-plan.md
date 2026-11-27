@@ -1,9 +1,10 @@
 # M4 live plan: record, harden, prove the fix, detections
 
 **Status: decisions D1 to D8 approved on 2026-11-26 (end of this file). D1
-changed: step 1 is now a log path check. The strike plan is
-`docs/milestones/M4-strikes-plan.md`, a plan only. Nothing here is built or
-run.** Written 2026-11-26, after the repository went public and the lab was torn
+changed: step 1 is now a log path check. Step 1 PASSED on 2026-11-27: both log
+categories reach Log Analytics on Entra ID Free, so D1 stands and no trial is
+needed. The strike plan is `docs/milestones/M4-strikes-plan.md` (approved; the
+write gate is built). Sessions A to D have not run.** Written 2026-11-26, after the repository went public and the lab was torn
 down. The spec is `docs/milestones/M4.md` (K1 to K5). This file is
 the live half: what runs in the tenant, in what order, who does each step, what
 it costs, and what has to be built first.
@@ -56,6 +57,15 @@ Two consequences shape the order of the plan:
   more than 2. Decision D6 covers this.
 
 ## Step 1: the log path check (D1, before anything else)
+
+**PASSED on 2026-11-27.** On the Entra ID Free tenant (no P1 or P2, no trial),
+the diagnostic setting accepted both `AuditLogs` and
+`ServicePrincipalSignInLogs`. `AuditLogs` got 6 rows and
+`AADServicePrincipalSignInLogs` 1, about 10 to 15 minutes after each event.
+**D1 stands:** no trial, and S4 can get a sign-in rule. Details, and the two
+surprises (`ClientCredentialType` is `clientAssertion` for a certificate
+sign-in; a key's add and delete log the same operation name), are in
+`docs/FINDINGS.md`, "M4 log path check". The text below is the plan as it was.
 
 **Before any strike code is written and before any trial is activated**, check
 on the free tenant whether these two Entra log categories reach a Log Analytics
@@ -132,7 +142,7 @@ most.
 
 | Session | Needs | Strikes? | Time (rough) |
 | --- | --- | --- | --- |
-| 1. Log path check (`docs/runbooks/m4-log-path-check.md`) | a lab build and a throwaway workspace, both removed at the end | no | 45 min, plus up to 2 h of waiting |
+| 1. Log path check (`docs/runbooks/m4-log-path-check.md`) | a lab build and a throwaway workspace, both removed at the end | no | **done 2026-11-27: passed** |
 | A. Rebuild, baseline scout, the `Directory.Read.All` and custom-role tests | step 1 reported; a fresh build | no | 1.5 h |
 | B. Logging on, legitimate use, record | A; the workspace and the Sentinel trial | no | 1 h, plus up to a day for logs to settle |
 | C. Strikes and detection results | B; step 1 passed or you chose an option; `fns strike` built from the approved strike plan | **yes**: S1 to S4 | 2 h, mostly waiting for alerts |
@@ -242,7 +252,7 @@ role *for the agent*, stays on the roadmap after v0.1.
 | Subscription diagnostic setting: Activity Log (Administrative, Security, Policy) | `AzureActivity` | listKeys, RBAC assignment, vault control-plane write, run code on the identity host |
 | Key Vault diagnostic setting: `AuditEvent` | `AzureDiagnostics` | secret access |
 | Blob service diagnostic settings on both accounts: StorageRead, StorageWrite | `StorageBlobLogs` | blob access or shared key |
-| Entra diagnostic setting: `AuditLogs` (plus `ServicePrincipalSignInLogs` if step 1 shows it arrives) | `AuditLogs` | credential added, owner added, app role assignment, directory role assigned |
+| Entra diagnostic setting: `AuditLogs` and `ServicePrincipalSignInLogs` (step 1 showed both arrive on Entra ID Free) | `AuditLogs` | credential added, owner added, app role assignment, directory role assigned |
 | The 10 rules from `detections/`, rendered by `fns detections export` | Sentinel scheduled rules | |
 
 Tests (offline): every table a rule names has a diagnostic setting that feeds

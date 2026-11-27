@@ -11,6 +11,41 @@ request (sanitized), the response, the date, and what the code does about it.
 | 2026-11-26 | Graph v1.0 `roleManagement/directory/roleEligibilitySchedules` (app-only, `sp-fns-scout`, `RoleManagement.Read.Directory`) | `GET https://graph.microsoft.com/v1.0/roleManagement/directory/roleEligibilitySchedules?$select=id,principalId,roleDefinitionId,directoryScopeId` in an Entra ID Free tenant | PIM needs Entra ID P2 or ID Governance. The response to a tenant without them was unknown to us; the tests used `AadPremiumLicenseRequired` only as an illustration | **`400`**, not `403` or an empty list: `{"error": {"code": "AadPremiumLicenseRequired", "message": "The tenant needs to have Microsoft Entra ID P2 or Microsoft Entra ID Governance license.", "innerError": {"date": "2026-11-26T18:07:28", "request-id": "<placeholder>", "client-request-id": "<placeholder>"}}}` | The collector records the status and error code (`http-400 AadPremiumLicenseRequired`) as evidence and never keys on the code or the message: any failed listing counts the same, and the licence check decides. Recorded in `fixtures/lab-run-2` |
 | 2026-11-26 | ARM `Microsoft.Authorization/roleEligibilitySchedules` (`api-version=2020-10-01`, Reader on the subscription) | `GET https://management.azure.com/subscriptions/<sub>/providers/Microsoft.Authorization/roleEligibilitySchedules?api-version=2020-10-01` in the same tenant | As above | **The same status and code from a second API**, with a different message: `400` `{"error": {"code": "AadPremiumLicenseRequired", "message": "The tenant needs to have Microsoft Entra Permissions Management or <GUID> or Microsoft Entra ID P2 or Microsoft Entra ID Governance license."}}`. ARM accepts more licences than Graph names, and it names one of them only by a GUID. The sanitizer replaced that GUID with a placeholder (`...-000000001049`), which appears nowhere else in the recording, so it is not the tenant, the subscription or any object in it. No `innerError` | Handled the same way as Graph. **Resolved 2026-11-26:** the old match (one P2 plan ID, plus SKU or plan names containing `P2` or `GOVERNANCE`) did not know Permissions Management or the GUID-named licence. A tenant with only one of those could have been reported `not-applicable`. The matcher now uses service plan IDs only. `not-applicable` needs every plan of every live SKU to be on `graph.PIM_FREE_PLAN_IDS`, a list of IDs known not to carry PIM. That list starts empty, so any unknown SKU or plan keeps `pim-eligibility` not collected and its findings inconclusive. This tenant (0 SKUs) is unchanged |
 | 2026-11-26 | Graph v1.0 `subscribedSkus` (app-only, `sp-fns-scout`) | `GET https://graph.microsoft.com/v1.0/subscribedSkus?$select=skuId,skuPartNumber,capabilityStatus,servicePlans` in the same tenant | Lists the tenant's commercial subscriptions | `200` with `"value": []`: an Entra ID Free tenant (here on an Azure for Students subscription) has **no subscribed SKUs at all**, not even a free one | **0 SKUs is a valid not-applicable signal.** A successful, empty answer is positive evidence that no licence carries PIM. It is different from a failed call, which leaves `pim-eligibility` not collected. The evidence line reads `GET /subscribedSkus -> ok: 0 SKU(s) [none]; plans that may carry PIM: none` |
+| 2026-11-27 | ARM `microsoft.aadiam/diagnosticSettings` (`api-version=2017-04-01-preview`) | `PUT https://management.azure.com/providers/microsoft.aadiam/diagnosticSettings/fns-logcheck` with `AuditLogs` and `ServicePrincipalSignInLogs` enabled, to a Log Analytics workspace, in an **Entra ID Free** tenant (0 subscribed SKUs, no P1 or P2, no trial) | Microsoft's two current pages, "Integrate Microsoft Entra logs with Azure Monitor logs" (updated 2026-06-15) and "Configure Microsoft Entra diagnostic settings" (updated 2026-02-26), list no licence. Older guidance, as the CIS benchmark quotes it, says "To export sign-in data, your organization needs an Azure AD P1 or P2 license" | **Accepted, both categories.** Rows arrived in both tables: `AuditLogs` 6, `AADServicePrincipalSignInLogs` 1. The current pages are right for this tenant; the older P1/P2 statement does not hold here | D1 stands: no trial. S4 can get a sign-in rule. Section "M4 log path check" below |
+| 2026-11-27 | `AADServicePrincipalSignInLogs` (`ClientCredentialType`) | `az login --service-principal --certificate <pem>` as `sp-fns-scout`, then the runbook's `qSignIn` query | Our runbook expected `Certificate` for a certificate sign-in | **`clientAssertion`.** The CLI signs a JWT client assertion with the certificate, and the log names the assertion, not the certificate | Runbook and rules match `clientAssertion`. A rule must not key on `Certificate` to find certificate sign-ins |
+| 2026-11-27 | `AuditLogs` ("Update application – Certificates and secrets management") | Adding a certificate to `sp-fns-scout` (`az ad app credential reset --create-cert --append`), then deleting it (`az ad app credential delete`) | Our runbook said the delete would not match the add's filter | **Both match.** Adding and deleting a key log the **same** `OperationName`, both `success`, both initiated by a user. What tells them apart is `TargetResources[].modifiedProperties`: the key list before the change (`oldValue`) and after it (`newValue`) | The runbook query and the credential rules compare the number of keys before and after (`KeyDescription`), and never decide on `OperationName` alone. **Not yet confirmed live:** the property name and its JSON shape are from Microsoft's audit log examples, not from this run's rows. The runbook prints the property names if the comparison finds nothing |
+
+## M4 log path check (2026-11-27)
+
+Run from `docs/runbooks/m4-log-path-check.md` on a fresh lab build, on the Entra
+ID Free tenant (no P1 or P2 licence, no trial started). Decision D1 stands.
+
+- **Diagnostic setting:** the `PUT` accepted both `AuditLogs` and
+  `ServicePrincipalSignInLogs`.
+- **Rows:** `AuditLogs` 6, `AADServicePrincipalSignInLogs` 1 (the `qTables`
+  query, from the setting's creation on).
+- **`qAudit`:** 2 rows, both "Update application – Certificates and secrets
+  management", `success`, `By` = `user`, target `sp-fns-scout`: the add at
+  05:41:07Z and the delete at 05:45:14Z. The runbook expected only the add.
+- **`qSignIn`:** `ResultType` 0, `ClientCredentialType` = `clientAssertion` (the
+  runbook expected `Certificate`), resource Azure Resource Manager.
+- **Latency:** about 10 to 15 minutes from the event to the row.
+- **Cleanup:** the certificate, the diagnostic setting, the workspace and its
+  resource group were deleted, then `lab-down`.
+
+Three runbook problems, now fixed in the runbook:
+
+- `az group show --ids <resource group id>` failed. The runbook uses
+  `az group show -n rg-fns-lab`.
+- The expected values above (`clientAssertion`; the add and the delete both
+  match, told apart by `modifiedProperties`).
+- If `uv run poe lab-down` (or `lab-up`) is pasted together with the lines
+  after it, Terraform reads the next pasted line as the answer to its `yes`
+  prompt. Every command that prompts now sits alone in its own block, with a
+  warning.
+
+Sources: the two Microsoft pages and the CIS quote are linked in
+`docs/milestones/M4-plan.md`, "Sources".
 
 ## M3 live run (2026-11-26)
 

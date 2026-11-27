@@ -1,5 +1,16 @@
 # M4 step 1: the log path check
 
+> **Run on 2026-11-27: passed.** Both categories were accepted and both tables
+> filled on Entra ID Free, so D1 stands. The results are in `docs/FINDINGS.md`,
+> "M4 log path check". The runbook has since been corrected in three places
+> (the resource group lookup, the expected `ClientCredentialType`, and the
+> audit query, which now tells the certificate's add from its delete). Keep it
+> for a re-check, for example after a licence change.
+
+> **Commands that prompt** (`lab-up`, `lab-down`) are each in a block of their
+> own. Paste them **alone**: Terraform reads the next pasted line as the answer
+> to its `yes` prompt.
+
 Decision D1 (`docs/milestones/M4-plan.md`, "Step 1"). The question: on this tenant,
 which has **no Entra P1 or P2 licence**, can a diagnostic setting send
 **`AuditLogs`** and **`ServicePrincipalSignInLogs`** to a Log Analytics workspace?
@@ -63,7 +74,12 @@ leaves that gitignored file. Leave it out on Azure for Students
 ```powershell
 Get-Content lab\terraform.tfvars                 # tenant, subscription, location, prefix
 uv run poe lab-check                             # fmt + validate, no credentials used
-uv run poe lab-up                                # review the plan, then type yes
+```
+
+Then paste this line **on its own**, and type the answer yourself:
+
+```powershell
+uv run poe lab-up
 ```
 
 **Review the plan before typing `yes`:**
@@ -90,8 +106,7 @@ The workspace goes in its own resource group, in the lab's region, so it can be
 removed without touching the lab.
 
 ```powershell
-$rgId = terraform -chdir=lab output -raw resource_group_id
-$location = az group show --ids $rgId --query location -o tsv
+$location = az group show -n rg-fns-lab --query location -o tsv   # not --ids: that form failed (FINDINGS)
 az provider register --namespace Microsoft.OperationalInsights --wait
 az provider register --namespace Microsoft.Insights --wait
 az group create -n rg-fns-logcheck -l $location --tags project=fang-and-scale purpose=lab -o none
@@ -212,7 +227,8 @@ Run nothing else as the scout.
 ## 7. Delete the scout certificate
 
 Step 5 checked the list was empty first, so every certificate here is this run's.
-Deleting it is a second audit event, which the queries don't count.
+Deleting it is a second audit event with the **same** operation name as the add.
+The audit query in step 8 shows both, with `Change` = `add` and `delete`.
 
 ```powershell
 foreach ($k in @(az ad app credential list --id $scoutId --cert --query "[].keyId" -o tsv)) {
@@ -235,7 +251,7 @@ $since = $setAt.ToString("yyyy-MM-ddTHH:mm:ssZ")
 
 $qTables = "union withsource=Table isfuzzy=true AuditLogs, AADServicePrincipalSignInLogs | where TimeGenerated > datetime($since) | summarize Rows = count() by Table"
 
-$qAudit = "AuditLogs | where TimeGenerated > datetime($since) | where OperationName contains 'Certificates and secrets management' | mv-expand Target = TargetResources | where tostring(Target.displayName) == 'sp-fns-scout' | project TimeGenerated, OperationName, Result, Target = tostring(Target.displayName), By = iff(isnotempty(tostring(InitiatedBy.user.id)), 'user', 'app')"
+$qAudit = "AuditLogs | where TimeGenerated > datetime($since) | where OperationName contains 'Certificates and secrets management' | mv-expand Target = TargetResources | where tostring(Target.displayName) == 'sp-fns-scout' | mv-apply P = Target.modifiedProperties on (summarize Props = make_set(tostring(P.displayName)), Before = sumif(array_length(todynamic(tostring(P.oldValue))), tostring(P.displayName) == 'KeyDescription'), After = sumif(array_length(todynamic(tostring(P.newValue))), tostring(P.displayName) == 'KeyDescription')) | project TimeGenerated, OperationName, Result, Target = tostring(Target.displayName), Change = case(After > Before, 'add', After < Before, 'delete', 'unknown'), Props = strcat_array(Props, ','), By = iff(isnotempty(tostring(InitiatedBy.user.id)), 'user', 'app')"
 
 $qSignIn = "AADServicePrincipalSignInLogs | where TimeGenerated > datetime($since) | where ServicePrincipalName == 'sp-fns-scout' | project TimeGenerated, ServicePrincipalName, ResultType, ClientCredentialType, ResourceDisplayName"
 ```
@@ -262,10 +278,18 @@ az monitor log-analytics query -w $ws --analytics-query $qSignIn -o table
 **Expected if both paths work:**
 
 - `qTables` shows both tables with rows.
-- `qAudit` shows one row from step 5, with `Result` = `success` and `By` = `user`.
-  Rows from step 7 don't match this filter.
+- `qAudit` shows **two** rows, both "Update application – Certificates and
+  secrets management", `Result` = `success`, `By` = `user`: step 5's add and
+  step 7's delete. The operation name is the same for both (FINDINGS);
+  `Change` tells them apart (`add`, then `delete`), from the key lists in
+  `modifiedProperties`.
+  - The `Change` column was added after the 2026-11-27 run and has not run
+    live yet. If it says `unknown`, paste the `Props` column too: it lists the
+    property names only, nothing identifying.
 - `qSignIn` shows at least one row with `ResultType` = `0` and
-  `ClientCredentialType` = `Certificate`.
+  `ClientCredentialType` = **`clientAssertion`**: the CLI signs a client
+  assertion with the certificate, and that is what the log names (FINDINGS).
+- **Latency** on 2026-11-27 was about 10 to 15 minutes.
 
 A query against a table that never received data fails with "Failed to resolve
 table". That counts as "no rows" for that table, and is a result in itself:
@@ -287,8 +311,16 @@ az group exists -n rg-fns-logcheck                               # must print fa
 
 ## 10. Tear down the lab (you approve the destroy)
 
+Paste this line **on its own**. Review that it destroys what step 2 added, then
+type `yes` yourself:
+
 ```powershell
-uv run poe lab-down                              # review: destroys what step 2 added; type yes
+uv run poe lab-down
+```
+
+Then check:
+
+```powershell
 az group exists -n rg-fns-lab                                    # must print false
 foreach ($n in "sp-billing-agent", "app-escalation-target", "id-verifier", "sp-fns-scout") {
     "{0}: {1}" -f $n, (@(az ad app list --display-name $n --query "[].appId" -o tsv).Count)   # each must be 0
@@ -309,7 +341,8 @@ Paste these:
 5. That steps 7, 9 and 10 printed what they should (empty lists, `False`,
    `false`, and four zeros).
 
-What happens next (`docs/milestones/M4-plan.md`, step 1):
+What happens next (`docs/milestones/M4-plan.md`, step 1). On 2026-11-27 the
+first case happened:
 
 - **Both tables have rows:** D1 stands. I record a FINDINGS entry with the date,
   and the M4 sessions go ahead with no trial.
@@ -331,6 +364,11 @@ foreach ($k in @(az ad app credential list --id $scoutId --cert --query "[?displ
 }
 az rest --method delete --url "https://management.azure.com/providers/microsoft.aadiam/diagnosticSettings/fns-logcheck?api-version=2017-04-01-preview"
 az group delete -n rg-fns-logcheck --yes
+```
+
+Last, on its own line (it prompts):
+
+```powershell
 uv run poe lab-down
 ```
 
