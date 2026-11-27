@@ -14,7 +14,7 @@ read back through the GitHub API the same day:
 | Dependabot security updates | enabled |
 | Private vulnerability reporting | enabled |
 | Code scanning default setup | not configured (correct: `codeql.yml` is the advanced setup) |
-| Branch protection on `main` | classic rule: force pushes blocked, deletion blocked. **No required status checks yet**: see "Require CI to pass" below |
+| Branch protection on `main` | classic rule: force pushes blocked, deletion blocked, and the three `ci` checks required (strict), applied by the owner by 2026-11-27: see "Require CI to pass" below. No required reviews (one maintainer) |
 | Workflow token | read-only; cannot approve pull requests |
 | Fork PR workflows | approval required for first-time contributors |
 | Automatically delete head branches | off (settings step 4, optional) |
@@ -38,9 +38,11 @@ Since then:
 - **A Sigstore verification failure now exits 5** instead of printing a
   traceback (#51).
 
-## Require CI to pass (optional; not applied)
+## Require CI to pass (applied)
 
-Branch protection on `main` has no required status checks yet. These are the
+Branch protection on `main` requires the three `ci` checks below (read back from
+the protection rule on 2026-11-27). This section stays as the record of how it
+was set, and the command to set it again. These are the
 checks that run on every pull request, with the names GitHub uses for them
 (read from the check runs of #51):
 

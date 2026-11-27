@@ -14,8 +14,8 @@ is now required on `main`.
 | 1 | Mark the decisions in `docs/DECISIONS.md` | done | #76 |
 | 2 | Agent ID findings `not-assessed` | done | #77 |
 | 3 | S4, with the runbook update | done | #78 |
-| 4 | Threat model open gaps (size caps, provenance attestation) | next | |
-| 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | | |
+| 4 | Threat model open gaps (size caps, provenance attestation) | done | #79 |
+| 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | next | |
 | 6 | M4 exit gate, option B: plan only, then stop | | |
 
 ### Decisions of 2026-11-27 (marked in `docs/DECISIONS.md`)
@@ -27,7 +27,7 @@ is now required on `main`.
 - S4: approved with conditions, and built (#78): right after S3 in the same run, the token never written anywhere (only `oid` and `roles` journaled), S3's password removed as soon as the token is held, the marker role defined by Terraform, and an emergency cleanup step in the M4 runbook. Tested against the fake tenant only; it has not run live. Its nine build choices are approved (2026-11-27), the unverified-signature claims check on the condition that it is a safety stop only, never verdict evidence (pinned by `tests/prove/test_s4_not_evidence.py`).
 - M4 exit gate: option B, **plan only** (item 6).
 - **M6 Agent ID licensing and the LLM bake-off: deferred.**
-- Threat model open gaps: size caps and build provenance approved (item 4).
+- Threat model open gaps: size caps and build provenance approved, and built (#79): `fns.inputcap` for every JSON and YAML read, bounded MCP stdin, and a pinned build provenance attestation in `release.yml`. THREAT-MODEL "Open gaps" now lists only required reviews (CI is required on `main`). The build choices are pending review in DECISIONS.
 
 ### Needs Daniel
 

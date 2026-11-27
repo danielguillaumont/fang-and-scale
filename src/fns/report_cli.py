@@ -11,6 +11,7 @@ from rich.console import Console
 
 from fns.console import FixtureConsole
 from fns.exitcodes import ExitCode
+from fns.inputcap import MAX_RECORD_BYTES, read_capped
 from fns.models.bundle import EvidenceBundle
 from fns.models.detection_results import DetectionResults
 from fns.models.mutation import MutationReport
@@ -35,8 +36,12 @@ def load_inputs(
     strikes: Sequence[Path] = (),
     detections: Path | None = None,
 ) -> Inputs:
-    report = ContainReport.model_validate_json(contain.read_bytes())
-    mut = MutationReport.model_validate_json(mutation.read_bytes()) if mutation else None
+    report = ContainReport.model_validate_json(read_capped(contain, MAX_RECORD_BYTES))
+    mut = (
+        MutationReport.model_validate_json(read_capped(mutation, MAX_RECORD_BYTES))
+        if mutation
+        else None
+    )
     base = Inputs(report, mut, *load_inputs_bundle(prove_dir))
     return replace(
         base,
@@ -47,11 +52,13 @@ def load_inputs(
 
 def load_strike(directory: Path) -> StrikeView:
     """A ``fns strike run`` directory: its plan, run record and any later cleanup."""
-    plan = StrikePlan.model_validate_json((directory / PLAN_FILE).read_bytes())
-    run = StrikeRunRecord.model_validate_json((directory / STRIKE_RUN_FILE).read_bytes())
+    plan = StrikePlan.model_validate_json(read_capped(directory / PLAN_FILE, MAX_RECORD_BYTES))
+    run = StrikeRunRecord.model_validate_json(
+        read_capped(directory / STRIKE_RUN_FILE, MAX_RECORD_BYTES)
+    )
     cleanup_file = directory / CLEANUP_FILE
     cleanup = (
-        StrikeRunRecord.model_validate_json(cleanup_file.read_bytes())
+        StrikeRunRecord.model_validate_json(read_capped(cleanup_file, MAX_RECORD_BYTES))
         if cleanup_file.exists()
         else None
     )
@@ -75,11 +82,13 @@ def load_inputs_bundle(
 ) -> tuple[EvidenceBundle | None, dict[str, str] | None]:
     if prove_dir is None:
         return None, None
-    bundle = EvidenceBundle.model_validate_json((prove_dir / BUNDLE_FILE).read_bytes())
+    bundle = EvidenceBundle.model_validate_json(
+        read_capped(prove_dir / BUNDLE_FILE, MAX_RECORD_BYTES)
+    )
     signing = None
     sig = prove_dir / SIGNING_FILE
     if sig.exists():
-        raw = json.loads(sig.read_text(encoding="utf-8"))
+        raw = json.loads(read_capped(sig, MAX_RECORD_BYTES))
         signing = {k: str(v) for k, v in raw.items() if k in {"signer", "warning"}}
     return bundle, signing
 

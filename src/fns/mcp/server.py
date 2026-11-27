@@ -45,6 +45,7 @@ from pydantic import ValidationError
 
 from fns import __version__
 from fns.fixtures.replay import FIXTURE_LABEL, FixtureError, FixtureManifest
+from fns.inputcap import InputTooLargeError, read_capped_text
 from fns.models.report import ContainReport
 
 SERVER_NAME: Final = "fang-and-scale"
@@ -118,10 +119,10 @@ class Tool:
 
 
 def _read_bounded(node: Traversable | Path, what: str) -> str:
-    data = node.read_bytes()
-    if len(data) > MAX_FILE_BYTES:
-        raise ToolError(f"{what} is larger than {MAX_FILE_BYTES} bytes")
-    return data.decode("utf-8")
+    try:
+        return read_capped_text(node, MAX_FILE_BYTES, what)
+    except InputTooLargeError as exc:
+        raise ToolError(str(exc)) from exc
 
 
 class Server:
@@ -448,9 +449,19 @@ def _error(msg_id: Any, code: int, message: str) -> str:
     return _dumps(_reply_error(msg_id, code, message))
 
 
+NEWLINE: Final = "\n"
+
+
 def serve(server: Server, stdin: TextIO, stdout: TextIO) -> int:
-    """Answer one line at a time until end of input. Only JSON-RPC goes to ``stdout``."""
-    for line in stdin:
+    """Answer one line at a time until end of input. Only JSON-RPC goes to ``stdout``.
+
+    A line is read at most ``MAX_LINE_BYTES + 1`` characters at a time, so an endless
+    line can't exhaust memory: it is answered with an error and skipped."""
+    while line := stdin.readline(MAX_LINE_BYTES + 1):
+        if not line.endswith(NEWLINE) and len(line) > MAX_LINE_BYTES:
+            while (rest := stdin.readline(MAX_LINE_BYTES + 1)) and not rest.endswith(NEWLINE):
+                pass  # the rest of the over-long line, dropped
+            line = "x" * (MAX_LINE_BYTES + 1)  # answered as too long below
         if not line.strip():
             continue
         reply = server.handle_line(line)

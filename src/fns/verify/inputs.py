@@ -21,6 +21,7 @@ from typing import Final
 
 from pydantic import ValidationError
 
+from fns.inputcap import MAX_RECORD_BYTES, InputTooLargeError, read_capped
 from fns.models.assertions import AssertionSet, ProbeObservation, StrikeObservation
 
 ASSERTIONS_FILE: Final = "assertions.json"
@@ -60,7 +61,7 @@ def _sha256(data: bytes) -> str:
 
 
 def load_inputs(run_dir: Path) -> Inputs:
-    raw = _read(run_dir / ASSERTIONS_FILE)
+    raw = read_file(run_dir / ASSERTIONS_FILE)
     digest = _sha256(raw)
     try:
         aset = AssertionSet.model_validate_json(raw)
@@ -129,15 +130,16 @@ def load_inputs(run_dir: Path) -> Inputs:
     return Inputs(run_dir, aset, digest, observations, tuple(unfinished), strikes)
 
 
-def _read(path: Path) -> bytes:
+def read_file(path: Path) -> bytes:
+    """A run-directory file, capped (``fns.inputcap``); IntegrityError if unreadable."""
     try:
-        return path.read_bytes()
-    except OSError as exc:
+        return read_capped(path, MAX_RECORD_BYTES)
+    except (OSError, InputTooLargeError) as exc:
         raise IntegrityError(f"cannot read {path.name}") from exc
 
 
 def _artifact(run_dir: Path, aset: AssertionSet, pid: str, digest: str) -> ProbeObservation:
-    data = _read(run_dir / ARTIFACTS_DIR / f"{digest}.json")
+    data = read_file(run_dir / ARTIFACTS_DIR / f"{digest}.json")
     if _sha256(data) != digest:
         raise IntegrityError(f"artifact {digest[:12]} does not match its digest")
     try:
@@ -158,7 +160,7 @@ def _artifact(run_dir: Path, aset: AssertionSet, pid: str, digest: str) -> Probe
 
 
 def _strike_artifact(run_dir: Path, aset: AssertionSet, key: str, digest: str) -> StrikeObservation:
-    data = _read(run_dir / ARTIFACTS_DIR / f"{digest}.json")
+    data = read_file(run_dir / ARTIFACTS_DIR / f"{digest}.json")
     if _sha256(data) != digest:
         raise IntegrityError(f"artifact {digest[:12]} does not match its digest")
     try:

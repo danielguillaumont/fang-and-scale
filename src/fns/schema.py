@@ -12,6 +12,7 @@ from typing import Any, Final
 
 from pydantic import BaseModel
 
+from fns.inputcap import MAX_RECORD_BYTES, read_capped
 from fns.models.assertions import AssertionSet
 from fns.models.bundle import EvidenceBundle
 from fns.models.contract import Contract
@@ -65,6 +66,8 @@ def drifted(out_dir: Path) -> list[Path]:
     stale = []
     for name in sorted(SCHEMAS):
         path = out_dir / filename(name)
-        if not path.is_file() or path.read_bytes() != render(name).encode("utf-8"):
+        if not path.is_file() or read_capped(path, MAX_RECORD_BYTES) != render(name).encode(
+            "utf-8"
+        ):
             stale.append(path)
     return stale

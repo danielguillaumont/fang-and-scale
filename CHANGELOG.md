@@ -9,6 +9,14 @@ version may change file formats; each change is listed here.
 
 ### Added
 
+- Size caps on every JSON and YAML file the tool reads (`fns.inputcap`): 64 MiB
+  for snapshots, fixture exchanges and strike recordings, 16 MiB for files the
+  tool writes and reads back, 1 MiB for YAML as before. A file over its cap is
+  refused before it is read. The MCP server reads stdin a bounded line at a time.
+- The release workflow attests the build provenance of every release file
+  (Sigstore, `actions/attest-build-provenance` pinned by SHA). Check a download
+  with `gh attestation verify <file> --repo danielguillaumont/fang-and-scale`.
+
 - `fns strike` S4 (approved 2026-11-27), right after S3 in the same run: a
   token as `app-escalation-target` with S3's password, whose claims must show
   `AppRoleAssignment.ReadWrite.All`, then, as that identity, the marker role

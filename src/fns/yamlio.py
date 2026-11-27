@@ -19,6 +19,8 @@ from typing import Any
 import yaml
 from yaml.nodes import MappingNode, Node
 
+from fns.inputcap import InputTooLargeError, read_capped_text
+
 MAX_BYTES = 1024 * 1024
 
 
@@ -88,7 +90,10 @@ def loads_yaml(text: str) -> dict[str, Any]:
 def load_yaml(path: Path) -> dict[str, Any]:
     if path.stat().st_size > MAX_BYTES:
         raise YamlError(f"{path} exceeds 1 MiB")
-    return loads_yaml(path.read_text(encoding="utf-8"))
+    try:
+        return loads_yaml(read_capped_text(path, MAX_BYTES))
+    except InputTooLargeError as exc:  # it grew after the size check
+        raise YamlError(f"{path} exceeds 1 MiB") from exc
 
 
 def dumps_yaml(data: dict[str, Any]) -> str:

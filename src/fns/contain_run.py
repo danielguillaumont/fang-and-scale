@@ -14,17 +14,19 @@ from fns.contain.evaluate import evaluate
 from fns.contain.report import build_report
 from fns.demo import DEMO_FIXTURE, run_demo_scout
 from fns.fixtures.replay import bundled
+from fns.inputcap import MAX_JSON_BYTES, read_capped, read_capped_text
 from fns.models.contract import Contract, load_contract
 from fns.models.report import ContainReport
 from fns.models.snapshot import Snapshot
 from fns.summary import ScoutResult
+from fns.yamlio import MAX_BYTES as YAML_MAX_BYTES
 from fns.yamlio import loads_yaml
 
 CONTRACT_FILE = "contract.fns.yaml"
 
 
 def load_snapshot(path: Path) -> Snapshot:
-    return Snapshot.model_validate_json(path.read_bytes())
+    return Snapshot.model_validate_json(read_capped(path, MAX_JSON_BYTES))
 
 
 def contain(
@@ -52,7 +54,7 @@ def write_report(report: ContainReport, path: Path | None, out_dir: Path) -> Pat
 def demo_contract(fixture_dir: Path | None) -> Contract:
     if fixture_dir is not None:
         return load_contract(fixture_dir / CONTRACT_FILE)
-    text = bundled(DEMO_FIXTURE).joinpath(CONTRACT_FILE).read_text(encoding="utf-8")
+    text = read_capped_text(bundled(DEMO_FIXTURE).joinpath(CONTRACT_FILE), YAML_MAX_BYTES)
     return Contract.model_validate(loads_yaml(text))
 
 

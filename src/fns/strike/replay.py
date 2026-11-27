@@ -29,6 +29,7 @@ from typing import Any, Final, Literal
 from pydantic import Field
 
 from fns.adapters.azure.http import ApiRequest, ApiResponse, TransportError
+from fns.inputcap import MAX_JSON_BYTES, read_capped
 from fns.models.base import FnsModel, sha256_hex
 from fns.models.ids import TzDatetime
 from fns.scope.writes import canonical_body
@@ -78,7 +79,9 @@ class ReplayError(TransportError):
 def load_recording(directory: Path, scenario: str) -> StrikeRecording:
     if scenario not in SCENARIOS:
         raise ValueError(f"unknown scenario {scenario!r}; one of {', '.join(SCENARIOS)}")
-    return StrikeRecording.model_validate_json((directory / f"{scenario}.json").read_bytes())
+    return StrikeRecording.model_validate_json(
+        read_capped(directory / f"{scenario}.json", MAX_JSON_BYTES)
+    )
 
 
 def body_sha256(body: object) -> str:

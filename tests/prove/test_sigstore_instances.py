@@ -521,13 +521,26 @@ def test_id_token_is_granted_on_one_job_only() -> None:
     assert job["permissions"] == {"contents": "read", "id-token": "write"}
 
 
+RELEASE_WORKFLOW = WORKFLOWS / "release.yml"
+"""The one other workflow that may mint an OIDC token: the release's build provenance
+attestation (approved 2026-11-27). Its certificate names ``release.yml`` on a tag, so
+it can never pass as the prove identity, which names ``prove-sign.yml`` on ``main``."""
+
+
 @pytest.mark.parametrize("path", sorted(WORKFLOWS.glob("*.yml")), ids=lambda p: p.name)
 def test_no_other_workflow_can_mint_an_oidc_token(path: Path) -> None:
     doc = _load(path)
     perms = [doc.get("permissions") or {}]
     perms += [j.get("permissions") or {} for j in doc["jobs"].values()]
     grants = [p for p in perms if isinstance(p, dict) and p.get("id-token") == "write"]
-    if path != WORKFLOW:
+    if path == RELEASE_WORKFLOW:
+        assert _triggers(doc) == {"push": {"tags": ["v*"]}}  # a maintainer's tag only
+        (job,) = doc["jobs"].values()
+        assert grants == [job["permissions"]]
+        actions = [s["uses"] for s in job["steps"] if "uses" in s]
+        assert actions[-1].startswith("actions/attest-build-provenance@")
+        assert "release.yml" not in PRODUCTION_WORKFLOW_REF
+    elif path != WORKFLOW:
         assert grants == [], path.name
     on = _triggers(doc)
     if grants:
