@@ -172,6 +172,9 @@ edit an object in the tenant.*
   vendored, hash-pinned Cytoscape.
 - **The PR comment** escapes `@`, `|`, `<`, backticks, brackets, emphasis and
   newlines in one pass.
+- **The terminal.** Every console is a `SafeConsole`. It shows C0 and C1
+  control characters, DEL and the bidi controls as escapes (`\x1b`, `\u202e`)
+  instead of sending them to the terminal. Rich's own colours are unaffected.
 - **Paging.** A `nextLink` is checked by the gate like any URL. If it is denied,
   the collector fails and discards the earlier pages.
 - **The model as a reader only.** No language model reads tenant data in
@@ -181,13 +184,13 @@ edit an object in the tenant.*
   verifier.
 
 Tests: `tests/test_report_html.py`, `tests/test_report_strikes.py`,
-`tests/test_action.py`, `tests/scope/test_gate_fuzz.py`.
+`tests/test_action.py`, `tests/scope/test_gate_fuzz.py`,
+`tests/test_console_controls.py`.
 
 **What does not:**
-- **Terminal output is not cleaned of control characters.** Rich drops some
-  (BEL) but passes ESC through. A display name with escape sequences in it could
-  recolour, hide or overwrite lines that `fns contain` prints in a terminal. The
-  HTML report, the JSON files and the PR comment are not affected (Open gaps).
+- **Showing an escape is not hiding it.** A name full of `\x1b[...` is now
+  visible as text, which is the point, but it can still make a line long and
+  noisy.
 - **Escaping is not judgement.** A hostile name that reads as a real one ("Owner
   approval required") is shown faithfully, as data.
 
@@ -245,7 +248,6 @@ it is.
 
 | Gap | Effect | Possible fix |
 | --- | --- | --- |
-| Terminal output keeps ESC and other control characters from tenant strings | A crafted display name can hide or rewrite lines in a terminal | Strip C0 and C1 control characters from tenant strings before printing (planned: queue item 10) |
 | JSON inputs (fixtures, run directories, reports) have no size limit | A huge file can exhaust memory on the machine reading it | A size cap like the YAML loader's 1 MiB, sized per file type |
 | Release files are not attested | `SHA256SUMS` shows integrity, not who built them | A Sigstore build attestation in `release.yml`, which needs `id-token: write` |
 | No required status checks on `main` | A PR can merge with CI red | The one command in `docs/PUBLIC-READINESS.md`, "Require CI to pass" |

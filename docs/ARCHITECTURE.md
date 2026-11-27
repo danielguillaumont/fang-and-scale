@@ -196,10 +196,12 @@ anyone who can edit an object in it can choose them. So:
   JSON shown with `textContent`, under a Content-Security-Policy that allows
   only the vendored, hash-pinned Cytoscape;
 - the pull-request comment escapes Markdown, mentions and HTML in one pass;
+- the terminal gets control characters as visible escapes, never raw
+  (`fns.console.SafeConsole`);
 - workflow scripts never expand `${{ }}` inside `run:`.
 
 Enforced by: `tests/test_report_html.py`, `tests/test_report_strikes.py`,
-`tests/test_action.py`.
+`tests/test_action.py`, `tests/test_console_controls.py`.
 
 ## Boundary 6: the MCP server only reads
 
