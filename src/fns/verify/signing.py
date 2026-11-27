@@ -170,18 +170,28 @@ def sign_sigstore(
     instance = sigstore_instance({INSTANCE_ENV: instance} if instance else env)
     if instance == "production":
         check_production_origin(env)
-    sign, models, oidc, dsse = (
-        _sigstore(m) for m in ("sigstore.sign", "sigstore.models", "sigstore.oidc", "sigstore.dsse")
+    sign, models, oidc, dsse, errors = (
+        _sigstore(m)
+        for m in (
+            "sigstore.sign",
+            "sigstore.models",
+            "sigstore.oidc",
+            "sigstore.dsse",
+            "sigstore.errors",
+        )
     )
-    trust = (
-        models.ClientTrustConfig.staging()
-        if instance == "staging"
-        else models.ClientTrustConfig.production()
-    )
-    token = oidc.IdentityToken(oidc.detect_credential())
-    ctx = sign.SigningContext.from_trust_config(trust)
-    with ctx.signer(token) as signer:
-        bundle = signer.sign_dsse(dsse.Statement(payload))
+    try:
+        trust = (
+            models.ClientTrustConfig.staging()
+            if instance == "staging"
+            else models.ClientTrustConfig.production()
+        )
+        token = oidc.IdentityToken(oidc.detect_credential())
+        ctx = sign.SigningContext.from_trust_config(trust)
+        with ctx.signer(token) as signer:
+            bundle = signer.sign_dsse(dsse.Statement(payload))
+    except errors.Error as exc:  # no OIDC token, Fulcio or Rekor refused: exit 5
+        raise SignatureError(f"Sigstore signing failed: {exc}") from exc
     sigstore_bundle = json.loads(bundle.to_json())
     envelope = sigstore_bundle.get("dsseEnvelope", {})
     signing: dict[str, Any] = {
@@ -243,16 +253,25 @@ def verify_envelope(
                 f"the bundle says it was signed on Sigstore {recorded or 'unknown'}; "
                 f"this verifier is set to {instance}"
             )
-        verify, models, policy = (
-            _sigstore(m) for m in ("sigstore.verify", "sigstore.models", "sigstore.verify.policy")
+        verify, models, policy, errors = (
+            _sigstore(m)
+            for m in (
+                "sigstore.verify",
+                "sigstore.models",
+                "sigstore.verify.policy",
+                "sigstore.errors",
+            )
         )
-        verifier = (
-            verify.Verifier.staging() if instance == "staging" else verify.Verifier.production()
-        )
-        bundle = models.Bundle.from_json(json.dumps(signing.get("sigstore_bundle")))
-        _, verified = verifier.verify_dsse(
-            bundle, policy.Identity(identity=sigstore_identity, issuer=sigstore_issuer)
-        )
+        try:
+            verifier = (
+                verify.Verifier.staging() if instance == "staging" else verify.Verifier.production()
+            )
+            bundle = models.Bundle.from_json(json.dumps(signing.get("sigstore_bundle")))
+            _, verified = verifier.verify_dsse(
+                bundle, policy.Identity(identity=sigstore_identity, issuer=sigstore_issuer)
+            )
+        except errors.Error as exc:  # wrong identity, bad bundle, failed proof: exit 5
+            raise SignatureError(f"Sigstore verification failed: {exc}") from exc
         if verified != payload:
             raise SignatureError("Sigstore-verified payload differs from the envelope")
         return payload

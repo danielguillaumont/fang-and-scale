@@ -98,6 +98,10 @@ def test_the_origin_variables_reach_the_verifier_process() -> None:
 # --- fake sigstore --------------------------------------------------------------
 
 
+class FakeSigstoreError(Exception):
+    """Stands in for ``sigstore.errors.Error``, the base of every sigstore failure."""
+
+
 class FakeSigstore:
     """Stands in for the sigstore modules and records every instance asked for."""
 
@@ -105,6 +109,8 @@ class FakeSigstore:
         self.calls: list[str] = []
         self.verified = verified
         self.policy: tuple[str, str] | None = None
+        self.sign_error: Exception | None = None
+        self.verify_error: Exception | None = None
         fake = self
 
         class Trust:
@@ -139,6 +145,8 @@ class FakeSigstore:
                 return None
 
             def sign_dsse(self, statement: bytes) -> Bundle:
+                if fake.sign_error is not None:
+                    raise fake.sign_error
                 return Bundle(statement)
 
         class Context:
@@ -163,6 +171,8 @@ class FakeSigstore:
 
             def verify_dsse(self, bundle: str, policy: tuple[str, str]) -> tuple[str, bytes]:
                 fake.policy = policy
+                if fake.verify_error is not None:
+                    raise fake.verify_error
                 if fake.verified is not None:
                     return DSSE_PAYLOAD_TYPE, fake.verified
                 signed = json.loads(bundle)["dsseEnvelope"]["payload"]
@@ -179,6 +189,7 @@ class FakeSigstore:
             "sigstore.verify.policy": types.SimpleNamespace(
                 Identity=lambda identity, issuer: (identity, issuer)
             ),
+            "sigstore.errors": types.SimpleNamespace(Error=FakeSigstoreError),
         }
 
     def load(self, module: str) -> Any:
@@ -330,6 +341,27 @@ def test_verification_needs_identity_and_issuer(fake: FakeSigstore) -> None:
     assert fake.calls == []
 
 
+def test_a_sigstore_verification_failure_is_a_signature_error(fake: FakeSigstore) -> None:
+    """Regression: a wrong identity raised sigstore's own error, a traceback, not exit 5."""
+    envelope, sig = _signed(fake)
+    fake.verify_error = FakeSigstoreError("Certificate's SANs do not match")
+    with pytest.raises(SignatureError, match="Sigstore verification failed: Certificate's SANs"):
+        verify_envelope(envelope, sig, sigstore_identity=IDENTITY, sigstore_issuer=ISSUER)
+
+
+def test_a_sigstore_signing_failure_is_a_signature_error(fake: FakeSigstore) -> None:
+    fake.sign_error = FakeSigstoreError("no ambient OIDC credential")
+    with pytest.raises(SignatureError, match="Sigstore signing failed: no ambient OIDC"):
+        sign(PAYLOAD, "sigstore")
+
+
+def test_other_errors_are_not_swallowed(fake: FakeSigstore) -> None:
+    envelope, sig = _signed(fake)
+    fake.verify_error = RuntimeError("a bug, not a verdict")
+    with pytest.raises(RuntimeError):
+        verify_envelope(envelope, sig, sigstore_identity=IDENTITY, sigstore_issuer=ISSUER)
+
+
 def test_a_payload_sigstore_did_not_sign_is_refused(fake: FakeSigstore) -> None:
     envelope, sig = _signed(fake)
     fake.verified = b"something else"
@@ -408,6 +440,29 @@ def test_the_sigstore_bundle_is_written_on_its_own_for_other_clients(sigstore_ru
         sigstore_run, echo=lines.append, sigstore_identity=IDENTITY, sigstore_issuer=ISSUER
     )
     assert ok == 0, lines
+
+
+def test_check_exits_5_when_sigstore_rejects_the_identity(
+    sigstore_run: Path, fake: FakeSigstore
+) -> None:
+    fake.verify_error = FakeSigstoreError("Certificate's SANs do not match")
+    lines: list[str] = []
+    wrong = IDENTITY.replace("refs/heads/main", "refs/heads/dev")
+    bad = verifier.check(
+        sigstore_run, echo=lines.append, sigstore_identity=wrong, sigstore_issuer=ISSUER
+    )
+    assert bad == 5
+    assert lines == [
+        "EVIDENCE INVALID: Sigstore verification failed: Certificate's SANs do not match"
+    ]
+
+
+def test_run_exits_5_when_sigstore_cannot_sign(sigstore_run: Path, fake: FakeSigstore) -> None:
+    fake.sign_error = FakeSigstoreError("no ambient OIDC credential")
+    lines: list[str] = []
+    code = verifier.run(sigstore_run, signer="sigstore", identity="test", echo=lines.append)
+    assert code == 5
+    assert lines[-1].endswith("signing failed: Sigstore signing failed: no ambient OIDC credential")
 
 
 def test_check_refuses_a_standalone_bundle_that_differs(sigstore_run: Path) -> None:
