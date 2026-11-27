@@ -4,7 +4,8 @@
 changed: step 1 is now a log path check. Step 1 PASSED on 2026-11-27: both log
 categories reach Log Analytics on Entra ID Free, so D1 stands and no trial is
 needed. The strike plan is `docs/milestones/M4-strikes-plan.md` (approved; the
-write gate is built). Sessions A to D have not run.** Written 2026-11-26, after the repository went public and the lab was torn
+write gate is built). Sessions A to D have not run; their runbook is
+`docs/runbooks/m4-live-run.md`.** Written 2026-11-26, after the repository went public and the lab was torn
 down. The spec is `docs/milestones/M4.md` (K1 to K5). This file is
 the live half: what runs in the tenant, in what order, who does each step, what
 it costs, and what has to be built first.

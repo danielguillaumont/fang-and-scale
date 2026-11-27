@@ -44,6 +44,23 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
   asks for an approved plan before a scope change, so S4 is not built. Everything else in
   item 4 goes ahead without it.
 
+- **D6 and the M4 exit gate.** With the guardrail as approved ("no finding moves
+  toward pass because of strike evidence"), D-1 to D-5 denials are context only
+  (#67). After harden, the four application items and `directory:tenant
+  applications/credentials/update` therefore stay `inconclusive`, plus
+  `roleAssignments/write` (SD3). That is six over a `max_inconclusive` of 2, so the
+  live prove in session D is expected to exit **3**, and the runbook says so.
+  Options:
+  - **a.** Keep it: raise `max_inconclusive` in the lab contract, with a reason
+    per item.
+  - **b.** Allow an observed strike denial to count like an observed probe
+    denial, so `pass` needs both the denial and every path refuted with no open
+    surface. This moves those items toward pass, so it would need your explicit
+    change to the guardrail and its own plan.
+  - **c.** Something else.
+
+  Nothing is built for b.
+
 ### Pending review
 
 Approved on 2026-11-27 (marked in `docs/DECISIONS.md`): the KQL evaluator, the
@@ -63,6 +80,8 @@ Still pending (strike engine, #64; not in the approved list):
 - the `strike:` block is rendered only with `enable_strikes`, and lists only the built strikes' forms (#66);
 - what a strike observation does to a finding: a denial is context, a success fails a
   `must_not_reach` item, and non-counting outcomes are dropped (#67).
+- the M4 live runbook's identity and cleanup choices (two profiles, a certificate per
+  step, logs kept in `.fns`, the narrow S2 and owner undos) (#68).
 
 # Status after the M3 live run (2026-11-26)
 
