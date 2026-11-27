@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ACTION = ROOT / "action.yml"
 WORKFLOWS = ROOT / ".github" / "workflows"
 LAB_RUN = ROOT / "fixtures" / "lab-run-1"
-PINNED = re.compile(r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
+PINNED = re.compile(r"^[\w.-]+/[\w.-]+(/[\w.-]+)*@[0-9a-f]{40}$")  # owner/repo[/path]@sha
 runner = CliRunner()
 
 
@@ -163,3 +163,22 @@ def test_action_script_on_the_lab_fixture(tmp_path: Path) -> None:
     body = Path(lines["comment-file"]).read_text(encoding="utf-8")
     assert "mutation 6/8" in body and "TEST signature" in body
     assert summary.read_text(encoding="utf-8") == body
+
+
+def test_codeql_is_read_only_apart_from_its_results() -> None:
+    doc = _load(WORKFLOWS / "codeql.yml")
+    assert doc["permissions"] == {}
+    (job,) = doc["jobs"].values()
+    assert job["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "security-events": "write",
+    }
+    assert set(job["strategy"]["matrix"]["language"]) == {"python", "actions"}
+    assert job["if"] == "${{ !github.event.repository.private }}"
+
+
+def test_dependabot_watches_every_ecosystem_we_pin() -> None:
+    doc = _load(ROOT / ".github" / "dependabot.yml")
+    got = {(u["package-ecosystem"], u["directory"]) for u in doc["updates"]}
+    assert got == {("uv", "/"), ("github-actions", "/"), ("terraform", "/lab")}
