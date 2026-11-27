@@ -1,5 +1,78 @@
 # Status
 
+## Summary: the queue is done (2026-11-27)
+
+All ten queue items are merged, except S4, which waits for your decision. No
+Azure, Graph or Log Analytics call was made, no `az` command ran, and Terraform
+ran only as `poe lab-check` (fmt and validate). Every PR passed CI before it
+merged. Nothing was tagged or published.
+
+**Tests:** 1402 passed at the start of the overnight session, 1701 after the
+night's last PR (#69), and **1876** now. Each count is on Windows, with 1 more
+test skipped (the Action's bash script, which runs only on Linux).
+
+### What changed, by PR
+
+| Item | PRs | In short |
+| --- | --- | --- |
+| 1. M4 log path check | #60 | Step 1 passed; D1 stands |
+| 2. Detection rules | #61, #62 | Sample rows run by a KQL subset evaluator; `lab/monitoring.tf`, off by default |
+| 3. Lab group (D3) | #63 | `grp-fns-billing`, the agent its only member, no roles |
+| 4. Strike engine | #64 to #67 | Plans with hash approval and 1-hour expiry, journaled writes and undos, read-back by a second identity, journal-driven cleanup; `fns strike`; the lab's `strike:` block; D-1 to D-5 as verdict evidence under the "never looser" guardrail. **S4 is not built** (Needs Daniel) |
+| 5. M4 live runbook | #68 | Sessions A to D, step by step |
+| 6. Report and UX | #69 | Strike runs, detection results and the evidence ladder on the report page |
+| 7. v0.1 release prep | #70 | Version 0.1.0, CHANGELOG, a draft-only release workflow on `v*` tags with SBOM and checksums, QUICKSTART, `fns demo --bundled`. **Not tagged** |
+| 8. Architecture and threat model | #71 | Six trust boundaries with diagrams; seven hostile inputs, each with what does **not** hold; open gaps |
+| 9. M6 groundwork | #72, #73 | `fns mcp serve`, a read-only MCP server (standard library only); design notes for Agent ID and the LLM bake-off |
+| 10. Hardening and quality | #74, #75 | The terminal shows control characters from tenant strings as escapes; the coverage gaps in the write gate, the strike engine and the verifier are closed with tests; property tests; test journals skip fsync (the top-level tests ran about 21% faster, back to back) |
+
+Findings along the way, each with a test or a DECISIONS row:
+- **Terminal escape injection.** Rich passed ESC from display names through to
+  the terminal. This is fixed in #74.
+- **Agent ID inheritance.** Today's collector would type an agent identity as a
+  plain service principal, so the permissions it inherits from its blueprint
+  would be invisible to the model. #73 proposes how to handle it; nothing is
+  built.
+- **Microsoft's Agent ID docs disagree with themselves** on how a blueprint
+  principal is created. This is V-A1 in `docs/milestones/M6-agent-id.md`.
+- **Encoding depth.** The write gate's denylist decodes at most 16 rounds of
+  percent-encoding. From 17 rounds, the strict URL rule refuses the request
+  instead. That defence in depth is now pinned by a test.
+
+### Decisions pending review
+
+All are in `docs/DECISIONS.md`, marked "Pending review". The ones from this
+session:
+
+- **Strike engine** (#64 to #69): transport errors count as sent, so the undo
+  runs; a lost `addPassword` answer is undone by name; after-harden successes
+  are undone at once; the `fns strike` exit codes; two CLI config dirs; ARM
+  targets need the lab tags; the `strike:` block is rendered only when enabled;
+  how a strike observation affects a finding; the runbook's identity and cleanup
+  choices; detection results are display-only.
+- **Release** (#70): a draft from a `v*` tag, never PyPI; install from a Git tag
+  with `--python 3.12`; `fns demo --bundled`.
+- **Threat model** (#71): the "Open gaps" table, where each fix waits for a
+  decision.
+- **MCP server** (#72): the standard library instead of the `mcp` SDK, and what
+  the server will open.
+- **M6** (#73): Agent ID findings stay `not-assessed` until inheritance is
+  modeled, and the bake-off's output is limited to the lever set.
+- **Tests** (#75): test journals skip fsync; the product keeps FULL.
+
+### Needs Daniel
+
+Each item is described in full below, under "Needs Daniel":
+1. **S4 gate rules:** S4 needs a token form and a write as a non-test identity.
+2. **D6 and the M4 exit gate:** after harden, session D's prove is expected to
+   exit 3. Choose option a, b or c.
+3. **Releasing v0.1.0:** four steps, when you want it.
+4. **M6 inputs:** Agent ID licensing and cost, and the models for the bake-off
+   and who pays for it.
+5. **Repository settings I may not change:** require CI to pass on `main` (one
+   command in `docs/PUBLIC-READINESS.md`), and require reviews once there is a
+   second maintainer. Both are THREAT-MODEL open gaps.
+
 ## Build session of 2026-11-27
 
 A long offline session working through the owner's queue, one focused PR per
@@ -26,6 +99,7 @@ Terraform run. To resume, read this section first.
 | #72 | 9 | **`fns mcp serve`: a read-only MCP server on stdio.**<br>It is standard-library JSON-RPC 2.0, with no new dependency. Five tools, each annotated read-only and closed-world:<br>- `list_fixtures` and `read_fixture_file`: from a fixed file list that never includes `_idmap.json` or `exchanges.json`;<br>- `contain_fixture`: a FIXTURE replay in a temporary directory;<br>- `list_reports` and `read_report`: from `--reports` only, FIXTURE unless `--include-live`, and refused if the content does not hash to the file name.<br>Names are pattern-checked and must resolve inside their root (no `..`, no symlink out). Files over 8 MiB and lines over 1 MiB are refused.<br>A new import contract keeps it away from the live transport, credentials, scout, the executor, the prover, the verifier and the proposer.<br>Tests: a canary ID map, a socket that raises if opened, and a real stdio subprocess.<br>The README has a client config example; ARCHITECTURE gains boundary 6 | 1791 |
 | #73 | 9 | **M6 design notes (nothing built):**<br>- `docs/milestones/M6-agent-id.md` uses Microsoft Learn, read 2026-11-27, and lists six lab checks (V-A1 to V-A6) before code depends on it. It found a gap: today an agent identity is collected as a plain service principal, so the permissions it inherits from its blueprint are invisible to the model. It proposes `not-assessed` until inheritance is modeled.<br>- `docs/milestones/M6-bakeoff.md`: the LLM is a proposer only, its output is limited to the `fns.harden.tfmap` levers, and both contestants are scored by the existing evaluator and `fns mutate`. It includes hostile-string cases, runs locally only, and picks no models yet.<br>`tests/test_m6_notes.py` keeps both marked as design only and true about the code | 1798 |
 | #74 | 10 | **Control characters from tenant strings are shown as escapes in the terminal.** Every console is now a `SafeConsole`. It makes C0 and C1 controls, DEL and the bidi controls visible (`\x1b[2J`, `\u202e`) before layout, so tables size for the escaped text. A segment-level pass after layout backstops `Text` objects. Rich's own colours are unaffected.<br>Tests: each kind of character, markup on and off, tables, `Text`, the FIXTURE console, no terminal, a Hypothesis property over any string, and a fixture whose display name holds `ESC[2J`, through `fns demo contain`.<br>This closes the THREAT-MODEL "Open gaps" row found in #71 | 1806 |
+| #75 | 10 | **Coverage gaps closed, property tests, faster test journals.** I measured branch coverage with `uv run --with coverage`, with no new dependency. Before the new tests:<br>- the write gate was at 96%;<br>- the strike engine was at 96%;<br>- the verifier's `inputs.py` was at 74% in-process, and the D6 guardrail was reached only through subprocesses.<br>New tests pin every uncovered refusal with its exact reason:<br>- deep or non-string bodies, over-long tags, non-canonical ARM paths, a child resource of a target, an app that has not passed the live check;<br>- percent-encoding: up to 16 rounds is hard-denied, and from 17 the strict URL rule refuses it;<br>- untagged ARM targets get no plan; a lab that cannot be re-read is never written; cleanup as another identity is refused;<br>- an unresolvable undo is recorded, exits 5, and a later cleanup finishes it; a failed or nonsensical read-back is never "restored";<br>- unfinished probes; forged artifacts (another probe, rung or mode); strike artifacts in-process.<br>Property tests:<br>- the guardrail over real findings and any strike observations: rank never rises, evidence only grows, denials change nothing;<br>- any MCP fixture name is refused or is a listed set.<br>Test journals skip fsync; the product keeps FULL, and a test pins that. Back to back, the top-level tests ran about 21% faster.<br>No refusal branch needed a code change | 1876 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -40,7 +114,9 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 7. ~~v0.1 release prep~~ (#70; tagging is yours, see Needs Daniel)
 8. ~~ARCHITECTURE and THREAT-MODEL~~ (#71)
 9. ~~M6 groundwork~~: read-only MCP server (#72), Agent ID and bake-off notes (#73)
-10. **Hardening and quality:** ~~terminal control characters~~ (#74); **next:** coverage gaps, property tests and faster tests
+10. ~~Hardening and quality~~: terminal control characters (#74), coverage gaps, property tests and faster test journals (#75)
+
+The queue is done. See the summary at the top.
 
 ### Needs Daniel
 
@@ -112,6 +188,7 @@ Still pending (strike engine, #64; not in the approved list):
   (fixed fixture files, FIXTURE reports unless `--include-live`) (#72).
 - Agent ID findings `not-assessed` until inheritance is modeled, and the bake-off's
   levers-only output (#73).
+- test journals skip fsync; the product keeps FULL (#75).
 - the threat model's "Open gaps" table: each fix waits for a decision (#71). The
   terminal control-character gap is fixed (#74).
 
