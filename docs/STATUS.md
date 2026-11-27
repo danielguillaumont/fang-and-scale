@@ -16,6 +16,7 @@ Terraform run. To resume, read this section first.
 | #62 | 2 (part 2) | **`lab/monitoring.tf` (D2)**, off by default (`enable_monitoring`). Workspace with Sentinel, Activity Log, Key Vault, blob and Entra diagnostic settings, and one scheduled rule per `detections/` file from the generated `lab/detections.json` (`fns detections export --terraform`, with `--check`). 18 more resources when on. `lab-check` passes; tests check every rule's table is fed, the rules are exactly `detections/`, and nothing deploys by default | 1482 |
 | #63 | 3 | **Lab group (D3):** `lab/groups.tf`, `grp-fns-billing`, a security group with `sp-billing-agent` as its only member, no roles, not role-assignable. The scout already reads `memberOf`, and the model already has groups; new tests check the lab-shaped response becomes one edge and that a group with no roles changes no verdict. The default lab plan is now **37 to add** (39 with the budget) | 1487 |
 | #64 | 4 (part 1) | **Strike engine core (`fns.strike`), no command yet.** Plans and their sha256, approval that admits one armed request at a time, journaled intent and result for every write (new append-only `strike_events` table, no bodies or secrets), every undo in a `finally` in reverse order, verification by the scout, journal-driven cleanup after a crash. S1 to S3, and D-1 to D-5 expecting denials. Secrets stripped inside the transport. Tested against a fake tenant only: faults at every step, a crash at every send, tampered hashes, a dropped undo caught by verification, and a fuzz test over fault schedules | 1591 |
+| #65 | 4 (part 2) | **`fns strike plan | run | cleanup`.** Live mode signs in two identities from two Azure CLI config dirs (agent writes, scout reads), checked before any call. `--fixture fixtures/strike-demo` replays a strict recording, generated from the fake tenant and labelled FIXTURE. ARM targets must carry the lab tags. Proposal for S4's gate rules recorded (pending review) | 1621 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -24,7 +25,7 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 1. ~~Log path check results~~ (#60)
 2. ~~Detection rules~~: sample-row tests (#61), `lab/monitoring.tf` (#62)
 3. ~~Lab group (D3)~~ (#63)
-4. Strike engine: ~~core~~ (#64). **Next:** S4 (escalated sign-in, gate rule), then `fns strike plan/run/cleanup` with recorded-fixture replay, then D-1 to D-5 as verdict evidence (approved with the guardrail)
+4. Strike engine: ~~core~~ (#64), ~~command and replay~~ (#65). **Next:** `lab/scope.tf` renders the `strike:` block (off by default), then D-1 to D-5 as verdict evidence (approved, with the guardrail). S4 waits for a decision (Needs Daniel)
 5. M4 live runbook
 6. Report and UX
 7. v0.1 release prep (no tag, no publish)
@@ -34,7 +35,12 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 
 ### Needs Daniel
 
-Nothing yet.
+- **S4 gate rules** (`docs/DECISIONS.md`, "Proposal, pending review: S4"). S4 signs in as
+  `app-escalation-target` with S3's password and assigns the marker role. That needs a
+  `token:` form for `login.microsoftonline.com` and a gate rule allowing writes as a
+  non-test identity. The strike plan leaves both to "its own decision", and CLAUDE.md
+  asks for an approved plan before a scope change, so S4 is not built. Everything else in
+  item 4 goes ahead without it.
 
 ### Pending review
 
@@ -48,7 +54,10 @@ Still pending (strike engine, #64; not in the approved list):
 - a transport error counts as "sent", so the undo runs (S1 regenerates both keys);
 - a lost `addPassword` answer is undone by the run's credential name;
 - an after-harden attempt that succeeds is undone at once;
-- `fns strike` exit codes 0 / 1 / 4 / 5, with 5 (verification failed) first.
+- `fns strike` exit codes 0 / 1 / 4 / 5, with 5 (verification failed) first; refusals
+  before any write (hash, identity, scope, changed lab) are 4 (#65);
+- two Azure CLI config dirs for the agent and the scout (#65);
+- ARM strike targets must carry the lab tags (#65).
 
 # Status after the M3 live run (2026-11-26)
 

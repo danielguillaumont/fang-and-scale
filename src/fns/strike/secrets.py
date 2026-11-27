@@ -36,7 +36,8 @@ SECRET_FIELDS: Final[frozenset[str]] = frozenset(
 )
 """Field names removed wherever they appear in a response body, at any depth."""
 
-REMOVED: Final = "[removed by fns strike]"
+REMOVED: Final = "REDACTED"
+"""The same marker as recorded fixtures (``fns.fixtures.sanitize.REDACTED``)."""
 
 
 def strip_secrets(body: object, path: str = "") -> tuple[Any, dict[str, Any]]:

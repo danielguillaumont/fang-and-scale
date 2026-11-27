@@ -1,0 +1,560 @@
+{
+  "agent_object_id": "00000000-0000-4000-8000-000000000100",
+  "description": "Session D, D-1 to D-5 against the fake lab tenant after harden: every attempt is denied (403). Made by tests/strike/make_fixture.py, not recorded live.",
+  "mode": "FIXTURE",
+  "now": "2026-11-25T12:00:00Z",
+  "plan_reads": [
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000301",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "id-verifier",
+            "id": "00000000-0000-4000-8000-000000000202",
+            "passwordCredentials": [],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000202%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000302",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "sp-fns-scout",
+            "id": "00000000-0000-4000-8000-000000000203",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000601"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000203%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "id": "00000000-0000-4000-8000-000000000160"
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000202/owners?$select=id"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "id": "00000000-0000-4000-8000-000000000160"
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000203/owners?$select=id"
+    }
+  ],
+  "reads": [
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000301",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "id-verifier",
+            "id": "00000000-0000-4000-8000-000000000202",
+            "passwordCredentials": [],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000202%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000302",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "sp-fns-scout",
+            "id": "00000000-0000-4000-8000-000000000203",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000601"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000203%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "id": "00000000-0000-4000-8000-000000000160"
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000202/owners?$select=id"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "id": "00000000-0000-4000-8000-000000000160"
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000203/owners?$select=id"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000301",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "id-verifier",
+            "id": "00000000-0000-4000-8000-000000000202",
+            "passwordCredentials": [],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000202%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000302",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "sp-fns-scout",
+            "id": "00000000-0000-4000-8000-000000000203",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000601"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000203%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000301",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "id-verifier",
+            "id": "00000000-0000-4000-8000-000000000202",
+            "passwordCredentials": [],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000202%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000302",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "sp-fns-scout",
+            "id": "00000000-0000-4000-8000-000000000203",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000601"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000203%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "id": "00000000-0000-4000-8000-000000000160"
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000202/owners?$select=id"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "id": "00000000-0000-4000-8000-000000000160"
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000203/owners?$select=id"
+    }
+  ],
+  "run_id": "202611251200-demo02",
+  "scout_object_id": "00000000-0000-4000-8000-000000000150",
+  "strikes": [
+    "D-1",
+    "D-2",
+    "D-3",
+    "D-4",
+    "D-5"
+  ],
+  "version": 1,
+  "writes": [
+    {
+      "body": {
+        "error": {
+          "code": "Authorization_RequestDenied"
+        }
+      },
+      "body_sha256": "c2520abc8e854c1fa1688b4a7a05bdf622a22fff97a27d2612386d30ae2771d5",
+      "method": "POST",
+      "request_id": "req-1",
+      "status": 403,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000200/addPassword"
+    },
+    {
+      "body": {
+        "error": {
+          "code": "Authorization_RequestDenied"
+        }
+      },
+      "body_sha256": "c2520abc8e854c1fa1688b4a7a05bdf622a22fff97a27d2612386d30ae2771d5",
+      "method": "POST",
+      "request_id": "req-2",
+      "status": 403,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000202/addPassword"
+    },
+    {
+      "body": {
+        "error": {
+          "code": "Authorization_RequestDenied"
+        }
+      },
+      "body_sha256": "c2520abc8e854c1fa1688b4a7a05bdf622a22fff97a27d2612386d30ae2771d5",
+      "method": "POST",
+      "request_id": "req-3",
+      "status": 403,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000203/addPassword"
+    },
+    {
+      "body": {
+        "error": {
+          "code": "Authorization_RequestDenied"
+        }
+      },
+      "body_sha256": "f65c8841481b7ad0712d61dd2b49bd9a910e1fc9d501e7e28a4c7559e17c04f3",
+      "method": "POST",
+      "request_id": "req-4",
+      "status": 403,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000202/owners/$ref"
+    },
+    {
+      "body": {
+        "error": {
+          "code": "Authorization_RequestDenied"
+        }
+      },
+      "body_sha256": "f65c8841481b7ad0712d61dd2b49bd9a910e1fc9d501e7e28a4c7559e17c04f3",
+      "method": "POST",
+      "request_id": "req-5",
+      "status": 403,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000203/owners/$ref"
+    }
+  ]
+}

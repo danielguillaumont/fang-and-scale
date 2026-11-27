@@ -50,6 +50,17 @@ from fns.strike.reader import LabReader
 ) = WRITE_FORM_OPERATIONS
 
 STRIKE_TAG: Final = "fns-strike"
+USED_FORMS: Final[tuple[str, ...]] = (
+    LIST_KEYS,
+    REGEN_KEY,
+    VAULT_WRITE,
+    ADD_PASSWORD,
+    REMOVE_PASSWORD,
+    ADD_OWNER,
+    REMOVE_OWNER,
+)
+"""The write forms S1 to S3 and D-1 to D-5 use. S4's three (``PATCH`` app roles,
+assign, unassign) are left out until S4 is built."""
 SUPPORTED: Final[frozenset[str]] = frozenset((*BEFORE_HARDEN, *AFTER_HARDEN))
 
 
@@ -182,13 +193,29 @@ def _app_state(reader: LabReader, app: str) -> dict[str, Any]:
     }
 
 
+ARM_LAB_TAGS: Final[dict[str, str]] = {"project": "fang-and-scale", "purpose": "lab"}
+"""``local.tags`` in ``lab/main.tf``: every lab Azure resource carries both."""
+
+
+def _lab_tagged(body: dict[str, Any], what: str) -> dict[str, str]:
+    tags = body.get("tags") or {}
+    if not isinstance(tags, dict):
+        raise PlanError(f"the {what}'s tags are not a map")
+    clean = {str(k): str(v) for k, v in tags.items()}
+    if any(clean.get(k) != v for k, v in ARM_LAB_TAGS.items()):
+        raise PlanError(f"the {what} lacks the lab tags {ARM_LAB_TAGS}: not a lab resource")
+    return clean
+
+
 def read_pre_state(strikes: Sequence[StrikeId], t: LabTargets, reader: LabReader) -> dict[str, Any]:
     """What the verification compares against, read as the scout."""
     state: dict[str, Any] = {}
     for s in strikes:
         if s == "S1":
             p = _need(t.payroll, "payroll storage account")
-            props = reader.storage_account(p).get("properties", {})
+            body = reader.storage_account(p)
+            _lab_tagged(body, "payroll storage account")
+            props = body.get("properties", {})
             times = props.get("keyCreationTime") if isinstance(props, dict) else None
             if not isinstance(times, dict) or not {"key1", "key2"} <= set(times):
                 raise PlanError("the payroll account read has no keyCreationTime")
@@ -197,10 +224,7 @@ def read_pre_state(strikes: Sequence[StrikeId], t: LabTargets, reader: LabReader
             }
         elif s == "S2":
             v = _need(t.vault, "Key Vault")
-            tags = reader.vault(v).get("tags") or {}
-            if not isinstance(tags, dict):
-                raise PlanError("the vault's tags are not a map")
-            state[f"arm:{v}"] = {"tags": {str(k): str(x) for k, x in tags.items()}}
+            state[f"arm:{v}"] = {"tags": _lab_tagged(reader.vault(v), "Key Vault")}
     for app in sorted(set(_apps(strikes, t))):
         state[f"app:{app}"] = _app_state(reader, app)
     for app in sorted(set(_owner_apps(strikes, t))):

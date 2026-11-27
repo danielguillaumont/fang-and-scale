@@ -29,3 +29,13 @@ and the mode is `FIXTURE`. The replay digests are pinned in `tests/golden/`. For
 Every `fns demo` command replays `lab-run-3` by default (run from a checkout).
 The hand-written `demo-scout` set, used by the tests, ships inside the package at
 `src/fns/fixtures/data/`.
+
+`strike-demo` is **not recorded live**. `tests/strike/make_fixture.py` generates it
+from the fake lab tenant in `tests/strike/faketenant.py`, and a test fails if the
+committed files drift from that generator. It holds a placeholder `scope.yaml` and
+two runs: `before-harden.json` (S1 to S3, each write succeeds and is undone) and
+`after-harden.json` (D-1 to D-5, each one denied). Every response body was
+stripped of secrets (`REDACTED`) before it was written. Replay it with
+`fns strike plan --strikes S1,S2,S3 --fixture fixtures/strike-demo`, then the
+`fns strike run` command that prints. The first live strike recording will come
+from the M4 live run.

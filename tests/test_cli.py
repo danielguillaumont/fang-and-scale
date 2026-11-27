@@ -11,7 +11,7 @@ from fns.console import BANNER
 
 runner = CliRunner()
 
-UNBUILT = ["strike", "molt"]
+UNBUILT = ["molt"]
 
 
 def test_version_prints_ascii_banner_and_version() -> None:

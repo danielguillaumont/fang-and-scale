@@ -1,0 +1,335 @@
+{
+  "agent_object_id": "00000000-0000-4000-8000-000000000100",
+  "description": "Session C, S1 to S3 against the fake lab tenant: every write succeeds and is undone. Made by tests/strike/make_fixture.py, not recorded live.",
+  "mode": "FIXTURE",
+  "now": "2026-11-25T12:00:00Z",
+  "plan_reads": [
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest",
+        "name": "stpayrolltest",
+        "properties": {
+          "keyCreationTime": {
+            "key1": "2026-11-01T00:00:00Z",
+            "key2": "2026-11-01T00:00:00Z"
+          }
+        },
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest?api-version=2023-05-01"
+    },
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels",
+        "name": "kv-crown-jewels",
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels?api-version=2023-07-01"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    }
+  ],
+  "reads": [
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest",
+        "name": "stpayrolltest",
+        "properties": {
+          "keyCreationTime": {
+            "key1": "2026-11-01T00:00:00Z",
+            "key2": "2026-11-01T00:00:00Z"
+          }
+        },
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest?api-version=2023-05-01"
+    },
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels",
+        "name": "kv-crown-jewels",
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels?api-version=2023-07-01"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "value": [
+          {
+            "appId": "00000000-0000-4000-8000-000000000300",
+            "appRoles": [
+              {
+                "allowedMemberTypes": [
+                  "Application"
+                ],
+                "description": "Read invoices",
+                "displayName": "Invoices.Read",
+                "id": "00000000-0000-4000-8000-000000000400",
+                "isEnabled": true,
+                "origin": "Application",
+                "value": "Invoices.Read"
+              }
+            ],
+            "displayName": "app-escalation-target",
+            "id": "00000000-0000-4000-8000-000000000200",
+            "passwordCredentials": [
+              {
+                "displayName": "terraform",
+                "keyId": "00000000-0000-4000-8000-000000000600"
+              }
+            ],
+            "tags": [
+              "project=fang-and-scale",
+              "purpose=lab"
+            ]
+          }
+        ]
+      },
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications?$filter=id%20eq%20%2700000000-0000-4000-8000-000000000200%27&$select=id,appId,displayName,tags,appRoles,passwordCredentials"
+    },
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels",
+        "name": "kv-crown-jewels",
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels?api-version=2023-07-01"
+    },
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest",
+        "name": "stpayrolltest",
+        "properties": {
+          "keyCreationTime": {
+            "key1": "2026-11-25T12:01:00Z",
+            "key2": "2026-11-25T12:02:00Z"
+          }
+        },
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest?api-version=2023-05-01"
+    }
+  ],
+  "run_id": "202611251200-demo01",
+  "scout_object_id": "00000000-0000-4000-8000-000000000150",
+  "strikes": [
+    "S1",
+    "S2",
+    "S3"
+  ],
+  "version": 1,
+  "writes": [
+    {
+      "body": {
+        "keys": "REDACTED"
+      },
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "method": "POST",
+      "request_id": "req-1",
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest/listKeys?api-version=2023-05-01"
+    },
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels",
+        "properties": {},
+        "tags": {
+          "fns-strike": "202611251200-demo01",
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "body_sha256": "34a892fdff82355f9a3445384ea6747bde65109b7bac5830d7995a16c6b29576",
+      "method": "PATCH",
+      "request_id": "req-2",
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels?api-version=2023-07-01"
+    },
+    {
+      "body": {
+        "displayName": "fns-strike-202611251200-demo01",
+        "keyId": "00000000-0000-4000-8000-000000000702",
+        "secretText": "REDACTED"
+      },
+      "body_sha256": "a76a594de054ebb591f0d575880e5d846078d9219d3d700f7cfa075b9a7f90d5",
+      "method": "POST",
+      "request_id": "req-3",
+      "status": 200,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000200/addPassword"
+    },
+    {
+      "body": {},
+      "body_sha256": "d21962355f268078e6f15468d3a4f16989131d4e7d4f9ce9e2f2c6444d2cb5b5",
+      "method": "POST",
+      "request_id": "req-4",
+      "status": 204,
+      "url": "https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000200/removePassword"
+    },
+    {
+      "body": {
+        "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels",
+        "properties": {},
+        "tags": {
+          "project": "fang-and-scale",
+          "purpose": "lab"
+        }
+      },
+      "body_sha256": "83914fa8f459639b183a45c2ec7b9ecb48ef46e62f7059911f4eca303f1eb9e6",
+      "method": "PATCH",
+      "request_id": "req-5",
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels?api-version=2023-07-01"
+    },
+    {
+      "body": {
+        "keys": "REDACTED"
+      },
+      "body_sha256": "864f589937be516129327c1c488696eea71b612b16d7754ab3efe3c44a7c69f0",
+      "method": "POST",
+      "request_id": "req-6",
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest/regenerateKey?api-version=2023-05-01"
+    },
+    {
+      "body": {
+        "keys": "REDACTED"
+      },
+      "body_sha256": "dd51dd0ea9e9aee28a3f736c7ba0be8f2c3e45016f4473297f6db6e5c263cc0d",
+      "method": "POST",
+      "request_id": "req-7",
+      "status": 200,
+      "url": "https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest/regenerateKey?api-version=2023-05-01"
+    }
+  ]
+}
