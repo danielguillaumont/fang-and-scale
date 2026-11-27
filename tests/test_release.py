@@ -143,12 +143,31 @@ def test_version_changelog_and_lock_agree() -> None:
     assert release_check.problems(None) == []
 
 
-def test_tagging_needs_the_release_date_first() -> None:
-    # The changelog says "not tagged yet"; the date goes in right before the tag.
+def test_the_release_is_dated_and_ready_to_tag() -> None:
+    # The date went in right before the tag (2026-11-27); the tag itself is Daniel's.
+    assert re.search(rf"^## \[{re.escape(VERSION)}\] - \d{{4}}-\d{{2}}-\d{{2}}$", CHANGELOG, re.M)
+    assert release_check.problems(f"v{VERSION}") == []
+    assert any("does not match" in p for p in release_check.problems("v9.9.9"))
+
+
+def test_tagging_needs_the_release_date_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("pyproject.toml", "uv.lock"):
+        (tmp_path / name).write_bytes((ROOT / name).read_bytes())
+    undated = re.sub(
+        rf"^## \[{re.escape(VERSION)}\] - .+$",
+        f"## [{VERSION}] - not tagged yet",
+        CHANGELOG,
+        count=1,
+        flags=re.M,
+    )
+    (tmp_path / "CHANGELOG.md").write_text(undated, encoding="utf-8")
+    monkeypatch.setattr(release_check, "ROOT", tmp_path)
     assert release_check.problems(f"v{VERSION}") == [
         f"CHANGELOG.md's [{VERSION}] section needs its release date, not 'not tagged yet'"
     ]
-    assert any("does not match" in p for p in release_check.problems("v9.9.9"))
+    assert release_check.problems(None) == []  # the no-tag check still passes undated
 
 
 def test_the_changelog_says_what_did_not_run_live() -> None:
