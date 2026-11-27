@@ -1,6 +1,7 @@
 # M6 design notes: Entra Agent ID
 
-**Status: design notes only.** Nothing here is built. The Microsoft behaviour
+**Status: design notes, except the first step.** Only the "not assessed until
+modeled" rule in "The gap today" is built (approved 2026-11-27). The Microsoft behaviour
 below comes from Microsoft's documentation, read on 2026-11-27, not from a lab
 run. Every "to verify" item has to be observed in the lab before code depends
 on it, and recorded in `docs/FINDINGS.md` where it differs from the docs.
@@ -57,23 +58,35 @@ verify (V-A1).
 ## The gap today
 
 `fns.adapters.azure.graph` reads `/servicePrincipals` and types each one as
-`servicePrincipal` or `managedIdentity`, from `servicePrincipalType`. **An agent
-identity would be collected as a plain service principal, and its inherited
-permissions would be invisible to the model.**
+`servicePrincipal` or `managedIdentity`, from `servicePrincipalType`. Before
+2026-11-27, **an agent identity was collected as a plain service principal, and
+its inherited permissions were invisible to the model.**
 
-This does not produce a false `pass`: a `must_not_reach` pass needs an observed
-denial (rung 3). It can, however, make a modeled reach look smaller than it is,
-and a reviewer reading a modeled-only result would be misled.
+That never produced a false `pass`, since a `must_not_reach` pass needs an
+observed denial (rung 3). It could, however, make a modeled reach look smaller
+than it is, and a reviewer reading a modeled-only result would be misled.
 
-**Proposed first step, before any other Agent ID code (pending review):**
-- the collector recognises the three `@odata.type` values;
-- until inheritance is modeled, every finding whose compromised principal is an
-  agent identity, a blueprint or a blueprint principal gets coverage
-  `not-assessed`, with the reason "Agent ID inheritance not modeled".
+**Built (approved 2026-11-27), before any other Agent ID code:**
+- the collector recognises the three `@odata.type` values above, in the service
+  principal and application listings and in owner lists. The object keeps its
+  base type (`servicePrincipal` or `application`) and gets the property
+  `agentIdType` (`agentIdentity`, `agentIdentityBlueprint` or
+  `agentIdentityBlueprintPrincipal`). Other objects are unchanged, so existing
+  snapshot digests are too;
+- when the attacker controls an Agent ID object (the compromised identity itself,
+  one it can take over, or the service principal of a blueprint), every finding
+  carries the reason "Agent ID inheritance not modeled". Findings the model
+  cannot settle are `inconclusive` with coverage `not-assessed`. That includes a
+  `must_still_do` the model sees no grant for, since an inherited grant may
+  allow it;
+- a modeled reach still **fails**: inheritance can only add reach, so the path
+  the model found stands;
+- `fns prove` freezes the open surface `agent-id-inheritance:not-modeled` into
+  every assertion, so even an observed denial with every path refuted stays
+  `inconclusive`, never `pass`.
 
-This only makes results stricter (toward `inconclusive`). Under the D6 guardrail
-("may only gain evidence or become stricter"), it still needs approval, because
-it changes coverage on findings that exist today.
+This only makes results stricter. Tests: `tests/contain/test_agent_id.py`. Whether
+`GET /servicePrincipals` actually returns these `@odata.type` values is still V-A2.
 
 ## Design, once the facts are verified
 
@@ -124,9 +137,8 @@ it changes coverage on findings that exist today.
 
 ## Decisions this needs
 
-Each is pending review. None is built.
-
-1. The "not-assessed until modeled" coverage rule above.
+1. The "not-assessed until modeled" coverage rule above: approved 2026-11-27 and
+   built.
 2. Whether Agent ID needs a P1/P2 or preview licence in the lab, and its cost
-   (Needs Daniel, with V-A6).
-3. Schema v3 for a blueprint as `compromised`.
+   (V-A6): deferred on 2026-11-27, together with the bake-off.
+3. Schema v3 for a blueprint as `compromised`: pending review, not built.

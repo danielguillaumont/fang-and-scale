@@ -12,8 +12,8 @@ is now required on `main`.
 | # | Item | State | PR |
 | --- | --- | --- | --- |
 | 1 | Mark the decisions in `docs/DECISIONS.md` | done | #76 |
-| 2 | Agent ID findings `not-assessed` | next | |
-| 3 | S4, with the runbook update | | |
+| 2 | Agent ID findings `not-assessed` | done | #77 |
+| 3 | S4, with the runbook update | next | |
 | 4 | Threat model open gaps (size caps, provenance attestation) | | |
 | 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | | |
 | 6 | M4 exit gate, option B: plan only, then stop | | |
@@ -23,7 +23,7 @@ is now required on `main`.
 - Every "Pending review" row from the build session: **approved**, including
   exit 5 for a failed post-undo verification (revisit with a dedicated exit code
   in a later release).
-- Agent ID `not-assessed`: approved, being built (item 2).
+- Agent ID `not-assessed`: approved and built (#77). Its build choices are pending review in DECISIONS (base types plus `agentIdType`, "controls" like PIM, a modeled reach still fails).
 - S4: approved with conditions (item 3).
 - M4 exit gate: option B, **plan only** (item 6).
 - **M6 Agent ID licensing and the LLM bake-off: deferred.**

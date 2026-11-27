@@ -39,6 +39,31 @@ TENANT_ROOT_SCOPE: Final = "/"
 EVERYONE_PRINCIPAL_ID: Final = "00000000-0000-0000-0000-000000000000"
 """ARM deny assignments that apply to all principals use the all-zeros principal ID."""
 
+AgentIdKind = Literal["agentIdentity", "agentIdentityBlueprint", "agentIdentityBlueprintPrincipal"]
+AGENT_ID_PROPERTY: Final = "agentIdType"
+"""Entity property set only on Entra Agent ID objects (docs/milestones/M6-agent-id.md).
+
+The entity keeps its base type (``servicePrincipal`` or ``application``), so
+nothing else in the model changes. The property marks what the model cannot
+assess yet: the permissions an agent identity inherits from its blueprint."""
+AGENT_ID_ODATA_TYPES: Final[dict[str, tuple[AgentIdKind, EntityType]]] = {
+    "#microsoft.graph.agentIdentity": ("agentIdentity", "servicePrincipal"),
+    "#microsoft.graph.agentIdentityBlueprint": ("agentIdentityBlueprint", "application"),
+    "#microsoft.graph.agentIdentityBlueprintPrincipal": (
+        "agentIdentityBlueprintPrincipal",
+        "servicePrincipal",
+    ),
+}
+"""Graph ``@odata.type`` -> (Agent ID kind, base entity type), from Microsoft Learn
+(read 2026-11-27). How they appear in ``GET /servicePrincipals`` is V-A2."""
+AGENT_ID_LABELS: Final[dict[str, str]] = {
+    "agentIdentity": "an agent identity",
+    "agentIdentityBlueprint": "an agent identity blueprint",
+    "agentIdentityBlueprintPrincipal": "a blueprint principal",
+}
+AGENT_ID_NOT_MODELED: Final = "Agent ID inheritance not modeled"
+"""The reason every finding gets when the attacker controls an Agent ID object."""
+
 PropertyValue = str | int | bool | None | tuple[str, ...]
 PropertyKey = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_.]{0,127}$")]
 SetOfStr = tuple[str, ...]

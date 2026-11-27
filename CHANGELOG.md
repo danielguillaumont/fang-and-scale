@@ -24,6 +24,15 @@ version may change file formats; each change is listed here.
   scope file, a contract, tenant data, a run directory or a pull request is
   hostile, including what does not hold.
 
+### Changed
+
+- Entra Agent ID objects are recognised by their `@odata.type` (agent identity,
+  blueprint, blueprint principal) and marked `agentIdType`. When the attacker
+  controls one, findings the model cannot settle are `not-assessed` with the
+  reason "Agent ID inheritance not modeled", and `fns prove` can't pass them,
+  because what an agent identity inherits from its blueprint is not modeled. A
+  modeled reach still fails.
+
 ### Fixed
 
 - Terminal output shows control characters from tenant strings (ESC, other C0

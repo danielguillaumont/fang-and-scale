@@ -27,6 +27,9 @@ from fns.contain import semantics as sem
 from fns.fixtures import wellknown as wk
 from fns.models.armid import ArmIdError, parse_arm_id
 from fns.models.snapshot import (
+    AGENT_ID_LABELS,
+    AGENT_ID_NOT_MODELED,
+    AGENT_ID_PROPERTY,
     TENANT_ROOT_SCOPE,
     DenyAssignment,
     Entity,
@@ -190,6 +193,32 @@ class Closure:
         """PIM eligibility of anything the attacker controls (M3 E1). Activation is
         not modeled, so each one leaves every finding open."""
         self.uncertain.update(self.eligibility)
+        self.agent_ids: tuple[str, ...] = self._agent_ids()
+        """Entra Agent ID objects the attacker controls (approved 2026-11-27). What an
+        agent identity inherits from its blueprint is not modeled, so each one leaves
+        every finding open, like PIM eligibility."""
+        self.uncertain.update(self.agent_ids)
+
+    def _agent_ids(self) -> tuple[str, ...]:
+        ix = self.index
+        app_of = {e.src: e.dst for edges in ix.sps_of_app.values() for e in edges}
+
+        def kind(oid: str | None) -> str | None:
+            e = ix.entities.get(oid) if oid is not None else None
+            k = e.properties.get(AGENT_ID_PROPERTY) if e is not None else None
+            return k if isinstance(k, str) and k in AGENT_ID_LABELS else None
+
+        out = set()
+        for c in self.controlled():
+            if (k := kind(c)) is not None:
+                out.add(f"{AGENT_ID_NOT_MODELED}: {ix.name(c)} is {AGENT_ID_LABELS[k]}")
+            app = app_of.get(c)
+            if (k := kind(app)) is not None and app is not None:
+                out.add(
+                    f"{AGENT_ID_NOT_MODELED}: {ix.name(c)} is the service principal of "
+                    f"{AGENT_ID_LABELS[k]} ({ix.name(app)})"
+                )
+        return tuple(sorted(out))
 
     def _eligibility(self) -> tuple[str, ...]:
         ix = self.index

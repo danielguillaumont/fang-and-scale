@@ -46,6 +46,10 @@ PIM_ELIGIBLE: Final = "pim-eligibility:eligible"
 """Open surface: the attacker controls a PIM-eligible principal, so an observed denial
 today does not show the operation stays denied after activation."""
 
+AGENT_ID_INHERITANCE: Final = "agent-id-inheritance:not-modeled"
+"""Open surface: the attacker controls an Entra Agent ID object, and what an agent
+identity inherits from its blueprint is not modeled (approved 2026-11-27)."""
+
 
 def run_id_for(report: ContainReport, frozen_at: datetime) -> str:
     text = f"{report.digest()}|{frozen_at.isoformat()}"
@@ -67,9 +71,9 @@ def freeze(
     by_finding: dict[str, list[ReachPath]] = {}
     for p in report.paths:
         by_finding.setdefault(p.finding_id, []).append(p)
-    eligible = _eligible(snapshot, report.compromised)
+    surfaces = _closure_surfaces(snapshot, report.compromised)
     assertions = tuple(
-        _assertion(f, by_finding.get(f.id, []), snapshot, eligible) for f in report.findings
+        _assertion(f, by_finding.get(f.id, []), snapshot, surfaces) for f in report.findings
     )
     b = contract.budget
     return AssertionSet(
@@ -137,15 +141,23 @@ def _resource(snapshot: Snapshot, finding: Finding) -> Entity | None:
     return resolve_resource(snapshot, ref).entity
 
 
-def _eligible(snapshot: Snapshot, compromised: str | None) -> bool:
-    """Whether anything the attacker controls is PIM-eligible (activation is not modeled)."""
+def _closure_surfaces(snapshot: Snapshot, compromised: str | None) -> tuple[str, ...]:
+    """Open surfaces from what the attacker controls: PIM eligibility (activation is
+    not modeled) and Agent ID objects (inheritance is not modeled)."""
     if compromised is None:
-        return False
-    return bool(Closure(SnapshotIndex(snapshot), compromised).eligibility)
+        return ()
+    c = Closure(SnapshotIndex(snapshot), compromised)
+    return (
+        *((PIM_ELIGIBLE,) if c.eligibility else ()),
+        *((AGENT_ID_INHERITANCE,) if c.agent_ids else ()),
+    )
 
 
 def _assertion(
-    finding: Finding, paths: list[ReachPath], snapshot: Snapshot, eligible: bool = False
+    finding: Finding,
+    paths: list[ReachPath],
+    snapshot: Snapshot,
+    surfaces: tuple[str, ...] = (),
 ) -> Assertion:
     probes = _Probes(finding.id)
     target = _resource(snapshot, finding)
@@ -208,7 +220,7 @@ def _assertion(
         probes=tuple(probes.specs.values()),
         open_surfaces=(
             *_open_surfaces(snapshot, semantics, target),
-            *((PIM_ELIGIBLE,) if eligible else ()),
+            *surfaces,
         ),
     )
 
