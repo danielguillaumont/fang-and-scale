@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 from typer.testing import CliRunner
 
 from fns import __version__
@@ -418,3 +420,18 @@ def test_the_cli_command_and_the_import_contract_exist() -> None:
     assert {"fns.adapters.azure.live", "fns.scope.credentials", "fns.strike", "azure"} <= set(
         mine["forbidden_modules"]
     )
+
+
+# --- properties -------------------------------------------------------------------------
+
+
+@given(name=st.text(max_size=40), file=st.text(max_size=20))
+@settings(max_examples=200, deadline=None)
+def test_any_name_is_refused_or_is_a_listed_set(name: str, file: str) -> None:
+    s = Server(fixtures=ROOT / "fixtures")
+    listed = {f["fixture"] for f in ok(s, "list_fixtures")["fixtures"]}
+    result = call(s, "read_fixture_file", fixture=name, file=file)
+    if result["isError"]:
+        return
+    assert name in listed and file in FIXTURE_FILES
+    assert "_idmap" not in result["structuredContent"]["text"]
