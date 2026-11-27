@@ -150,6 +150,15 @@ class StepRow:
     status: StepStatus
 
 
+SYNCHRONOUS: Final = "FULL"
+"""SQLite fsyncs every commit, so a crash or power loss never loses a recorded step.
+
+``tests/conftest.py`` lowers it for in-process test journals only: durability
+cannot be observed by a test, and fsync is most of the suite's time on Windows.
+``tests/journal/test_durability.py`` pins this value.
+"""
+
+
 class SqliteJournal:
     """One connection per journal object. Always close it (Windows file locks)."""
 
@@ -159,7 +168,7 @@ class SqliteJournal:
         self._now = now or (lambda: datetime.now(UTC))
         self._conn = sqlite3.connect(path, isolation_level=None)
         self._conn.execute("PRAGMA foreign_keys = ON")
-        self._conn.execute("PRAGMA synchronous = FULL")
+        self._conn.execute(f"PRAGMA synchronous = {SYNCHRONOUS}")
         self._conn.executescript(_SCHEMA + _append_only_triggers())
 
     # -- lifecycle -------------------------------------------------------------------
