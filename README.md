@@ -380,7 +380,9 @@ fixture](#real-vs-fixture).
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
 | M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | not started |
 
-Design: `docs/PLAN.md`. Milestone specs: `docs/milestones/`. Every non-trivial
+Design: `docs/PLAN.md`. Trust boundaries, with diagrams: `docs/ARCHITECTURE.md`.
+What happens when the tool, a fixture or a scope file is hostile:
+`docs/THREAT-MODEL.md`. Milestone specs: `docs/milestones/`. Every non-trivial
 choice: `docs/DECISIONS.md`. Places where Microsoft APIs behave differently from
 their documentation: `docs/FINDINGS.md`.
 
