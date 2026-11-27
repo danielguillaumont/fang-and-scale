@@ -61,3 +61,23 @@ def test_public_repository_files_are_present() -> None:
     assert (ROOT / "CONTRIBUTING.md").is_file()
     owners = (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
     assert "* @danielguillaumont" in owners.splitlines()
+
+
+def test_readme_has_the_status_and_verification_sections() -> None:
+    headings = set(re.findall(r"^## (.+)$", README, flags=re.M))
+    assert {"Project status", "Verify a signed result"} <= headings
+
+
+def test_the_verification_commands_match_the_signing_workflow() -> None:
+    """The README pins the identity prove-sign.yml really signs with on main."""
+    from fns.verify.main import SIGSTORE_BUNDLE_FILE
+    from fns.verify.signing import PRODUCTION_WORKFLOW_REF
+
+    section = README.split("## Verify a signed result", 1)[1].split("\n## ", 1)[0]
+    identity = f"https://github.com/{PRODUCTION_WORKFLOW_REF}"
+    assert section.count(f"--cert-identity {identity}") == 1
+    assert section.count(f"--sigstore-identity {identity}") == 1
+    assert f"--bundle run/{SIGSTORE_BUNDLE_FILE}" in section
+    assert "--sigstore-instance production" in section
+    assert "--trigger push" in section
+    assert "--sigstore-issuer https://token.actions.githubusercontent.com" in section

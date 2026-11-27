@@ -314,6 +314,24 @@ means that the check a command runs has failed:
 A missing or invalid contract, scope, snapshot, report or log file exits 2, and
 so does an internal error, so a crash never looks like a verdict.
 
+## Project status
+
+- **Public since 2026-11-26.** One maintainer, no release yet; the first tag
+  meant for users is `v0.1` (M5).
+- **Ran live, on one lab tenant:** scout (M1), contain (M2), and prove with
+  probes as the compromised identity (M3), all on 2026-11-26. Each run is
+  recorded as a fixture and replayed as a regression test.
+- **Built and tested offline only:** harden, record mode, detections (M4) and
+  mutation testing, the HTML report and the GitHub Action (M5).
+- **On every push to `main`:** tests on ubuntu and windows, CodeQL, and a
+  Sigstore production signature of the recorded M3 replay.
+- **The lab is torn down.** The next live work is M4: harden the lab, prove the
+  fix, and run the detections in a Log Analytics workspace. Spec:
+  `docs/milestones/M4.md`.
+
+Day-to-day state: `docs/STATUS.md`. What each fixture proves: [Real vs.
+fixture](#real-vs-fixture).
+
 ## Roadmap
 
 | Milestone | Scope | State |
