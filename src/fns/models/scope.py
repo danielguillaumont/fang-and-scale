@@ -158,12 +158,45 @@ class StrikeTarget(FnsModel):
         return str(uuid.UUID(self.id))
 
 
+class StrikeEscalation(FnsModel):
+    """S4 (approved 2026-11-27): the one identity other than a test identity a strike
+    may act as, and the one thing it may do.
+
+    Absent means no token request and no write as anyone but a test identity. The
+    gate allows the escalated identity only to assign this marker role to a test
+    identity on its own service principal, and to remove that assignment.
+    """
+
+    service_principal: Guid
+    """The escalation target's service principal (``app-escalation-target``). It must
+    be a ``graph-service-principal`` strike target, and never a test identity."""
+    marker_role_id: Guid
+    """The marker app role Terraform defines on that service principal's application
+    (``lab/identities.tf``); the gate checks it live before S4 may assign it."""
+
+
 class StrikeScope(FnsModel):
     """The ``strike:`` block: which lab objects strikes may write, and until when."""
+
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"escalation"})
 
     expires_at: TzDatetime
     """Strike writes stop at this instant, even if the manifest is still valid."""
     targets: tuple[StrikeTarget, ...] = Field(min_length=1)
+    escalation: StrikeEscalation | None = None
+    """S4 only (``lab/scope.tf`` renders it with ``enable_strikes``)."""
+
+    @model_validator(mode="after")
+    def _escalation(self) -> StrikeScope:
+        e = self.escalation
+        if e is None:
+            return self
+        sp = str(e.service_principal)
+        if not any(t.kind == "graph-service-principal" and t.key == sp for t in self.targets):
+            raise ValueError("strike.escalation names a service principal that is not a target")
+        if is_first_party(str(e.marker_role_id)):
+            raise ValueError("the marker role can never be a Microsoft first-party ID")
+        return self
 
     @field_validator("targets")
     @classmethod
@@ -293,6 +326,9 @@ class ScopeManifest(FnsModel):
                 raise ValueError("the tenant itself is not a strike target")
             if t.kind == "graph-application" and t.key in tests:
                 raise ValueError("an application object cannot be a test identity")
+        e = self.strike.escalation
+        if e is not None and str(e.service_principal) in tests:
+            raise ValueError("the escalated identity (strike.escalation) is never a test identity")
         return self
 
     @model_validator(mode="after")

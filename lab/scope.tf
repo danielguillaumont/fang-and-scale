@@ -53,9 +53,11 @@ locals {
 }
 
 # M4 strikes (lab/README.md, "Strikes"). Off by default; with enable_strikes the
-# scope also lists the write forms S1 to S3 and D-1 to D-5 use, and the lab
-# objects they may touch. Every write still needs an approved plan hash and the
-# gate's live lab check. tests/test_lab_strikes.py checks these against fns.strike.
+# scope also lists the write forms S1 to S4 and D-1 to D-5 use, the lab objects
+# they may touch, S4's escalation block (app-escalation-target's SP and the marker
+# role defined in identities.tf) and the scout's two extra reads for S4. Every
+# write still needs an approved plan hash and the gate's live lab check.
+# tests/test_lab_strikes.py checks these against fns.strike.
 resource "time_offset" "strike_expiry" {
   count = var.enable_strikes ? 1 : 0
 
@@ -71,6 +73,14 @@ locals {
     "graph:POST /applications/{id}/removePassword",
     "graph:POST /applications/{id}/owners/$ref",
     "graph:DELETE /applications/{id}/owners/{id}/$ref",
+    "graph:POST /servicePrincipals/{id}/appRoleAssignedTo",
+    "graph:DELETE /servicePrincipals/{id}/appRoleAssignedTo/{id}",
+  ]
+  # S4's reads as the scout: the assignments on app-escalation-target's SP
+  # (pre-state, lost answers, verification). graph:GET /servicePrincipals is
+  # already in scout_operations.
+  strike_scout_operations = [
+    "graph:GET /servicePrincipals/{id}/appRoleAssignedTo",
   ]
   strike_arm_targets = [
     azurerm_storage_account.payroll.id,
@@ -81,6 +91,12 @@ locals {
     { id = azuread_application.verifier.object_id, display_name = azuread_application.verifier.display_name },
     { id = azuread_application.scout.object_id, display_name = azuread_application.scout.display_name },
   ]
+  strike_escalation = {
+    service_principal = azuread_service_principal.escalation_target.object_id
+    application       = azuread_application.escalation_target.object_id
+    display_name      = azuread_application.escalation_target.display_name
+    marker_role_id    = var.enable_strikes ? random_uuid.strike_marker[0].result : ""
+  }
 }
 
 resource "local_file" "scope" {
@@ -100,6 +116,9 @@ resource "local_file" "scope" {
     strike_operations  = local.strike_operations
     strike_arm_targets = local.strike_arm_targets
     strike_app_targets = local.strike_app_targets
+    strike_escalation  = local.strike_escalation
     strike_expires_at  = var.enable_strikes ? time_offset.strike_expiry[0].rfc3339 : ""
+
+    strike_scout_operations = local.strike_scout_operations
   })
 }

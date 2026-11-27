@@ -116,6 +116,13 @@ Graph has no way to revoke an app-only token. After step 8 the token from step 1
 stays valid until it expires (typically 60 to 90 minutes). It exists only in the
 strike process's memory, and the process exits after the run.
 
+> **As built (approved 2026-11-27, with conditions; see "Build status", S4).**
+> Steps 3, 6 and 7 are gone: Terraform defines the marker role on
+> `app-escalation-target` (`lab/identities.tf`, `enable_strikes` only), so no
+> strike patches app roles. Step 8 moves up: S3's password is removed right
+> after step 1, before anything else is sent. The run is S3, then S4/token
+> (steps 1 and 2), then S4/assign (step 4, undo step 5), then verification.
+
 ### After harden (session D, D6): required denials
 
 After harden, the agent has neither Contributor nor `OwnedBy`. It still owns
@@ -385,7 +392,9 @@ Where the build differs from the text above, and why:
 | no query string on a write | Graph writes: none. ARM writes: exactly `api-version=<pinned>` (Storage `2023-05-01`, Key Vault `2023-07-01`) | ARM requires `api-version`; pinning it is the Key Vault data-plane rule again |
 | denylist: role, grant and authorization endpoints | also `$batch`, all of `appRoleAssignments`, `federatedIdentityCredentials`, and writes to `Microsoft.Insights`, `Microsoft.AadIam`, `Microsoft.OperationalInsights` and `Microsoft.SecurityInsights` | a batch can carry any request, and a strike must never switch off the logs it is measured by |
 | `graph-group` target kind | left out | no write form names a group |
-| a `token:` form for S4 step 1, acting as `app-escalation-target` | not yet: every write must be made signed in as a test identity | it lands with S4, under its own decision |
+| a `token:` form for S4 step 1, acting as `app-escalation-target` | the scope's `strike.escalation` block (`service_principal`, `marker_role_id`) authorises the token request (sent by the agent's gate, exact URL and body, no secret in it) and the escalated identity, which may send only the marker assignment and its removal | S4, approved 2026-11-27; no grammar change to `allowed_operations` |
+| S4 steps 3, 6 and 7 `PATCH` the marker role in and out | Terraform defines it; the `PATCH` app-roles form stays in the gate's vocabulary but no strike uses it, the lab scope does not list it, and a marker it defines can't be assigned | the owner's condition: "marker role defined by Terraform on a lab app only" |
+| S4 step 8 removes S3's password last | right after the token request, whatever its result | the owner's condition: "S3's password is removed as soon as S4 holds its token" |
 | `lab/scope.tf` renders `strike.targets` | not yet | the live scope gets write forms only when strike code exists to use them |
 | `removePassword` and the assignment `DELETE` bound to IDs the run created | bound to lab objects only; the plan binding (step 3) will bind them to IDs from the journal | the gate cannot learn a `keyId` before the strike runner exists |
 
@@ -395,15 +404,38 @@ never on Microsoft Graph or a first-party app) is enforced in three places:
 - a scope cannot name a first-party ID as a target;
 - the live check refuses a service principal owned by another tenant, or with a
   first-party `appId`;
-- an `appRoleAssignedTo` write is allowed only for a marker role that this run's
-  gate let through, on the service principal's own lab application.
+- an `appRoleAssignedTo` write is allowed only for the marker role the scope's
+  `strike.escalation` block names, defined (enabled, `Application` only, "Grants
+  nothing") on the service principal's own lab application, as the live check
+  read it; only the escalated identity may send it, and only to that SP.
 
 Each place has a negative test.
 
 The denylist also reads text in request bodies. So an app role whose description
-contained a denied word, such as "directory", could not be written back by the S4
-undo. The gate refuses the write rather than allowing it, and the lab apps define
-no app roles (`lab/identities.tf`), so this can't happen today.
+contained a denied word, such as "directory", could not be written back by a
+`PATCH`. The gate refuses the write rather than allowing it. Since S4 no longer
+patches app roles, and the only lab app role is Terraform's marker, this can't
+happen today.
+
+**S4: built** (approved 2026-11-27, with the owner's conditions):
+
+| Condition | Where | Tests |
+| --- | --- | --- |
+| the token is never persisted or logged; only its `oid` and `roles` claims are recorded | `fns.strike.transport.TokenTransport` strips `access_token` into the secret holder; `fns.strike.run.recorded_claims` | `tests/strike/test_s4.py`: every journal, gate row and run output scanned for the token, its payload and every secret |
+| S4 runs only right after S3, in the same run | `build_plan` refuses S4 without S3; the token step reads S3's password from this run's holder | `test_s4_runs_only_with_s3_in_the_same_run` |
+| S3's password is removed as soon as S4 holds its token | `fns.strike.run._remove_s3_now`, whatever the token result | `test_s3s_password_is_removed_as_soon_as_s4_holds_its_token`, and with a refused or lost token |
+| the marker role is defined by Terraform on a lab app only | `lab/identities.tf`; `check_defined_marker`; the plan refuses without it | `tests/test_lab_strikes.py`; `test_s4_needs_terraforms_marker_on_the_lab_app`; the gate rows in `tests/scope/test_gate_writes.py` |
+| an emergency cleanup step for the marker assignment | `docs/runbooks/m4-live-run.md`, Emergency cleanup, step 2, "S4"; `fns strike cleanup` marks it `needs-emergency-cleanup` and exits 5 | `tests/test_runbook_m4_live.py`; `test_a_failed_removal_leaves_exit_5_and_cleanup_cannot_fix_it` |
+| negative tests for every rule, a forged scope, the denylist, and token claims that don't prove the capability | `tests/scope/test_gate_s4.py`; `tests/strike/test_s4.py` | the token request (URL, method, body, principal, plan, budget, expiry, tenant, denylist), the escalated identity's two forms only, a forged `strike.escalation` (policy denies everything), and seven sets of claims that don't prove it |
+
+The safety stop reads the token's claims without verifying its signature (it
+came straight from `login.microsoftonline.com` over TLS; approved 2026-11-27 on the
+condition that it is a safety stop only, never recorded or used as verdict
+evidence, which `tests/prove/test_s4_not_evidence.py` pins): `tid` is the
+tenant, `oid` is `app-escalation-target`'s service principal, `appid` (or `azp`)
+its appId, and `roles` includes `AppRoleAssignment.ReadWrite.All`. Any other
+answer stops S4 with nothing assigned. The escalated gate is signed in as that
+`oid`.
 
 ## Decisions for you
 

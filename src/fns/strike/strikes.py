@@ -2,8 +2,12 @@
 
 Before harden (session C): S1 ``listKeys`` (undo: regenerate both keys, SD1), S2 a
 tag on the vault (undo: the pre-state tags), S3 a 1-hour password on
-``app-escalation-target`` (undo: ``removePassword``). S4 comes with its own PR:
-it signs in as the escalated identity, which the gate does not allow yet.
+``app-escalation-target`` (undo: ``removePassword``), and S4 right after S3
+(approved 2026-11-27): a token as ``app-escalation-target`` with S3's password,
+whose ``roles`` claim must show ``AppRoleAssignment.ReadWrite.All``, then, as that
+identity, the marker role Terraform defined on its own app assigned to the agent
+(undo: delete the assignment). S3's password is removed as soon as S4 holds the
+token, and the token is used for nothing but the assignment and its undo.
 
 After harden (session D, D6): D-1 to D-5 must be denied. Each has the undo that
 runs if it is not.
@@ -14,15 +18,23 @@ Everything a strike writes carries the run ID: the credential name
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Final
 
 from fns.adapters.azure.http import ARM_BASE, GRAPH_BASE
 from fns.models.operations import WRITE_FORM_OPERATIONS
 from fns.models.scope import ScopeManifest
-from fns.scope.writes import ARM_API_VERSIONS, CREDENTIAL_PREFIX
+from fns.scope.writes import (
+    ARM_API_VERSIONS,
+    CREDENTIAL_PREFIX,
+    TOKEN_OPERATION,
+    check_defined_marker,
+    token_body,
+    token_url,
+)
 from fns.strike.plan import (
     AFTER_HARDEN,
     BEFORE_HARDEN,
@@ -58,9 +70,14 @@ USED_FORMS: Final[tuple[str, ...]] = (
     REMOVE_PASSWORD,
     ADD_OWNER,
     REMOVE_OWNER,
+    ASSIGN,
+    UNASSIGN,
 )
-"""The write forms S1 to S3 and D-1 to D-5 use. S4's three (``PATCH`` app roles,
-assign, unassign) are left out until S4 is built."""
+"""The write forms S1 to S4 and D-1 to D-5 use. ``PATCH`` app roles is not one:
+the marker role is defined by Terraform, never by a strike."""
+TOKEN_KEY: Final = "S4/token"  # noqa: S105 - a journal step key
+ASSIGN_KEY: Final = "S4/assign"
+S3_KEY: Final = "S3/add-password"
 SUPPORTED: Final[frozenset[str]] = frozenset((*BEFORE_HARDEN, *AFTER_HARDEN))
 
 
@@ -74,9 +91,27 @@ class LabTargets:
     escalation_app: str | None = None
     verifier_app: str | None = None
     scout_app: str | None = None
+    escalation_sp: str | None = None
+    """S4 only: ``app-escalation-target``'s service principal (``strike.escalation``)."""
+    tenant: str | None = None
+    """S4 only: the scope's tenant, for the token URL."""
+    escalation_app_id: str | None = None
+    """S4 only: its appId, the token request's ``client_id``."""
+    marker_role: str | None = None
+    """S4 only: the marker role Terraform defines on ``app-escalation-target``."""
 
     def as_dict(self) -> dict[str, str]:
-        roles = ("payroll", "vault", "escalation_app", "verifier_app", "scout_app")
+        roles = (
+            "payroll",
+            "vault",
+            "escalation_app",
+            "verifier_app",
+            "scout_app",
+            "escalation_sp",
+            "escalation_app_id",
+            "marker_role",
+            "tenant",
+        )
         out = {"agent": self.agent}
         out.update({r: v for r in roles if (v := getattr(self, r)) is not None})
         return out
@@ -86,7 +121,9 @@ class LabTargets:
         return cls(**roles)
 
 
-def lab_targets(manifest: ScopeManifest) -> LabTargets:
+def lab_targets(manifest: ScopeManifest, *, s4: bool = False) -> LabTargets:
+    """The strike targets by role. S4's roles are added only when ``s4`` is set, so
+    plans without S4 stay exactly as they were."""
     if manifest.strike is None:
         raise PlanError("the scope has no strike: block (lab/scope.tf renders it)")
     agents = [i for i in manifest.test_identities if i.name == "sp-billing-agent"]
@@ -107,12 +144,19 @@ def lab_targets(manifest: ScopeManifest) -> LabTargets:
                 "sp-fns-scout": "scout_app",
             }.get(t.display_name or "")
         else:
-            role = None  # service principals: S4
+            role = "escalation_sp" if s4 and t.display_name == "app-escalation-target" else None
         if role is None:
             continue
         if role in found:
             raise PlanError(f"two strike targets for {role}")
         found[role] = t.id if t.kind == "arm" else t.key.lower()
+    if s4:
+        esc = manifest.strike.escalation
+        if esc is None:
+            raise PlanError("S4 needs the scope's strike.escalation block (enable_strikes)")
+        if found.get("escalation_sp") != str(esc.service_principal):
+            raise PlanError("strike.escalation must name app-escalation-target's SP")
+        found["marker_role"] = str(esc.marker_role_id)
     return LabTargets(agent=str(agents[0].object_id).lower(), **found)
 
 
@@ -225,6 +269,9 @@ def read_pre_state(strikes: Sequence[StrikeId], t: LabTargets, reader: LabReader
         elif s == "S2":
             v = _need(t.vault, "Key Vault")
             state[f"arm:{v}"] = {"tags": _lab_tagged(reader.vault(v), "Key Vault")}
+        elif s == "S4":
+            sp = _need(t.escalation_sp, "escalation service principal")
+            state[f"assigned:{sp}"] = {"assignments": reader.assigned_to(sp)}
     for app in sorted(set(_apps(strikes, t))):
         state[f"app:{app}"] = _app_state(reader, app)
     for app in sorted(set(_owner_apps(strikes, t))):
@@ -235,7 +282,7 @@ def read_pre_state(strikes: Sequence[StrikeId], t: LabTargets, reader: LabReader
 def _apps(strikes: Sequence[StrikeId], t: LabTargets) -> list[str]:
     out = []
     for s in strikes:
-        if s in ("S3", "D-1"):
+        if s in ("S3", "S4", "D-1"):
             out.append(_need(t.escalation_app, "app-escalation-target"))
         elif s in ("D-2", "D-4"):
             out.append(_need(t.verifier_app, "id-verifier"))
@@ -331,12 +378,86 @@ def planned_writes(
         elif s in ("D-4", "D-5"):
             app = _owner_apps([s], t)[0]
             writes.append(_add_owner(f"{s}/add-owner", s, app, t.agent))
-        else:
+        elif s == "S4":
+            writes.extend(_s4(t, pre_state))
+        else:  # pragma: no cover - every StrikeId is handled above
             raise PlanError(f"{s} is not built yet")
     return tuple(
         w.model_copy(update={"observes": OBSERVES[w.strike]}) if w.strike in OBSERVES else w
         for w in writes
     )
+
+
+def _with_escalation(t: LabTargets, reader: LabReader, tenant: str) -> LabTargets:
+    """S4's live facts, read as the scout: the app's appId, and the marker role
+    Terraform defined on it (enabled, granting nothing). Refused before planning
+    otherwise."""
+    app = _need(t.escalation_app, "app-escalation-target")
+    marker = _need(t.marker_role, "marker role")
+    body = reader.application(app)
+    roles = body.get("appRoles")
+    try:
+        check_defined_marker(
+            [r for r in (roles if isinstance(roles, list) else []) if isinstance(r, dict)],
+            uuid.UUID(marker),
+        )
+    except ValueError as exc:
+        raise PlanError(f"S4: {exc} (apply the lab with enable_strikes)") from exc
+    client_id = str(body.get("appId", "")).lower()
+    try:
+        uuid.UUID(client_id)
+    except ValueError as exc:
+        raise PlanError("S4: app-escalation-target has no appId") from exc
+    return replace(t, escalation_app_id=client_id, tenant=tenant)
+
+
+def _s4(t: LabTargets, pre_state: dict[str, Any]) -> tuple[PlannedWrite, PlannedWrite]:
+    """S4: the token as the escalation target, then the marker assignment as it."""
+    app = _need(t.escalation_app, "app-escalation-target")
+    sp = _need(t.escalation_sp, "escalation service principal")
+    marker = _need(t.marker_role, "marker role")
+    client_id = _need(t.escalation_app_id, "escalation appId")
+    if pre_state[f"assigned:{sp}"]["assignments"]:
+        found = pre_state[f"assigned:{sp}"]["assignments"]
+        if any(a["appRoleId"] == marker for a in found):
+            raise PlanError("the marker role is already assigned: clean up first")
+    assigned = f"{GRAPH_BASE}/servicePrincipals/{sp}/appRoleAssignedTo"
+    lab = (app, sp)
+    token = PlannedWrite(
+        key=TOKEN_KEY,
+        strike="S4",
+        request=PlannedRequest(
+            operation=TOKEN_OPERATION,
+            method="POST",
+            url=token_url(uuid.UUID(_need(t.tenant, "tenant"))),
+            body=token_body(client_id),
+        ),
+        expect="allowed",
+        lab_objects=lab,
+    )
+    assign = PlannedWrite(
+        key=ASSIGN_KEY,
+        strike="S4",
+        request=PlannedRequest(
+            operation=ASSIGN,
+            method="POST",
+            url=assigned,
+            body={"principalId": t.agent, "resourceId": sp, "appRoleId": marker},
+            learn=("id",),
+            acts_as="escalated",
+        ),
+        expect="allowed",
+        undo=(
+            PlannedRequest(
+                operation=UNASSIGN,
+                method="DELETE",
+                url=f"{assigned}/{{{{learned:{ASSIGN_KEY}:id}}}}",
+                acts_as="escalated",
+            ),
+        ),
+        lab_objects=lab,
+    )
+    return token, assign
 
 
 def build_plan(
@@ -357,8 +478,13 @@ def build_plan(
     before = [s for s in strikes if s in BEFORE_HARDEN]
     if before and len(before) != len(strikes):
         raise PlanError("plan the strikes (S*) and the after-harden attempts (D-*) separately")
+    if "S4" in strikes and "S3" not in strikes:
+        raise PlanError("S4 runs only right after S3, in the same run: plan S3,S4")
     ordered = tuple(s for s in (*BEFORE_HARDEN, *AFTER_HARDEN) if s in strikes)
-    t = lab_targets(manifest)
+    s4 = "S4" in ordered
+    t = lab_targets(manifest, s4=s4)
+    if s4:
+        t = _with_escalation(t, reader, str(manifest.tenant_id).lower())
     run_id = run_id or new_run_id(now)
     pre = read_pre_state(ordered, t, reader)
     expires = min(now + PLAN_LIFETIME, manifest.expires_at)

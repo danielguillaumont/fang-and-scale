@@ -64,6 +64,9 @@ MARKER: dict[str, Any] = {
     "displayName": "Fang & Scale strike marker run-1",
     "description": "Grants nothing",
 }
+ESC_ROLES: list[dict[str, Any]] = [*PRE_ROLES, MARKER]
+"""``app-escalation-target``'s roles: the marker is defined by Terraform (S4)."""
+ESCALATION: dict[str, Any] = {"service_principal": SP_ESC, "marker_role_id": MARKER["id"]}
 
 TARGETS: list[dict[str, Any]] = [
     {"kind": "arm", "id": PAYROLL},
@@ -89,6 +92,7 @@ def strike_dict(**overrides: Any) -> dict[str, Any]:
     base: dict[str, Any] = {
         "expires_at": STRIKE_UNTIL.isoformat(),
         "targets": copy.deepcopy(TARGETS),
+        "escalation": copy.deepcopy(ESCALATION),
     }
     base.update(overrides)
     return base
@@ -113,7 +117,9 @@ def app_json(oid: str, roles: list[dict[str, Any]] | None = None, **over: Any) -
         "appId": app_id,
         "displayName": name,
         "tags": ["project=fang-and-scale", "purpose=lab"],
-        "appRoles": copy.deepcopy(PRE_ROLES if roles is None else roles),
+        "appRoles": copy.deepcopy(
+            (ESC_ROLES if oid == APP_ESC else PRE_ROLES) if roles is None else roles
+        ),
     }
     body.update(over)
     return body
@@ -252,6 +258,15 @@ def valid(op: str) -> WriteRequest:
     }[op]
 
 
-def define_marker(gate: Gate) -> None:
-    """Run S4 step 3 through the gate so the marker role is known."""
-    gate.call_write(valid(APP_PATCH), lambda: None)
+def escalated_gate(m: Any = _DEFAULT, **kw: Any) -> tuple[Gate, InMemoryJournal, FrozenClock]:
+    """A write gate signed in as ``app-escalation-target`` (S4's token ``oid``)."""
+    return write_gate(m, principal=SP_ESC, **kw)
+
+
+ESCALATED_FORMS = (ASSIGN, UNASSIGN)
+"""What the escalated identity may send, and nobody else may."""
+
+
+def gate_for(op: str, **kw: Any) -> tuple[Gate, InMemoryJournal, FrozenClock]:
+    """The gate that may send ``op`` when every rule holds."""
+    return escalated_gate(**kw) if op in ESCALATED_FORMS else write_gate(**kw)

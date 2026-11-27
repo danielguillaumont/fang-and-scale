@@ -12,9 +12,11 @@ from datetime import timedelta
 
 from fns.models.operations import WRITE_FORM_OPERATIONS
 from fns.models.scope import parse_scope
+from fns.scope.writes import MARKER_DESCRIPTION, MARKER_NAME_PREFIX, MARKER_VALUE
+from fns.strike.reader import OP_ASSIGNED_TO, OP_SERVICE_PRINCIPALS
 from fns.strike.strikes import USED_FORMS, lab_targets
 from tests.factories import NOW, SP_AGENT
-from tests.scope.writekit import APP_ESC, APP_SCOUT, APP_VER, PAYROLL, VAULT
+from tests.scope.writekit import APP_ESC, APP_SCOUT, APP_VER, MARKER, PAYROLL, SP_ESC, VAULT
 from tests.test_lab import LAB, STRIKE_IF, _render_template, _scope_tf_operations
 
 STRIKE_OPS_BLOCK = "%{ for op in strike_operations ~}\n    - ${op}\n%{ endfor ~}\n"
@@ -26,7 +28,14 @@ APP_BLOCK = (
     "      display_name: ${app.display_name}\n"
     "%{ endfor ~}\n"
 )
+SCOUT_BLOCK = "%{ for op in strike_scout_operations ~}\n    - ${op}\n%{ endfor ~}\n"
 APPS = ((APP_ESC, "app-escalation-target"), (APP_VER, "id-verifier"), (APP_SCOUT, "sp-fns-scout"))
+ESCALATION = {
+    "service_principal": SP_ESC,
+    "application": APP_ESC,
+    "display_name": "app-escalation-target",
+    "marker_role_id": MARKER["id"],
+}
 
 
 def _text(name: str) -> str:
@@ -43,11 +52,18 @@ def strike_operations() -> list[str]:
     return re.findall(r'"([^"]+)"', _local_list("strike_operations"))
 
 
+def strike_scout_operations() -> list[str]:
+    return re.findall(r'"([^"]+)"', _local_list("strike_scout_operations"))
+
+
 def render_with_strikes() -> str:
     t = _text("scope.lab.yaml.tftpl")
-    for block in (STRIKE_OPS_BLOCK, ARM_BLOCK, APP_BLOCK):
+    for block in (STRIKE_OPS_BLOCK, ARM_BLOCK, APP_BLOCK, SCOUT_BLOCK):
         assert block in t
     t = t.replace(STRIKE_OPS_BLOCK, "".join(f"    - {op}\n" for op in strike_operations()))
+    t = t.replace(SCOUT_BLOCK, "".join(f"    - {op}\n" for op in strike_scout_operations()))
+    for key, value in ESCALATION.items():
+        t = t.replace("${strike_escalation." + key + "}", value)
     t = t.replace(ARM_BLOCK, "".join(f"    - kind: arm\n      id: {i}\n" for i in (PAYROLL, VAULT)))
     t = t.replace(
         APP_BLOCK,
@@ -68,18 +84,20 @@ def test_off_by_default() -> None:
         r'resource "time_offset" "strike_expiry" \{\n  count = var\.enable_strikes \? 1 : 0',
         _text("scope.tf"),
     )
-    assert len(STRIKE_IF.findall(_text("scope.lab.yaml.tftpl"))) == 2
+    assert len(STRIKE_IF.findall(_text("scope.lab.yaml.tftpl"))) == 3
+    assert re.search(
+        r'resource "random_uuid" "strike_marker" \{\n  count = var\.enable_strikes \? 1 : 0',
+        _text("identities.tf"),
+    )
 
 
 def test_the_rendered_operations_are_exactly_what_the_strikes_use() -> None:
     assert strike_operations() == list(USED_FORMS)
     assert set(USED_FORMS) <= set(WRITE_FORM_OPERATIONS)
-    s4_only = set(WRITE_FORM_OPERATIONS) - set(USED_FORMS)
-    assert s4_only == {
-        "graph:PATCH /applications/{id}",
-        "graph:POST /servicePrincipals/{id}/appRoleAssignedTo",
-        "graph:DELETE /servicePrincipals/{id}/appRoleAssignedTo/{id}",
-    }
+    # The marker role is Terraform's (approved 2026-11-27): no strike patches app roles.
+    assert set(WRITE_FORM_OPERATIONS) - set(USED_FORMS) == {"graph:PATCH /applications/{id}"}
+    assert strike_scout_operations() == [OP_ASSIGNED_TO]
+    assert OP_SERVICE_PRINCIPALS in _scope_tf_operations()
 
 
 def test_targets_are_the_lab_objects_by_terraform_reference() -> None:
@@ -100,7 +118,41 @@ def test_targets_are_the_lab_objects_by_terraform_reference() -> None:
         ("azuread_application.scout", "azuread_application.scout"),
     ]
     assert "billing_agent" not in arm + apps  # never the agent itself
-    assert "azuread_service_principal" not in apps  # no SP targets until S4
+    assert "azuread_service_principal" not in apps  # the one SP target is S4's, below
+    esc = re.search(r"^  strike_escalation = \{\n(.*?)^  \}", _text("scope.tf"), re.M | re.S)
+    assert esc is not None
+    assert re.findall(r"^    (\w+)\s+= (.+)$", esc[1], re.M) == [
+        ("service_principal", "azuread_service_principal.escalation_target.object_id"),
+        ("application", "azuread_application.escalation_target.object_id"),
+        ("display_name", "azuread_application.escalation_target.display_name"),
+        ("marker_role_id", 'var.enable_strikes ? random_uuid.strike_marker[0].result : ""'),
+    ]
+
+
+def test_the_marker_role_is_terraforms_and_grants_nothing() -> None:
+    app = re.search(
+        r'resource "azuread_application" "escalation_target" \{(.*?)\n\}',
+        _text("identities.tf"),
+        re.S,
+    )
+    assert app is not None
+    role = re.search(
+        r'dynamic "app_role" \{\n\s+for_each = random_uuid\.strike_marker\n(.*?)\n    \}',
+        app[1],
+        re.S,
+    )
+    assert role is not None
+    fields = dict(re.findall(r"^\s+(\w+)\s+= (.+)$", role[1], re.M))
+    assert fields == {
+        "id": "app_role.value.result",
+        "value": f'"{MARKER_VALUE}"',
+        "display_name": f'"{MARKER_NAME_PREFIX}"',
+        "description": f'"{MARKER_DESCRIPTION}"',
+        "allowed_member_types": '["Application"]',
+        "enabled": "true",
+    }
+    others = re.sub(r'dynamic "app_role" \{.*', "", _text("identities.tf"), flags=re.S)
+    assert "app_role {" not in others  # no other app role anywhere in the lab
 
 
 def test_rendered_with_strikes_is_a_valid_manifest_the_engine_accepts() -> None:
@@ -110,6 +162,10 @@ def test_rendered_with_strikes_is_a_valid_manifest_the_engine_accepts() -> None:
     t = lab_targets(m)
     assert (t.agent, t.payroll, t.vault) == (SP_AGENT, PAYROLL, VAULT)
     assert (t.escalation_app, t.verifier_app, t.scout_app) == (APP_ESC, APP_VER, APP_SCOUT)
+    assert t.escalation_sp is None  # S4's roles only when S4 is planned
+    s4 = lab_targets(m, s4=True)
+    assert (s4.escalation_sp, s4.marker_role) == (SP_ESC, MARKER["id"])
+    assert m.strike.escalation is not None
     # the scout can make every read the strikes need with the same scope
     scout = set(m.allowed_operations["scout"])
     for op in (
@@ -117,5 +173,7 @@ def test_rendered_with_strikes_is_a_valid_manifest_the_engine_accepts() -> None:
         "arm:Microsoft.KeyVault/vaults/read",
         "graph:GET /applications",
         "graph:GET /applications/{id}/owners",
+        OP_SERVICE_PRINCIPALS,
+        OP_ASSIGNED_TO,
     ):
         assert op in scout

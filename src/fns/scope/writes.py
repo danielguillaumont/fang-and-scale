@@ -21,6 +21,11 @@ module is pure: it reads no clock, holds no state and makes no call. The
 3. :func:`check_body`: only the keys and values the form allows, with every
    object ID in the body bound to a lab target or a test identity.
 
+S4 (approved 2026-11-27) adds one request that is not a Graph or ARM write: the
+client-credentials token request for the escalation target
+(:data:`TOKEN_OPERATION`, :func:`token_url`, :func:`check_token_body`). Its body
+here never holds the secret; the token transport adds it from memory.
+
 Case: ARM paths compare case-insensitively (ARM is). Graph literal segments
 compare exactly: ``/Applications/`` is refused, not folded.
 """
@@ -31,7 +36,7 @@ import json
 import re
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Final, Literal
 from urllib.parse import unquote, urlsplit
@@ -56,6 +61,13 @@ MAX_CREDENTIAL_LIFETIME: Final = timedelta(hours=1)
 MARKER_VALUE: Final = "fns.strike.marker"
 MARKER_DESCRIPTION: Final = "Grants nothing"
 MARKER_NAME_PREFIX: Final = "Fang & Scale strike marker"
+TOKEN_HOST: Final = "login.microsoftonline.com"  # noqa: S105 - a host name
+TOKEN_OPERATION: Final = "token:client_credentials"  # noqa: S105 - a form name
+"""S4 step 1. Not an ``allowed_operations`` entry: the ``strike.escalation`` block
+authorises it, and only for the escalation target."""
+TOKEN_SCOPE: Final = "https://graph.microsoft.com/.default"  # noqa: S105 - a scope
+CAPABILITY_ROLE: Final = "AppRoleAssignment.ReadWrite.All"
+"""The ``roles`` claim S4's token must carry: the capability S4 proves."""
 MAX_BODY_BYTES: Final = 65_536
 MAX_TAGS: Final = 50
 
@@ -371,8 +383,8 @@ class BodyContext:
     test_identities: frozenset[uuid.UUID]
     lab: Mapping[uuid.UUID, LabObject]
     sp_application: Mapping[uuid.UUID, uuid.UUID]
-    markers: Mapping[uuid.UUID, frozenset[uuid.UUID]] = field(default_factory=dict)
-    """Enabled marker roles per application, from earlier allowed and successful writes."""
+    marker_role: uuid.UUID | None = None
+    """``strike.escalation.marker_role_id``: the one role S4 may assign."""
 
 
 def canonical_body(body: object) -> str:
@@ -463,6 +475,52 @@ def _check_marker(role: Mapping[str, object], taken: set[str]) -> uuid.UUID:
     return rid
 
 
+def check_defined_marker(app_roles: Sequence[Mapping[str, object]], role_id: uuid.UUID) -> None:
+    """Raise unless ``role_id`` is an enabled marker role among ``app_roles`` (the
+    application's roles as the live check read them), granting nothing.
+
+    The marker is defined by Terraform (``lab/identities.tf``), never by a strike.
+    """
+    found = [r for r in app_roles if _maybe_guid(r.get("id")) == role_id]
+    if len(found) != 1:
+        raise WriteRefusedError(
+            "body", "the marker role is not defined on the service principal's lab application"
+        )
+    role = found[0]
+    name = role.get("displayName")
+    if (
+        role_id not in marker_roles({"appRoles": list(app_roles)})
+        or role.get("allowedMemberTypes") != ["Application"]
+        or role.get("description") != MARKER_DESCRIPTION
+        or not isinstance(name, str)
+        or not name.startswith(MARKER_NAME_PREFIX)
+    ):
+        raise WriteRefusedError(
+            "body", "the marker role must be enabled, for applications only, and grant nothing"
+        )
+
+
+def token_url(tenant_id: uuid.UUID) -> str:
+    return f"https://{TOKEN_HOST}/{tenant_id}/oauth2/v2.0/token"
+
+
+def token_body(client_id: str) -> dict[str, str]:
+    """The token request's form fields, without the secret (added in transport)."""
+    return {"client_id": client_id, "grant_type": "client_credentials", "scope": TOKEN_SCOPE}
+
+
+def check_token_body(body: object, client_id: uuid.UUID) -> None:
+    """Exactly :func:`token_body` for the escalation target's appId: no secret, no
+    other scope, no other grant."""
+    b = _exact_keys(body, {"client_id", "grant_type", "scope"}, "the token request")
+    if b["grant_type"] != "client_credentials":
+        raise WriteRefusedError("body", "the token request uses client_credentials only")
+    if b["scope"] != TOKEN_SCOPE:
+        raise WriteRefusedError("body", f"the token scope is exactly {TOKEN_SCOPE}")
+    if _maybe_guid(b["client_id"]) != client_id or b["client_id"] != str(client_id):
+        raise WriteRefusedError("body", "client_id must be the escalation target's appId")
+
+
 def marker_roles(body: object) -> frozenset[uuid.UUID]:
     """Enabled marker role IDs in an ``appRoles`` body (after it passed check_body)."""
     if not isinstance(body, Mapping) or not isinstance(roles := body.get("appRoles"), list):
@@ -549,13 +607,13 @@ def check_body(form: WriteForm, body: object, m: Matched, ctx: BodyContext) -> N
             raise WriteRefusedError("body", "resourceId must be the service principal in the path")
         if principal not in ctx.test_identities:
             raise WriteRefusedError("body", "principalId must be a test identity")
+        if ctx.marker_role is None or role != ctx.marker_role:
+            raise WriteRefusedError("body", "appRoleId must be the scope's marker role")
         app = ctx.sp_application.get(resource)
-        if app is None or role not in ctx.markers.get(app, frozenset()):
-            raise WriteRefusedError(
-                "body",
-                "appRoleId must be an enabled marker role this run defined on the "
-                "service principal's own lab application",
-            )
+        lab_app = ctx.lab.get(app) if app is not None else None
+        if lab_app is None or lab_app.kind != "graph-application":
+            raise WriteRefusedError("lab-check", "the application has not passed the live check")
+        check_defined_marker(lab_app.app_roles, role)
         return
     if rule == "add-owner":
         b = _exact_keys(body, {"@odata.id"}, "the owner reference")

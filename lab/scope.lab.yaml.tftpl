@@ -15,6 +15,11 @@ allowed_operations:
 %{ for op in operations ~}
     - ${op}
 %{ endfor ~}
+%{ if enable_strikes ~}
+%{ for op in strike_scout_operations ~}
+    - ${op}
+%{ endfor ~}
+%{ endif ~}
   prove:
 %{ for op in prove_operations ~}
     - ${op}
@@ -47,4 +52,11 @@ strike:
       id: ${app.id}
       display_name: ${app.display_name}
 %{ endfor ~}
+    - kind: graph-service-principal
+      id: ${strike_escalation.service_principal}
+      display_name: ${strike_escalation.display_name}
+      application: ${strike_escalation.application}
+  escalation:
+    service_principal: ${strike_escalation.service_principal}
+    marker_role_id: ${strike_escalation.marker_role_id}
 %{ endif ~}

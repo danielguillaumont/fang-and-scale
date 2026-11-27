@@ -36,11 +36,30 @@ resource "azuread_app_role_assignment" "billing_agent_owned_by" {
 # The escalation path the lab exists to expose: billing-agent owns this app, so it
 # can add a credential to it and act with AppRoleAssignment.ReadWrite.All.
 
+# S4's marker role (enable_strikes only, approved 2026-11-27): an app role that grants
+# nothing, defined here and never by a strike. S4 assigns it to the agent as this
+# app's identity, which proves AppRoleAssignment.ReadWrite.All, then removes it.
+resource "random_uuid" "strike_marker" {
+  count = var.enable_strikes ? 1 : 0
+}
+
 resource "azuread_application" "escalation_target" {
   display_name = "app-escalation-target"
   owners       = concat(local.owners, [azuread_service_principal.billing_agent.object_id])
   tags         = local.ad_tags
   notes        = "Fang & Scale lab: privileged app owned by sp-billing-agent (escalation target)."
+
+  dynamic "app_role" {
+    for_each = random_uuid.strike_marker
+    content {
+      id                   = app_role.value.result
+      value                = "fns.strike.marker"
+      display_name         = "Fang & Scale strike marker"
+      description          = "Grants nothing"
+      allowed_member_types = ["Application"]
+      enabled              = true
+    }
+  }
 }
 
 resource "azuread_service_principal" "escalation_target" {

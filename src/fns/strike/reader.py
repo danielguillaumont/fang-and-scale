@@ -23,6 +23,7 @@ OP_VAULT_READ: Final = "arm:Microsoft.KeyVault/vaults/read"
 OP_APPLICATIONS: Final = "graph:GET /applications"
 OP_SERVICE_PRINCIPALS: Final = "graph:GET /servicePrincipals"
 OP_APP_OWNERS: Final = "graph:GET /applications/{id}/owners"
+OP_ASSIGNED_TO: Final = "graph:GET /servicePrincipals/{id}/appRoleAssignedTo"
 APP_SELECT: Final = "id,appId,displayName,tags,appRoles,passwordCredentials"
 SP_SELECT: Final = "id,appId,displayName,tags,appOwnerOrganizationId,appRoles"
 
@@ -37,6 +38,7 @@ class LabReader(Protocol):
     def application(self, object_id: str) -> dict[str, Any]: ...
     def service_principal(self, object_id: str) -> dict[str, Any]: ...
     def app_owners(self, object_id: str) -> list[str]: ...
+    def assigned_to(self, object_id: str) -> list[dict[str, str]]: ...
 
 
 def _guid(value: str) -> str:
@@ -99,3 +101,26 @@ class ScoutReader:
         if not isinstance(items, list):
             raise ReadError("owners: no value list")
         return sorted(str(i.get("id")).lower() for i in items if isinstance(i, dict))
+
+    def assigned_to(self, object_id: str) -> list[dict[str, str]]:
+        """App role assignments granted on a service principal (S4's pre-state and
+        verification): ``{id, principalId, appRoleId}``, sorted."""
+        sp = _guid(object_id)
+        select = "$select=id,principalId,appRoleId"
+        url = f"{GRAPH_BASE}/servicePrincipals/{sp}/appRoleAssignedTo?{select}"
+        body = self._get(ApiRequest("graph", OP_ASSIGNED_TO, DirectoryTarget(), url))
+        items = body.get("value")
+        if not isinstance(items, list) or body.get("@odata.nextLink"):
+            raise ReadError("appRoleAssignedTo: no value list, or more than one page")
+        return sorted(
+            (
+                {
+                    "id": str(i.get("id")),
+                    "principalId": str(i.get("principalId")).lower(),
+                    "appRoleId": str(i.get("appRoleId")).lower(),
+                }
+                for i in items
+                if isinstance(i, dict)
+            ),
+            key=lambda a: (a["principalId"], a["appRoleId"], a["id"]),
+        )

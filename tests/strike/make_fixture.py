@@ -22,7 +22,9 @@ from fns.strike.strikes import USED_FORMS, build_plan
 from fns.strike.transport import StrikeRequest
 from fns.yamlio import dumps_yaml
 from tests.factories import NOW, SP_AGENT
+from tests.scope.writekit import APP_ESC, ESCALATED_FORMS, PRE_ROLES, strike_dict
 from tests.strike.faketenant import (
+    RECORDED_SCOUT_READS,
     SCOUT,
     FakeTenant,
     FakeWrites,
@@ -31,6 +33,10 @@ from tests.strike.faketenant import (
     manifest,
 )
 
+RECORDED_FORMS = tuple(op for op in USED_FORMS if op not in ESCALATED_FORMS)
+"""The recording holds S1 to S3 and D-1 to D-5 only. S4 needs a token exchange a
+recording can't replay without the token, so it is tested against the fake tenant
+(tests/strike/test_s4.py), and its scope block is left out here."""
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "strike-demo"
 RUN_IDS = {"before-harden": "202611251200-demo01", "after-harden": "202611251200-demo02"}
 STRIKES: dict[str, tuple[StrikeId, ...]] = {
@@ -73,7 +79,12 @@ def scope_text(lab: Lab) -> str:
 
 
 def make(scenario: str) -> tuple[str, StrikeRecording]:
-    lab = Lab(m=manifest(ops=USED_FORMS))
+    lab = Lab(
+        m=manifest(
+            ops=RECORDED_FORMS, scout=RECORDED_SCOUT_READS, strike=strike_dict(escalation=None)
+        )
+    )
+    lab.tenant.roles[APP_ESC] = PRE_ROLES  # recorded before Terraform defined the marker
     lab.tenant.hardened = scenario == "after-harden"
     rec = Recorder()
     reads = _Reads(lab.tenant, rec)

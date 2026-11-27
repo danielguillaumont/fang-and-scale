@@ -5,12 +5,14 @@ the plans approved (``docs/milestones/M4-plan.md``, ``M4-strikes-plan.md``):
 
 - nothing real filled in: every ID comes from a Terraform output or ``az``;
 - every ``fns`` command and option it uses exists;
-- the tool writes only through ``fns strike run``, only S1 to S3 and D-1 to D-5,
-  each with an approved hash and two separate CLI profiles;
+- the tool writes only through ``fns strike run``, only S1 to S4 and D-1 to D-5,
+  each with an approved hash and two separate CLI profiles; S4 right after S3,
+  in the same run (approved 2026-11-27);
 - every certificate lasts at most a day and is deleted again;
 - one query per strike, whose output names nothing identifying, and rules that
   exist in ``detections/``;
-- an emergency cleanup for every write a strike can make;
+- an emergency cleanup for every write a strike can make, the S4 marker
+  assignment included;
 - plan counts that match the lab's ``.tf`` files;
 - commands that prompt are pasted alone.
 """
@@ -74,7 +76,7 @@ def test_every_terraform_output_it_reads_exists() -> None:
         re.findall(r'^output "([a-z_]+)"', (ROOT / "lab" / "outputs.tf").read_text(), re.M)
     )
     used = set(re.findall(r"terraform -chdir=lab output -(?:raw|json) ([a-z_]+)", TEXT))
-    assert {"billing_agent", "scout", "resources", "monitoring"} <= used
+    assert {"billing_agent", "scout", "resources", "monitoring", "identities"} <= used
     assert used <= outputs, used - outputs
 
 
@@ -125,13 +127,12 @@ def test_the_tool_writes_only_through_strike_run() -> None:
     assert "git apply harden.diff" in TEXT
 
 
-def test_strikes_are_s1_to_s3_then_d1_to_d5_never_s4() -> None:
+def test_strikes_are_s1_to_s4_then_d1_to_d5() -> None:
     plans = [c for c in _fns_lines() if "strike plan" in c]
     assert [re.search(r"--strikes (\S+)", c)[1] for c in plans] == [  # type: ignore[index]
-        "S1,S2,S3",
+        "S1,S2,S3,S4",  # S4 only right after S3, in the same run
         "D-1,D-2,D-3,D-4,D-5",
     ]
-    assert "S4" not in " ".join(_fns_lines())
     runs = [c for c in _fns_lines() if re.search(r"strike (run|cleanup)", c)]
     assert len(runs) == 3
     for c in runs:
@@ -139,6 +140,21 @@ def test_strikes_are_s1_to_s3_then_d1_to_d5_never_s4() -> None:
         assert "--agent-config $agentDir" in c and "--scout-config $scoutDir" in c
     assert '$scoutDir = Join-Path $env:TEMP "fns-m4-scout-az"' in TEXT
     assert '$agentDir = Join-Path $env:TEMP "fns-m4-agent-az"' in TEXT
+
+
+def test_s4_is_reviewed_with_its_conditions() -> None:
+    c3, c4 = _section("### C3."), _section("### C4.")
+    assert "Expected: five writes, all `allowed`" in c3
+    assert (
+        "| `S4/token` | `POST https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token`" in c3
+    )
+    assert "**no secret**" in c3 and "right after `S4/token`" in c3
+    assert "`appRoleId` the marker" in c3 and "as the escalated identity" in c3
+    assert "| S4/assign       | allowed | succeeded | 201    | 204      |" in c4
+    assert "only its `oid` and `roles` claims" in c4
+    assert "`needs-emergency-cleanup`" in c4 and 'step 2, "S4"' in c4
+    c1 = _section("### C1.")
+    assert "`random_uuid.strike_marker[0]`" in c1 and '"Grants nothing"' in c1
 
 
 def test_the_approval_is_typed_by_the_owner_after_review() -> None:
@@ -231,14 +247,16 @@ def _queries() -> dict[str, str]:
 
 def test_one_query_per_strike_and_one_for_alerts() -> None:
     q = _queries()
-    assert {"qS1", "qS2", "qS3", "qAlerts"} <= set(q)
+    assert {"qS1", "qS2", "qS3", "qS4", "qAlerts"} <= set(q)
+    assert "Add app role assignment to service principal" in q["qS4"]
+    assert "Remove app role assignment from service principal" in q["qS4"]
     assert "LISTKEYS/ACTION" in q["qS1"] and "REGENERATEKEY/ACTION" in q["qS1"]
     assert "VAULTS/WRITE" in q["qS2"]
     assert "app-escalation-target" in q["qS3"] and "Change = case(" in q["qS3"]
     assert q["qAlerts"].startswith("SecurityAlert")
 
 
-@pytest.mark.parametrize("name", ["qS1", "qS2", "qS3", "qAlerts"])
+@pytest.mark.parametrize("name", ["qS1", "qS2", "qS3", "qS4", "qAlerts"])
 def test_query_output_names_nothing_identifying(name: str) -> None:
     query = _queries()[name]
     output = query[query.rindex("| project ") :] if "| project " in query else query
@@ -246,7 +264,7 @@ def test_query_output_names_nothing_identifying(name: str) -> None:
         output = query[query.rindex("| summarize ") :]
     for column in IDENTIFYING:
         assert column not in output, (name, column)
-    if name == "qS3":  # only whether an app or a user did it, never which one
+    if name in ("qS3", "qS4"):  # only whether an app or a user did it, never which one
         assert (
             "By = iff(isnotempty(tostring(InitiatedBy.app.servicePrincipalId)), 'app', 'user')"
             in output
@@ -260,6 +278,7 @@ def test_the_expected_rules_exist_with_their_display_names() -> None:
         "storage-listkeys-by-workload",
         "keyvault-control-plane-write-by-workload",
         "app-credential-added-by-workload",
+        "app-role-assignment-by-workload",
     ):
         assert f"`{rule}`" in table
         assert f'"{rules[rule]["display_name"]}"' in table
@@ -290,10 +309,14 @@ def test_the_base_plan_count_is_the_log_path_checks() -> None:
     assert len(_resource_blocks()) > int(m[1]) // 2  # sanity: the helper read the lab
 
 
-def test_strikes_add_only_the_expiry_and_rerender_the_scope() -> None:
+def test_strikes_add_the_expiry_and_the_marker_and_rerender_the_scope() -> None:
     c1 = _section("### C1.")
-    assert "`time_offset.strike_expiry[0]` is created" in c1 and "`local_file.scope`" in c1
-    assert "**2 to add, 0\nto change, 1 to destroy**" in c1
+    assert "`time_offset.strike_expiry[0]` and `random_uuid.strike_marker[0]`" in c1
+    assert "`azuread_application.escalation_target` is updated in place" in c1
+    assert "`local_file.scope`" in c1
+    assert "**3 to add, 1\nto change, 1 to destroy**" in c1
+    blocks = _resource_blocks()
+    assert "random_uuid.strike_marker" in blocks and "time_offset.strike_expiry" in blocks
     d5 = _section("### D5.")
     assert 'terraform -chdir=lab apply "-replace=time_offset.strike_expiry[0]"' in d5
     readme = (ROOT / "lab" / "README.md").read_text(encoding="utf-8")
@@ -334,8 +357,19 @@ def test_every_strike_write_has_a_manual_undo() -> None:
         "--key secondary",
         "uv run poe lab-down",
         "from strike_events",
+        "appRoles[?value=='fns.strike.marker'].id",  # S4
+        "az rest --method delete --url",
+        "value[?appRoleId=='$marker']",
     ):
         assert needed in emergency, needed
+    assert "It **cannot** undo `S4/assign`" in emergency
+
+
+def test_the_only_az_rest_writes_are_the_s4_emergency_deletes() -> None:
+    writes = [c for c in COMMANDS if c.startswith("az rest") and "--method get" not in c]
+    assert writes and all(c.startswith("az rest --method delete --url") for c in writes)
+    assert all("/appRoleAssignedTo/$a" in c for c in writes)
+    assert all(c in _session("Emergency cleanup") for c in writes)
 
 
 def test_the_agent_keeps_its_ownership_of_the_escalation_target() -> None:

@@ -79,12 +79,15 @@ def test_the_expected_plan_count_matches_the_lab() -> None:
         "azurerm_monitor_diagnostic_setting.blobs",
         "azurerm_monitor_aad_diagnostic_setting.entra",
         "azurerm_sentinel_alert_rule_scheduled.rules",
-        # lab/scope.tf (enable_strikes = false by default)
+        # lab/scope.tf and identities.tf (enable_strikes = false by default)
         "time_offset.strike_expiry",
+        "random_uuid.strike_marker",
     }
     copies = {
         "azuread_app_role_assignment.scout_graph": 4,
         "azurerm_role_assignment.runner_blobs": 2,
+        # one app: its for_each is the dynamic marker app_role block (S4), empty by default
+        "azuread_application.escalation_target": 1,
     }
     assert multi == off | set(copies)
     expected = len(blocks) - len(off) + sum(n - 1 for n in copies.values())

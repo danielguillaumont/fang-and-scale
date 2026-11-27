@@ -12,18 +12,25 @@ Defense in depth behind the write gate, which has already approved the request:
 
 Subclasses implement :meth:`StrikeTransport._exchange`: the live HTTPS transport
 here, and the fake tenant in the tests.
+
+S4's token request has its own :class:`TokenTransport`: ``POST`` to
+``login.microsoftonline.com`` only, form-encoded, no bearer token, no redirects. The
+client secret is added to the form inside :meth:`TokenTransport.send_token` and the
+``access_token`` is stripped from the answer before anything else sees it.
 """
 
 from __future__ import annotations
 
 import http.client
 import json
+import re
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, Final, Literal
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from fns.adapters.azure.http import TransportError
 from fns.adapters.azure.live import (
@@ -35,6 +42,7 @@ from fns.adapters.azure.live import (
     default_opener,
 )
 from fns.scope.credentials import TokenProvider
+from fns.scope.writes import TOKEN_HOST
 from fns.strike.secrets import SecretHolder, strip_secrets
 
 WriteApi = Literal["arm", "graph"]
@@ -122,27 +130,102 @@ class HttpStrikeTransport(StrikeTransport):
         req = urllib.request.Request(  # noqa: S310 - scheme and host checked in send()
             request.url, data=data, method=request.method, headers=headers
         )
-        try:
-            with self.opener.open(req, timeout=self.timeout) as resp:
-                return self._read(resp.status, resp.headers, resp)
-        except urllib.error.HTTPError as err:
-            try:
-                return self._read(err.code, err.headers, err)
-            finally:
-                err.close()
-        except (OSError, http.client.HTTPException) as exc:
-            raise TransportError(f"{type(exc).__name__}: network error") from exc
+        return _open(self.opener, req, self.timeout)
 
-    @staticmethod
-    def _read(status: int, headers: Any, stream: Any) -> tuple[int, object, str | None]:
-        raw = stream.read(MAX_BODY_BYTES + 1)
-        if len(raw) > MAX_BODY_BYTES:
-            raise TransportError("response body exceeds the size limit")
-        body: object = {}
-        if raw.strip():
-            try:
-                body = json.loads(raw)
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                body = {}
-        request_id = next((headers[h] for h in REQUEST_ID_HEADERS if headers.get(h)), None)
-        return status, body, request_id
+
+def _open(
+    opener: Opener, req: urllib.request.Request, timeout: float
+) -> tuple[int, object, str | None]:
+    try:
+        with opener.open(req, timeout=timeout) as resp:
+            return _read(resp.status, resp.headers, resp)
+    except urllib.error.HTTPError as err:
+        try:
+            return _read(err.code, err.headers, err)
+        finally:
+            err.close()
+    except (OSError, http.client.HTTPException) as exc:
+        raise TransportError(f"{type(exc).__name__}: network error") from exc
+
+
+def _read(status: int, headers: Any, stream: Any) -> tuple[int, object, str | None]:
+    raw = stream.read(MAX_BODY_BYTES + 1)
+    if len(raw) > MAX_BODY_BYTES:
+        raise TransportError("response body exceeds the size limit")
+    body: object = {}
+    if raw.strip():
+        try:
+            body = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            body = {}
+    request_id = next((headers[h] for h in REQUEST_ID_HEADERS if headers.get(h)), None)
+    return status, body, request_id
+
+
+# --- S4: the token request ------------------------------------------------------------
+
+_TOKEN_PATH = re.compile(r"^/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/oauth2/v2\.0/token$")
+TOKEN_FIELDS: Final = frozenset({"client_id", "grant_type", "scope"})
+
+
+@dataclass(frozen=True, slots=True)
+class TokenWire:
+    """S4 step 1 as sent, minus the secret: the gate approved exactly these fields."""
+
+    url: str
+    form: Mapping[str, str] = field(default_factory=dict)
+
+
+def check_token_wire(wire: TokenWire) -> None:
+    parts = urlsplit(wire.url)
+    if parts.scheme != "https" or parts.hostname != TOKEN_HOST:
+        raise TransportError(f"refusing to send a token request to {parts.hostname!r}")
+    if parts.port not in (None, 443) or parts.username or parts.password:
+        raise TransportError("refusing a token URL with a port or credentials")
+    if parts.query or parts.fragment or "#" in wire.url or not _TOKEN_PATH.fullmatch(parts.path):
+        raise TransportError("the token URL is /<tenant>/oauth2/v2.0/token and nothing else")
+    if set(wire.form) != TOKEN_FIELDS or not all(isinstance(v, str) for v in wire.form.values()):
+        raise TransportError(f"the token form is exactly {sorted(TOKEN_FIELDS)} plus the secret")
+
+
+class TokenTransport(ABC):
+    """Base class: :meth:`send_token` adds the secret and strips the token."""
+
+    def send_token(
+        self, wire: TokenWire, secret: str, holder: SecretHolder, step: str
+    ) -> StrikeResponse:
+        check_token_wire(wire)
+        if not isinstance(secret, str) or not secret:
+            raise TransportError("no client secret to send")
+        status, raw, request_id = self._exchange_token(wire, secret)
+        clean, found = strip_secrets(raw)
+        holder.put(step, found)
+        del raw, found, secret
+        if not isinstance(clean, dict):
+            clean = {}
+        return StrikeResponse(status, clean, request_id, holder.count_for(step))
+
+    @abstractmethod
+    def _exchange_token(self, wire: TokenWire, secret: str) -> tuple[int, object, str | None]:
+        """Send it; return ``(status, raw JSON body, request id)``."""
+
+
+class HttpTokenTransport(TokenTransport):
+    """The live token request: form-encoded, no bearer token, redirects refused."""
+
+    def __init__(self, *, opener: Opener | None = None, timeout: float = TIMEOUT_SECONDS) -> None:
+        self.opener = opener or default_opener()
+        self.timeout = timeout
+
+    def _exchange_token(self, wire: TokenWire, secret: str) -> tuple[int, object, str | None]:
+        data = urlencode({**dict(wire.form), "client_secret": secret}).encode()
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "User-Agent": USER_AGENT,
+        }
+        req = urllib.request.Request(  # noqa: S310 - scheme and host checked in send_token()
+            wire.url, data=data, method="POST", headers=headers
+        )
+        del data
+        return _open(self.opener, req, self.timeout)

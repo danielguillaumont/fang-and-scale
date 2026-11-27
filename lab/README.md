@@ -109,10 +109,19 @@ its feeds, and 11 rules.
 `scope.lab.yaml` is read-only by default. With `enable_strikes = true` in
 `terraform.tfvars`, `scope.tf` also renders what `fns strike` needs:
 
-- `allowed_operations.strike`: the seven write forms that S1 to S3 and D-1 to D-5
+- `allowed_operations.strike`: the nine write forms that S1 to S4 and D-1 to D-5
   use (`listKeys`, `regenerateKey`, the vault tag `PATCH`, `addPassword`,
-  `removePassword`, and adding and removing an owner). S4's three forms are left
-  out until S4 is built (`docs/DECISIONS.md`, "Proposal, pending review: S4");
+  `removePassword`, adding and removing an owner, and S4's marker assignment and
+  its removal). The app-roles `PATCH` is never listed: no strike defines a role;
+- the marker role on `app-escalation-target` (`identities.tf`): value
+  `fns.strike.marker`, "Grants nothing", `Application` only, with an ID from
+  `random_uuid.strike_marker`. S4 assigns it to the agent as
+  `app-escalation-target`, then removes it;
+- `strike.escalation`: `app-escalation-target`'s service principal (also a
+  `graph-service-principal` target) and the marker role's ID. It authorises S4's
+  token request and the escalated identity;
+- one more scout read, `graph:GET /servicePrincipals/{id}/appRoleAssignedTo`
+  (S4's pre-state and verification);
 - `strike.targets`: the payroll storage account, the crown-jewels vault, and the
   applications `app-escalation-target`, `id-verifier` and `sp-fns-scout`, each
   with the display name Terraform gave it. The agent itself is never a target;
