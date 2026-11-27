@@ -21,6 +21,7 @@ move a finding toward ``pass``.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Final
 
@@ -32,6 +33,8 @@ from fns.strike.plan import StrikePlan
 PLAN_FILE: Final = "plan.json"
 RUN_FILE: Final = "strike-run.json"
 COUNTED: Final[dict[str, str]] = {"denied": "denied", "unexpected-success": "allowed"}
+CONTRACT_ITEM: Final = re.compile(r"^((?:resource|directory|application):[^\s:]+) (\S+)$")
+"""``<kind>:<name> <operation>``, as a contract item's target and operation read."""
 
 
 class AfterStrikeError(ValueError):
@@ -64,9 +67,10 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
             continue
         status = w.get("status")
         for item in p.observes:
-            target, _, operation = item.rpartition(" ")
-            if not target or ":" not in target:
+            m = CONTRACT_ITEM.match(item)
+            if m is None:
                 continue  # D-1's "first hop" names a path, not a contract item
+            target, operation = m[1], m[2]
             out.append(
                 StrikeObservation(
                     version=1,

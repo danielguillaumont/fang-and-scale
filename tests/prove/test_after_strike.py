@@ -260,3 +260,43 @@ def test_a_tampered_strike_artifact_fails_the_check(tmp_path: Path, one_aset: As
     art.write_text(json.dumps(data))
     code, output = check_run(run_dir)
     assert code == 5 and "EVIDENCE INVALID" in output
+
+
+# --- the real `fns strike run` output (fixtures/strike-demo, after harden) ------------
+
+
+@pytest.fixture(scope="module")
+def demo_strike_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    from tests.strike.test_replay import plan
+    from tests.strike.test_replay import run as strike_run
+
+    p, h = plan(tmp_path_factory.mktemp("demo-strike"), "D-1,D-2,D-3,D-4,D-5")
+    assert strike_run(p, h).exit_code == 0
+    return p.parent
+
+
+def test_a_real_strike_run_maps_onto_contract_items(
+    demo_strike_dir: Path, one_aset: AssertionSet
+) -> None:
+    from fns.prove.strikes import load_after_strike
+
+    plan = StrikePlan.model_validate_json((demo_strike_dir / "plan.json").read_bytes())
+    same_tenant = one_aset.model_copy(update={"tenant_id": plan.tenant_id})
+    got = load_after_strike(demo_strike_dir, same_tenant)
+    assert sorted((o.strike, o.target, o.operation, o.outcome, o.http_status) for o in got) == [
+        ("D-2", "application:id-verifier", "credentials/update", "denied", 403),
+        ("D-2", "directory:tenant", "applications/credentials/update", "denied", 403),
+        ("D-3", "application:sp-fns-scout", "credentials/update", "denied", 403),
+        ("D-4", "application:id-verifier", "owners/update", "denied", 403),
+        ("D-5", "application:sp-fns-scout", "owners/update", "denied", 403),
+    ]  # D-1 observes a path's first hop, not a contract item: nothing for it
+    assert {o.mode for o in got} == {"FIXTURE"}
+    items = {(a.target, a.operation) for a in one_aset.assertions}
+    assert all((o.target, o.operation) in items for o in got)
+
+
+def test_the_demo_strike_tenant_is_not_the_prove_fixtures_tenant(
+    tmp_path: Path, demo_strike_dir: Path
+) -> None:
+    r = prove_with(ONE, tmp_path / "out", demo_strike_dir)
+    assert r.exit_code == 2 and "another tenant" in r.output
