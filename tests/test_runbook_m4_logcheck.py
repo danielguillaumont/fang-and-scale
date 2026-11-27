@@ -79,6 +79,8 @@ def test_the_expected_plan_count_matches_the_lab() -> None:
         "azurerm_monitor_diagnostic_setting.blobs",
         "azurerm_monitor_aad_diagnostic_setting.entra",
         "azurerm_sentinel_alert_rule_scheduled.rules",
+        # lab/scope.tf (enable_strikes = false by default)
+        "time_offset.strike_expiry",
     }
     copies = {
         "azuread_app_role_assignment.scout_graph": 4,

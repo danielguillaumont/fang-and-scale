@@ -103,3 +103,25 @@ its feeds, and 11 rules.
   `az rest --method get --url "https://management.azure.com/providers/microsoft.aadiam/diagnosticSettings?api-version=2017-04-01-preview"`.
 - **Both Entra categories work on Entra ID Free.** The log path check showed it
   on 2026-11-27 (`docs/FINDINGS.md`).
+
+## Strikes (M4, sessions C and D)
+
+`scope.lab.yaml` is read-only by default. With `enable_strikes = true` in
+`terraform.tfvars`, `scope.tf` also renders what `fns strike` needs:
+
+- `allowed_operations.strike`: the seven write forms that S1 to S3 and D-1 to D-5
+  use (`listKeys`, `regenerateKey`, the vault tag `PATCH`, `addPassword`,
+  `removePassword`, and adding and removing an owner). S4's three forms are left
+  out until S4 is built (`docs/DECISIONS.md`, "Proposal, pending review: S4");
+- `strike.targets`: the payroll storage account, the crown-jewels vault, and the
+  applications `app-escalation-target`, `id-verifier` and `sp-fns-scout`, each
+  with the display name Terraform gave it. The agent itself is never a target;
+- `strike.expires_at`: `strike_valid_hours` (default 4, at most 24) after it was
+  rendered. Renew it right before a session with
+  `terraform -chdir=lab apply "-replace=time_offset.strike_expiry[0]"`.
+
+The default plan doesn't change: `time_offset.strike_expiry` exists only when
+strikes are on, so they add **1** resource. Rendering the block sends nothing.
+Every write still needs `fns strike plan`, the operator's `--approve <plan
+hash>`, and the gate's live lab check. Turn it off again (`enable_strikes =
+false`, then `apply`) after session D.
