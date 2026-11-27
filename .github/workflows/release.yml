@@ -4,6 +4,11 @@ name: release
 # CycloneDX SBOM and SHA-256 sums, attests their build provenance (Sigstore, signed
 # with this workflow's OIDC identity), and creates a *draft* GitHub release with them.
 # A person reviews and publishes the draft. Nothing is uploaded to PyPI.
+#
+# Three jobs, so that only the attestation can mint a signing token: `build` runs the
+# full check and the build with read-only permissions; `attest` has `id-token: write`
+# and runs two pinned actions only (download the files, attest them), no shell step;
+# `draft` creates the draft release and cannot mint a token.
 on:
   push:
     tags: ["v*"]
@@ -17,12 +22,10 @@ concurrency:
 
 jobs:
   build:
-    name: build, check and draft the release
+    name: build and check
     runs-on: ubuntu-latest
     permissions:
-      contents: write # the draft release only
-      id-token: write # the provenance attestation's Sigstore certificate only
-      attestations: write # store that attestation on this repository
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,13 +49,46 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: sha256sum -- * > SHA256SUMS
+      - name: Hand the release files to the next jobs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: dist/
+          if-no-files-found: error
+
+  attest:
+    name: attest the build provenance
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # the provenance attestation's Sigstore certificate only
+      attestations: write # store that attestation on this repository
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: dist
       - name: Build provenance attestation (every release file)
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*
+
+  draft:
+    name: draft the release
+    needs: attest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the draft release only
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: dist
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: >-
           gh release create "$TAG" dist/*

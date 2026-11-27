@@ -46,10 +46,19 @@ def _workflow() -> dict[Any, Any]:
     return data
 
 
+JOBS = ("build", "attest", "draft")
+"""In order: each job needs the one before it."""
+
+
+def _job(name: str) -> dict[str, Any]:
+    job: dict[str, Any] = _workflow()["jobs"][name]
+    return job
+
+
 def _steps() -> list[dict[str, Any]]:
-    (job,) = _workflow()["jobs"].values()
-    steps: list[dict[str, Any]] = job["steps"]
-    return steps
+    """Every step, in run order (the jobs run one after another)."""
+    assert tuple(_workflow()["jobs"]) == JOBS
+    return [s for name in JOBS for s in _job(name)["steps"]]
 
 
 def _run_text() -> str:
@@ -65,24 +74,36 @@ def test_it_runs_only_on_a_version_tag() -> None:
 
 
 ATTEST = "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8"
-NEW_PINS = {ATTEST: "v4.2.2"}
-"""Pins used only here, each with its version comment (the provenance attestation)."""
+UPLOAD = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"
+DOWNLOAD = "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333"
+NEW_PINS = {ATTEST: "v4.2.2", DOWNLOAD: "v8.0.2"}
+"""Pins used only here, each with its version comment."""
 
 
 def test_permissions_are_read_only_except_the_draft_and_the_attestation() -> None:
     wf = _workflow()
     assert wf["permissions"] == {"contents": "read"}
-    (job,) = wf["jobs"].values()
-    assert job["permissions"] == {
-        "contents": "write",
-        "id-token": "write",
-        "attestations": "write",
+    assert {name: _job(name)["permissions"] for name in JOBS} == {
+        "build": {"contents": "read"},
+        "attest": {"contents": "read", "id-token": "write", "attestations": "write"},
+        "draft": {"contents": "write"},
     }
-    # the OIDC token is for the attestation: no step but that one is an action
-    actions = [s["uses"] for s in _steps() if "uses" in s]
-    assert actions == [
-        u for u in actions if u.startswith(("actions/checkout@", "astral-sh/setup-uv@"))
-    ] + [ATTEST]
+    assert [_job(name).get("needs") for name in JOBS] == [None, "build", "attest"]
+
+
+def test_only_the_attestation_step_can_mint_a_signing_token() -> None:
+    """id-token: write is per job, so the attest job runs two pinned actions and
+    nothing else: no shell step, no checkout, no container, no environment."""
+    attest = _job("attest")
+    assert [s.get("uses") for s in attest["steps"]] == [DOWNLOAD, ATTEST]
+    assert all("run" not in s and "env" not in s for s in attest["steps"])
+    assert set(attest) == {"name", "needs", "runs-on", "permissions", "steps"}
+    download, step = attest["steps"]
+    assert download["with"] == {"name": "release-files", "path": "dist"}
+    assert step["with"] == {"subject-path": "dist/*"}
+    # The full check, the build and the draft run where no token can be minted.
+    assert "poe check" in "\n".join(str(s.get("run", "")) for s in _job("build")["steps"])
+    assert _job("draft")["steps"][0]["uses"] == DOWNLOAD
 
 
 def test_every_action_is_pinned_like_the_other_workflows() -> None:
@@ -120,6 +141,9 @@ def test_it_checks_builds_writes_an_sbom_and_drafts_only() -> None:
     attest = next(s for s in _steps() if s.get("uses") == ATTEST)
     assert attest["with"] == {"subject-path": "dist/*"}  # wheel, sdist, SBOM and SHA256SUMS
     assert names.index("Checksums") < names.index(attest["name"]) < names.index("Draft release")
+    upload = next(s for s in _steps() if s.get("uses") == UPLOAD)
+    assert names.index("Checksums") < names.index(upload["name"])
+    assert upload["with"]["path"] == "dist/" and upload["with"]["if-no-files-found"] == "error"
     assert "--draft" in text and "--verify-tag" in text
     for publish in ("uv publish", "twine", "pypa/gh-action-pypi-publish", "--latest"):
         assert publish not in RELEASE.read_text(encoding="utf-8"), publish
