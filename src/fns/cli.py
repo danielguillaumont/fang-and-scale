@@ -437,6 +437,12 @@ def detections_export(
     raise typer.Exit(harden_cli.detections_export(make_console(), directory, param or [], out))
 
 
+_AFTER_STRIKE_OPT = typer.Option(
+    help="A `fns strike run` directory after harden: its D-1 to D-5 results become evidence "
+    "(they can only add context or fail a finding, never pass one)."
+)
+
+
 @app.command()
 def prove(
     contract: Annotated[Path, typer.Option(help="Contract file (*.fns.yaml).")],
@@ -468,6 +474,7 @@ def prove(
     identity: Annotated[str, typer.Option(help="Label for who the verifier ran as.")] = (
         "unspecified"
     ),
+    after_strike: Annotated[Path | None, _AFTER_STRIKE_OPT] = None,
 ) -> None:
     """Freeze assertions, run probes, and verify in a separate process (M3).
 
@@ -501,18 +508,27 @@ def prove(
         err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc
     if results is not None:
-        _run_prove(c, snap, MockProbe(results, at=snap.collected_at), out, sign, identity)
-    _run_live_prove(c, snap, scope, out, record, sign, identity)
+        probe = MockProbe(results, at=snap.collected_at)
+        _run_prove(c, snap, probe, out, sign, identity, after_strike)
+    _run_live_prove(c, snap, scope, out, record, sign, identity, after_strike)
 
 
 def _run_live_prove(
-    c: Any, snap: Any, scope: Path, out: Path, record: Path | None, sign: str, identity: str
+    c: Any,
+    snap: Any,
+    scope: Path,
+    out: Path,
+    record: Path | None,
+    sign: str,
+    identity: str,
+    after_strike: Path | None = None,
 ) -> None:
     from pydantic import ValidationError
 
     from fns.journal.sqlite import JournalError
     from fns.models.scope import ScopeExpiredError
     from fns.prove.live import LiveProveError, ProberNotAllowedError, run_live_prove
+    from fns.prove.strikes import AfterStrikeError
     from fns.scope.credentials import CredentialError, PrincipalMismatchError, TenantMismatchError
     from fns.yamlio import YamlError
 
@@ -527,7 +543,13 @@ def _run_live_prove(
             record=record,
             signer=sign,  # type: ignore[arg-type]  # checked by the caller
             identity=identity,
+            after_strike=after_strike,
         )
+    except AfterStrikeError as exc:
+        err.print(
+            f"--after-strike refused: {exc}. No probe was sent.", style="fns.fail", markup=False
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
     except (TenantMismatchError, PrincipalMismatchError, ProberNotAllowedError) as exc:
         err.print(f"refused: {exc}. No probe was sent.", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.SCOPE_DENIED) from exc
@@ -566,18 +588,42 @@ def _run_live_prove(
     raise typer.Exit(done.result.exit_code)
 
 
-def _run_prove(c: Any, snap: Any, probe: Any, out: Path, sign: str, identity: str) -> None:
+def _run_prove(
+    c: Any,
+    snap: Any,
+    probe: Any,
+    out: Path,
+    sign: str,
+    identity: str,
+    after_strike: Path | None = None,
+) -> None:
     from datetime import UTC, datetime
 
     from fns.console import FixtureConsole
     from fns.prove.run import prove as run_prove
+    from fns.prove.strikes import AfterStrikeError
 
     fixed = snap.collected_at if snap.mode == "FIXTURE" or probe.mode == "FIXTURE" else None
 
     def now() -> datetime:
         return fixed or datetime.now(UTC)
 
-    result = run_prove(c, snap, probe, out, now=now, signer=sign, identity=identity)  # type: ignore[arg-type]
+    try:
+        result = run_prove(
+            c,
+            snap,
+            probe,
+            out,
+            now=now,
+            signer=sign,  # type: ignore[arg-type]
+            identity=identity,
+            after_strike=after_strike,
+        )
+    except AfterStrikeError as exc:
+        make_console(stderr=True).print(
+            f"--after-strike refused: {exc}. Nothing was recorded.", style="fns.fail", markup=False
+        )
+        raise typer.Exit(ExitCode.INVALID_INPUT) from exc
     for line in result.output.splitlines():
         typer.echo(line)
     con = make_console()
@@ -980,6 +1026,7 @@ def demo_prove(
         typer.Option(help="Recorded fixture set to replay (uses its contract and probes.json)."),
     ] = LAB_RUN,
     sign: Annotated[str, typer.Option(help="offline-test or none.")] = "offline-test",
+    after_strike: Annotated[Path | None, _AFTER_STRIKE_OPT] = None,
 ) -> None:
     """Replay a fixture, freeze assertions, replay probe results, verify (FIXTURE).
 
@@ -1025,7 +1072,8 @@ def demo_prove(
         markup=False,
     )
     snap = scout_result.snapshot
-    _run_prove(c, snap, MockProbe(results, at=snap.collected_at), out, sign, "fixture-replay")
+    probe = MockProbe(results, at=snap.collected_at)
+    _run_prove(c, snap, probe, out, sign, "fixture-replay", after_strike)
 
 
 def _is_read(op: str) -> bool:

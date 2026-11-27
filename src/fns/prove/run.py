@@ -27,6 +27,7 @@ from fns.models.snapshot import Snapshot
 from fns.probes.base import Probe
 from fns.probes.runner import ProbeRun, freeze_into, run_probes
 from fns.prove.freeze import freeze
+from fns.prove.strikes import load_after_strike, record_strikes
 
 JOURNAL_FILE: Final = "journal.sqlite"
 SCRUBBED_PREFIXES: Final = ("AZURE_", "ARM_", "MSI_", "IDENTITY_", "MSAL_")
@@ -83,6 +84,7 @@ def prepare(
     out_dir: Path,
     *,
     now: Callable[[], datetime],
+    after_strike: Path | None = None,
 ) -> tuple[ContainReport, AssertionSet, Path, ProbeRun]:
     when = now()
     report = contain(contract, snapshot, now=when)
@@ -91,6 +93,8 @@ def prepare(
     if mode == "FIXTURE" and aset.mode != "FIXTURE":
         # Fixture probe results make the whole run FIXTURE evidence.
         aset = AssertionSet.model_validate({**aset.model_dump(), "mode": "FIXTURE"})
+    # Checked before the run directory exists: a strike run that cannot count stops here.
+    strikes = load_after_strike(after_strike, aset) if after_strike is not None else []
     run_dir = out_dir / "runs" / aset.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     with SqliteJournal(run_dir / JOURNAL_FILE, now=now) as journal:
@@ -99,6 +103,7 @@ def prepare(
         freeze_into(journal, aset, run_dir)
         built = probe if hasattr(probe, "observe") else probe(journal, aset.run_id)
         probes = run_probes(journal, aset, built, run_dir, now=now)  # type: ignore[arg-type]
+        record_strikes(journal, aset, strikes, run_dir)
     return report, aset, run_dir, probes
 
 
@@ -125,8 +130,11 @@ def prove(
     now: Callable[[], datetime],
     signer: Signer = "offline-test",
     identity: str = "unspecified",
+    after_strike: Path | None = None,
 ) -> ProveResult:
-    report, aset, run_dir, probes = prepare(contract, snapshot, probe, out_dir, now=now)
+    report, aset, run_dir, probes = prepare(
+        contract, snapshot, probe, out_dir, now=now, after_strike=after_strike
+    )
     done = spawn_verifier(["run", "--run", str(run_dir), "--sign", signer, "--identity", identity])
     output = done.stdout + (done.stderr or "")
     return ProveResult(report, aset, run_dir, probes, done.returncode, output)

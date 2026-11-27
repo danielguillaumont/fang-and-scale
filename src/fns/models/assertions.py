@@ -173,3 +173,46 @@ class ProbeObservation(FnsModel):
 
     def file_bytes(self) -> bytes:
         return (self.canonical_json() + "\n").encode("utf-8")
+
+
+StrikeItemOutcome = Literal["allowed", "denied"]
+
+
+def strike_step_key(write_key: str, item: str) -> str:
+    """The journal step of one strike observation: ``strike:<sha256 of key and item>``."""
+    text = "\x1f".join((write_key, item))
+    return "strike:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+class StrikeObservation(FnsModel):
+    """One after-harden attempt (D-1 to D-5) as evidence for one contract item (D6).
+
+    Written by ``fns prove --after-strike`` from a ``fns strike run`` and stored
+    content-addressed under ``artifacts/`` like a probe observation. The verifier
+    may only add it to a finding as context (a denial), or make the finding
+    stricter (a success fails it). It never moves a finding toward ``pass``
+    (decision of 2026-11-27).
+    """
+
+    __volatile__: ClassVar[frozenset[str]] = frozenset({"observed_at", "request_id"})
+
+    version: Literal[1]
+    mode: Literal["LIVE", "FIXTURE"]
+    strike_run_id: str = Field(pattern=r"^[a-z0-9-]{8,40}$")
+    plan_sha256: Hex64 = Field(pattern=r"^[0-9a-f]{64}$")
+    write_key: str = Field(pattern=r"^[A-Z0-9-]+/[a-z0-9-]+$")
+    strike: str = Field(pattern=r"^D-[1-9]$")
+    target: str = Field(min_length=1)
+    """The contract item's target, e.g. ``application:id-verifier``."""
+    operation: str = Field(min_length=1)
+    outcome: StrikeItemOutcome
+    http_status: int | None = None
+    request_id: str | None = None
+    observed_at: TzDatetime
+
+    @property
+    def step_key(self) -> str:
+        return strike_step_key(self.write_key, f"{self.target} {self.operation}")
+
+    def file_bytes(self) -> bytes:
+        return (self.canonical_json() + "\n").encode("utf-8")
