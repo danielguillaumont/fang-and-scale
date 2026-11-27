@@ -20,6 +20,7 @@ Terraform run. To resume, read this section first.
 | #66 | 4 (part 3) | **`lab/scope.tf` renders the `strike:` block**, only with `enable_strikes = true` (off by default; 1 more resource when on). The seven write forms the built strikes use, the five lab targets by Terraform reference, a 4-hour strike expiry. `lab-check` passes; tests render the template both ways and load it through the engine | 1625 |
 | #67 | 4 (part 4) | **D-1 to D-5 as verdict evidence (D6), with the guardrail.** `fns prove --after-strike <strike run dir>` (and `fns demo prove`) records each after-harden attempt as a frozen, journaled strike observation. The verifier adds a denial as context only. A success against a `must_not_reach` item fails it, and code refuses any verdict that would loosen. A new test re-runs every prove golden with every item struck, all denied and all succeeded: no finding moves toward pass, and denials change no decision. A strike run from another plan, tenant or mode is refused before anything is written. A tampered strike artifact fails `check`. The real `fixtures/strike-demo` after-harden run maps onto exactly the five application and directory items | 1649 |
 | #68 | 5 | **M4 live runbook** (`docs/runbooks/m4-live-run.md`), sessions A to D. It covers: rebuild; monitoring on (workspace, Sentinel, diagnostic settings, the 11 rules); legitimate use and `fns record`; strikes on; S1 to S3 with two CLI profiles; one KQL query per strike plus an alert query (D5); harden and apply; D-1 to D-5; `prove --live --after-strike`; teardown; and an emergency cleanup for every write a strike can make. Exact PowerShell, prompting commands alone, no real values. `tests/test_runbook_m4_live.py` checks every `fns` option, Terraform output, plan count, certificate lifetime and query column against the code. README and M4 plan point to it | 1675 |
+| #69 | 6 | **The report shows strikes, detections and the evidence ladder.**<br>`fns report --strike <dir>` (repeatable) shows each strike run: writes, outcomes, undos, what each observes, the scout's verification and the exit code.<br>`--detections <file>` shows the D5 results per strike: fired with latency, `detection-gap`, or no source rows. The new format (`schemas/detection-results.schema.json`) is operator-reported and never evidence.<br>Every finding gets a ladder column (one cell per rung, context marked). With `--prove`, its evidence table shows the bundle's evidence and roles.<br>The report refuses a strike run from another tenant or mode, or one that does not match its plan, and refuses detections for a run not on the page.<br>`strike-run.json` is read through one model (`StrikeRunRecord`) by the report and by `prove --after-strike`.<br>Cytoscape was already vendored and pinned by its SRI hash, and the page is still self-contained.<br>Golden: `tests/golden/report-strike-demo.html`, built through the real commands from demo-scout and strike-demo | 1701 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -30,8 +31,8 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 3. ~~Lab group (D3)~~ (#63)
 4. ~~Strike engine~~: core (#64), command and replay (#65), `lab/scope.tf` strike block (#66), D-1 to D-5 as verdict evidence (#67). S4 waits for a decision (Needs Daniel)
 5. ~~M4 live runbook~~ (#68)
-6. **Next:** Report and UX
-7. v0.1 release prep (no tag, no publish)
+6. ~~Report and UX~~ (#69)
+7. **Next:** v0.1 release prep (no tag, no publish)
 8. ARCHITECTURE and THREAT-MODEL
 9. M6 groundwork (read-only MCP server)
 10. Hardening and quality
@@ -83,6 +84,8 @@ Still pending (strike engine, #64; not in the approved list):
   `must_not_reach` item, and non-counting outcomes are dropped (#67).
 - the M4 live runbook's identity and cleanup choices (two profiles, a certificate per
   step, logs kept in `.fns`, the narrow S2 and owner undos) (#68).
+- detection results are an operator-reported file, shown in the report and never
+  evidence (#69).
 
 # Status after the M3 live run (2026-11-26)
 
