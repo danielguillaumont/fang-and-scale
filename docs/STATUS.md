@@ -15,6 +15,7 @@ Terraform run. To resume, read this section first.
 | #61 | 2 (part 1) | **Detection rules tested against sample rows.** `fns.harden.kql`, a small KQL evaluator that refuses anything it doesn't model; `detections/samples/<id>.yaml` for every rule, each with rows that must alert and rows that must not; `fns detections check` runs them. `app-credential-added-by-workload` no longer fires on a key delete. New rule `workload-sign-in-with-secret` for S4. Mutation tests show the samples catch the delete, a certificate sign-in, and an ignored failure | 1471 |
 | #62 | 2 (part 2) | **`lab/monitoring.tf` (D2)**, off by default (`enable_monitoring`). Workspace with Sentinel, Activity Log, Key Vault, blob and Entra diagnostic settings, and one scheduled rule per `detections/` file from the generated `lab/detections.json` (`fns detections export --terraform`, with `--check`). 18 more resources when on. `lab-check` passes; tests check every rule's table is fed, the rules are exactly `detections/`, and nothing deploys by default | 1482 |
 | #63 | 3 | **Lab group (D3):** `lab/groups.tf`, `grp-fns-billing`, a security group with `sp-billing-agent` as its only member, no roles, not role-assignable. The scout already reads `memberOf`, and the model already has groups; new tests check the lab-shaped response becomes one edge and that a group with no roles changes no verdict. The default lab plan is now **37 to add** (39 with the budget) | 1487 |
+| #64 | 4 (part 1) | **Strike engine core (`fns.strike`), no command yet.** Plans and their sha256, approval that admits one armed request at a time, journaled intent and result for every write (new append-only `strike_events` table, no bodies or secrets), every undo in a `finally` in reverse order, verification by the scout, journal-driven cleanup after a crash. S1 to S3, and D-1 to D-5 expecting denials. Secrets stripped inside the transport. Tested against a fake tenant only: faults at every step, a crash at every send, tampered hashes, a dropped undo caught by verification, and a fuzz test over fault schedules | 1591 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -23,7 +24,7 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 1. ~~Log path check results~~ (#60)
 2. ~~Detection rules~~: sample-row tests (#61), `lab/monitoring.tf` (#62)
 3. ~~Lab group (D3)~~ (#63)
-4. **Next:** strike engine
+4. Strike engine: ~~core~~ (#64). **Next:** S4 (escalated sign-in, gate rule), then `fns strike plan/run/cleanup` with recorded-fixture replay, then D-1 to D-5 as verdict evidence (approved with the guardrail)
 5. M4 live runbook
 6. Report and UX
 7. v0.1 release prep (no tag, no publish)
@@ -37,17 +38,17 @@ Nothing yet.
 
 ### Pending review
 
-Choices made where the plans are silent, marked "pending review" in
-`docs/DECISIONS.md`:
+Approved on 2026-11-27 (marked in `docs/DECISIONS.md`): the KQL evaluator, the
+two rule choices, the 1 GB cap, both ID kinds monitored, the plan expiry and
+pre-state re-read, journal-driven cleanup, the `strike_events` table, and D-1 to
+D-5 as verdict evidence with the "never looser" guardrail.
 
-- our own KQL subset evaluator for the rule samples (#61);
-- `app-credential-added-by-workload` alerts when it can't tell an add from a
-  delete (#61);
-- `workload-sign-in-with-secret` alerts on any credential type other than the
-  three key-based ones, rather than only on `clientSecret` (#61);
-- a 1 GB daily ingestion cap on the lab workspace (#62);
-- the monitored identities list both object and client IDs, until session B
-  shows what `AzureActivity.Caller` holds (#62).
+Still pending (strike engine, #64; not in the approved list):
+
+- a transport error counts as "sent", so the undo runs (S1 regenerates both keys);
+- a lost `addPassword` answer is undone by the run's credential name;
+- an after-harden attempt that succeeds is undone at once;
+- `fns strike` exit codes 0 / 1 / 4 / 5, with 5 (verification failed) first.
 
 # Status after the M3 live run (2026-11-26)
 

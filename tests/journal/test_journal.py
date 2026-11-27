@@ -41,9 +41,17 @@ def test_update_and_delete_are_rejected_on_every_table(journal: SqliteJournal) -
         GateRecord("r1", 1, "scout", "op", "t", "ten", None, None, "allowed", None, "", T0)
     )
     journal.record_call_result("r1", 1, "succeeded", "", T0)
+    journal.strike_event("r1", "S1/list-keys", "intent", {"method": "POST"})
     conn = sqlite3.connect(journal.path)
     try:
-        for table in ("runs", "steps", "step_events", "gate_decisions", "gate_results"):
+        for table in (
+            "runs",
+            "steps",
+            "step_events",
+            "gate_decisions",
+            "gate_results",
+            "strike_events",
+        ):
             with pytest.raises(sqlite3.IntegrityError, match="append-only"):
                 conn.execute(f"DELETE FROM {table}")  # noqa: S608
             with pytest.raises(sqlite3.IntegrityError, match="append-only"):
@@ -268,3 +276,20 @@ class JournalMachine(RuleBasedStateMachine):
 
 JournalMachine.TestCase.settings = settings(max_examples=30, stateful_step_count=15, deadline=None)
 test_journal_state_machine = JournalMachine.TestCase
+
+
+def test_strike_events_round_trip_in_order(journal: SqliteJournal) -> None:
+    journal.strike_event("r1", "S3/add-password", "intent", {"url": "u", "b": 1})
+    journal.strike_event(
+        "r1", "S3/add-password", "result", {"status": 200, "learned": {"keyId": "k"}}
+    )
+    journal.strike_event("r2", "S1/list-keys", "intent", {})
+    assert journal.strike_events("r1") == [
+        ("S3/add-password", "intent", {"b": 1, "url": "u"}),
+        ("S3/add-password", "result", {"learned": {"keyId": "k"}, "status": 200}),
+    ]
+
+
+def test_strike_event_phase_is_checked(journal: SqliteJournal) -> None:
+    with pytest.raises(sqlite3.IntegrityError):
+        journal.strike_event("r1", "k", "rewrite", {})  # type: ignore[arg-type]
