@@ -56,3 +56,26 @@ variable "github_repository" {
   type        = string
   default     = ""
 }
+
+variable "budget_alert_email" {
+  description = "Where the lab budget alert goes (M4 D7). Empty: no budget. Set it in terraform.tfvars only, never in a committed file."
+  type        = string
+  default     = ""
+  sensitive   = true
+
+  validation {
+    condition     = var.budget_alert_email == "" || can(regex("^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$", var.budget_alert_email))
+    error_message = "budget_alert_email must be empty or one email address."
+  }
+}
+
+variable "budget_amount" {
+  description = "Monthly lab budget in the billing currency (M4 D7). Alerts at 50% and 100% actual, and 100% forecast."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.budget_amount >= 1 && var.budget_amount <= 100
+    error_message = "budget_amount must be between 1 and 100."
+  }
+}
