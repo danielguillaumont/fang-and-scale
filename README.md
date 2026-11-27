@@ -205,6 +205,14 @@ coverage. Semantics the model does not support give `inconclusive`, never `pass`
 not proof of absence either: a `must_not_reach` item passes only with an observed
 denial, every path refuted, and no open surfaces.
 
+**A deliberate limit: `roleAssignments/write` on the directory.** The only direct
+test of "can this identity assign a directory role?" is to assign one, and the tool
+never does (M4 strike plan, the stop line). So this item can't get an observed
+denial. After a fix, the escalation path to it is refuted by observation: the
+first hop is attempted and denied. The item itself still reports `inconclusive`,
+with that reason, and counts against the contract's `max_inconclusive`. It is not
+reported as a pass, because nothing observed the direct operation fail.
+
 | Rung | Means | Produced by | Status |
 | --- | --- | --- | --- |
 | 1 modeled | the reach model says so, from a snapshot | `fns contain` | built; live scout ran in M1 |
@@ -291,6 +299,14 @@ not a trusted log, and reports label them `Sigstore STAGING`.
 - **Read-only by default.** Only `strike` and `harden --apply` may ever write, only
   to the lab, and only after `--approve <plan-hash>`. Neither is built:
   `harden --apply` refuses.
+- **The write gate is built first, with nothing calling it yet** (M4).
+  `Gate.check_write` allows only ten write forms, and only:
+  - to Terraform-rendered lab objects that pass a live tag check;
+  - with bodies limited to known keys;
+  - inside an approved plan.
+  A hard denylist runs before the scope is even read, and no scope can lift it.
+  It covers directory roles, permission grants, ARM authorization, the logging
+  providers and Microsoft first-party IDs.
 - **Scope gate.** Every Azure and Graph request, page and retry goes through
   `fns.scope.gate`. Anything missing, expired or mismatched is denied. The gate has
   negative tests for each rule and Hypothesis property tests.
@@ -328,8 +344,8 @@ so does an internal error, so a crash never looks like a verdict.
 - **The lab is torn down.** The next live work is M4: harden the lab, prove the
   fix, and run the detections in a Log Analytics workspace. Spec:
   `docs/milestones/M4.md`; live plan (decisions approved):
-  `docs/milestones/M4-plan.md`; strike plan, awaiting approval:
-  `docs/milestones/M4-strikes-plan.md`.
+  `docs/milestones/M4-plan.md`; strike plan (approved; the write gate is built,
+  no strike code yet): `docs/milestones/M4-strikes-plan.md`.
 
 Day-to-day state: `docs/STATUS.md`. What each fixture proves: [Real vs.
 fixture](#real-vs-fixture).

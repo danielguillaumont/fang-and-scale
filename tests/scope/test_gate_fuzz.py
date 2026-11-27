@@ -328,11 +328,12 @@ def test_forged_manifest_cannot_grant_writes_to_read_only_verbs(verb: str, op: s
 
 
 @given(op=st.sampled_from([ARM_WRITE, LIST_KEYS]), verb=st.sampled_from(["strike", "harden"]))
-def test_no_writes_in_m1_for_any_verb(op: str, verb: str) -> None:
-    m = ScopeManifest.model_validate(scope_dict(allowed_operations={verb: [op]}))
+def test_no_writes_on_the_read_path_for_any_verb(op: str, verb: str) -> None:
+    # Writes go through check_write only; check() never allows one, whatever is listed.
+    m = ScopeManifest.model_construct(**{**MANIFEST.__dict__, "allowed_operations": {verb: (op,)}})
     gate, _, _ = make_gate(m)
     d = gate.check(verb, op, RG, TENANT, pid(100))
-    assert isinstance(d, Denied) and d.reason is DenyReason.WRITE_NOT_AVAILABLE_IN_M1
+    assert isinstance(d, Denied) and d.reason is DenyReason.WRITE_ON_READ_PATH
 
 
 # --- budget ------------------------------------------------------------------------------------

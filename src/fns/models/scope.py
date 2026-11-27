@@ -7,16 +7,18 @@ nothing. The model never reads the wall clock; expiry is checked by
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, ClassVar, Final, Literal
 
 from pydantic import AfterValidator, Field, PositiveInt, field_validator, model_validator
 
-from fns.models.armid import parse_arm_id
+from fns.models.armid import GUID_RE, parse_arm_id
 from fns.models.base import FnsModel
+from fns.models.firstparty import is_first_party
 from fns.models.ids import ArmId, Guid, TzDatetime
-from fns.models.operations import OperationError, parse_operation
+from fns.models.operations import WRITE_FORM_KEYS, OperationError, parse_operation
 from fns.yamlio import load_yaml, loads_yaml
 
 Verb = Literal["scout", "contain", "strike", "harden", "prove", "molt"]
@@ -108,6 +110,74 @@ class DataObject(FnsModel):
         return self
 
 
+StrikeTargetKind = Literal["arm", "graph-application", "graph-service-principal"]
+
+
+class StrikeTarget(FnsModel):
+    """One object ``strike`` may write to (M4 strike plan, "Lab objects only").
+
+    Rendered by Terraform from the lab's own resources, never hand-written. A Graph
+    target also has to pass a live check (its lab tags and display name) before the
+    gate allows the first write to it.
+    """
+
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"display_name", "application"})
+
+    kind: StrikeTargetKind
+    id: str = Field(min_length=1, max_length=2048)
+    """A full ARM ID (``arm``: a vault or a storage account) or an Entra object ID."""
+    display_name: str | None = Field(default=None, min_length=1, max_length=256)
+    """Graph targets: the display name Terraform gave the object; the live check
+    compares it."""
+    application: Guid | None = None
+    """Service principals: the object ID of its application, also a target."""
+
+    @model_validator(mode="after")
+    def _shape(self) -> StrikeTarget:
+        if self.kind == "arm":
+            if data_resource(self.id) is None:
+                raise ValueError("an arm strike target is exactly one vault or storage account")
+            if self.display_name is not None or self.application is not None:
+                raise ValueError("an arm strike target has no display_name or application")
+            return self
+        if not GUID_RE.fullmatch(self.id):
+            raise ValueError(f"a {self.kind} target id is an object ID (GUID)")
+        if is_first_party(self.id):
+            raise ValueError("a strike target can never be a Microsoft first-party object")
+        if self.display_name is None:
+            raise ValueError(f"a {self.kind} target needs its display_name")
+        if (self.kind == "graph-service-principal") != (self.application is not None):
+            raise ValueError("a service principal target, and only one, names its application")
+        return self
+
+    @property
+    def key(self) -> str:
+        """Canonical ID: lowercased ARM ID or canonical GUID."""
+        if self.kind == "arm":
+            return parse_arm_id(self.id).format()
+        return str(uuid.UUID(self.id))
+
+
+class StrikeScope(FnsModel):
+    """The ``strike:`` block: which lab objects strikes may write, and until when."""
+
+    expires_at: TzDatetime
+    """Strike writes stop at this instant, even if the manifest is still valid."""
+    targets: tuple[StrikeTarget, ...] = Field(min_length=1)
+
+    @field_validator("targets")
+    @classmethod
+    def _targets(cls, v: tuple[StrikeTarget, ...]) -> tuple[StrikeTarget, ...]:
+        keys = [t.key for t in v]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate strike target")
+        apps = {t.key for t in v if t.kind == "graph-application"}
+        for t in v:
+            if t.application is not None and str(t.application) not in apps:
+                raise ValueError(f"service principal {t.key}: its application is not a target")
+        return tuple(sorted(v, key=lambda t: (t.kind, t.key)))
+
+
 class ScopeBudget(FnsModel):
     """Per-run limits enforced by the gate."""
 
@@ -118,7 +188,7 @@ class ScopeBudget(FnsModel):
 class ScopeManifest(FnsModel):
     """The scope manifest (``scope.yaml``)."""
 
-    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"data_objects"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"data_objects", "strike"})
 
     version: Literal[1]
     tenant_id: Guid
@@ -131,6 +201,8 @@ class ScopeManifest(FnsModel):
     """Exact operations per verb. A missing verb allows nothing."""
     data_objects: tuple[DataObject, ...] = ()
     """Data-plane objects ``prove`` may read. Empty means no data-plane call at all."""
+    strike: StrikeScope | None = None
+    """Lab objects ``strike`` may write to (M4). Absent means no write at all."""
     budget: ScopeBudget
     expires_at: TzDatetime
     """After this instant the manifest allows nothing."""
@@ -171,6 +243,15 @@ class ScopeManifest(FnsModel):
             data = [op for op in ops if parse_operation(op).is_data_plane]
             if data and verb != DATA_PLANE_VERB:
                 raise ValueError(f"data-plane operations are allowed only under prove: {data}")
+            if verb == "strike":
+                unknown = [
+                    op
+                    for op in ops
+                    if not parse_operation(op).is_read
+                    and parse_operation(op).key not in WRITE_FORM_KEYS
+                ]
+                if unknown:
+                    raise ValueError(f"strike may list only the M4 write forms, not: {unknown}")
             if verb in READ_ONLY_VERBS:
                 writes = [op for op in ops if not parse_operation(op).is_read]
                 if writes:
@@ -197,6 +278,21 @@ class ScopeManifest(FnsModel):
                 raise ValueError(f"data object {d.resource} is outside allowed_resource_groups")
             if parse_operation(d.operation).key not in listed:
                 raise ValueError(f"data object operation {d.operation} is not listed under prove")
+        return self
+
+    @model_validator(mode="after")
+    def _strike_targets_in_scope(self) -> ScopeManifest:
+        if self.strike is None:
+            return self
+        rgs = {parse_arm_id(rg).format() for rg in self.allowed_resource_groups}
+        tests = {str(i.object_id) for i in self.test_identities}
+        for t in self.strike.targets:
+            if t.kind == "arm" and parse_arm_id(t.id).resource_group_id not in rgs:
+                raise ValueError(f"strike target {t.id} is outside allowed_resource_groups")
+            if t.kind != "arm" and t.key == str(self.tenant_id):
+                raise ValueError("the tenant itself is not a strike target")
+            if t.kind == "graph-application" and t.key in tests:
+                raise ValueError("an application object cannot be a test identity")
         return self
 
     @model_validator(mode="after")
