@@ -19,6 +19,7 @@ from tests.factories import NOW, RG, SP_AGENT, SUB, TENANT
 LAB = Path(__file__).resolve().parents[1] / "lab"
 FOR_BLOCK = "%{ for op in operations ~}\n    - ${op}\n%{ endfor ~}\n"
 PROVE_BLOCK = "%{ for op in prove_operations ~}\n    - ${op}\n%{ endfor ~}\n"
+STRIKE_IF = re.compile(r"%\{ if enable_strikes ~\}\n.*?%\{ endif ~\}\n", re.S)
 OBJECTS_BLOCK = (
     "%{ for obj in data_objects ~}\n"
     "  - resource: ${obj.resource}\n"
@@ -85,6 +86,12 @@ def _prove_operations() -> tuple[list[str], list[tuple[str, str]]]:
 
 def _render(operations: list[str]) -> str:
     template = (LAB / "scope.lab.yaml.tftpl").read_text(encoding="utf-8")
+    # enable_strikes = false (the default): Terraform drops the strike blocks.
+    # tests/test_lab_strikes.py renders them switched on.
+    return _render_template(STRIKE_IF.sub("", template), operations)
+
+
+def _render_template(template: str, operations: list[str]) -> str:
     prove_ops, objects = _prove_operations()
     for block in (FOR_BLOCK, PROVE_BLOCK, OBJECTS_BLOCK):
         assert block in template

@@ -19,6 +19,12 @@ allowed_operations:
 %{ for op in prove_operations ~}
     - ${op}
 %{ endfor ~}
+%{ if enable_strikes ~}
+  strike:
+%{ for op in strike_operations ~}
+    - ${op}
+%{ endfor ~}
+%{ endif ~}
 data_objects:
 %{ for obj in data_objects ~}
   - resource: ${obj.resource}
@@ -28,3 +34,17 @@ budget:
   max_api_calls: 500
   max_minutes: 15
 expires_at: "${expires_at}"
+%{ if enable_strikes ~}
+strike:
+  expires_at: "${strike_expires_at}"
+  targets:
+%{ for id in strike_arm_targets ~}
+    - kind: arm
+      id: ${id}
+%{ endfor ~}
+%{ for app in strike_app_targets ~}
+    - kind: graph-application
+      id: ${app.id}
+      display_name: ${app.display_name}
+%{ endfor ~}
+%{ endif ~}

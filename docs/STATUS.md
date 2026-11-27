@@ -17,6 +17,7 @@ Terraform run. To resume, read this section first.
 | #63 | 3 | **Lab group (D3):** `lab/groups.tf`, `grp-fns-billing`, a security group with `sp-billing-agent` as its only member, no roles, not role-assignable. The scout already reads `memberOf`, and the model already has groups; new tests check the lab-shaped response becomes one edge and that a group with no roles changes no verdict. The default lab plan is now **37 to add** (39 with the budget) | 1487 |
 | #64 | 4 (part 1) | **Strike engine core (`fns.strike`), no command yet.** Plans and their sha256, approval that admits one armed request at a time, journaled intent and result for every write (new append-only `strike_events` table, no bodies or secrets), every undo in a `finally` in reverse order, verification by the scout, journal-driven cleanup after a crash. S1 to S3, and D-1 to D-5 expecting denials. Secrets stripped inside the transport. Tested against a fake tenant only: faults at every step, a crash at every send, tampered hashes, a dropped undo caught by verification, and a fuzz test over fault schedules | 1591 |
 | #65 | 4 (part 2) | **`fns strike plan | run | cleanup`.** Live mode signs in two identities from two Azure CLI config dirs (agent writes, scout reads), checked before any call. `--fixture fixtures/strike-demo` replays a strict recording, generated from the fake tenant and labelled FIXTURE. ARM targets must carry the lab tags. Proposal for S4's gate rules recorded (pending review) | 1621 |
+| #66 | 4 (part 3) | **`lab/scope.tf` renders the `strike:` block**, only with `enable_strikes = true` (off by default; 1 more resource when on). The seven write forms the built strikes use, the five lab targets by Terraform reference, a 4-hour strike expiry. `lab-check` passes; tests render the template both ways and load it through the engine | 1625 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -25,7 +26,7 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 1. ~~Log path check results~~ (#60)
 2. ~~Detection rules~~: sample-row tests (#61), `lab/monitoring.tf` (#62)
 3. ~~Lab group (D3)~~ (#63)
-4. Strike engine: ~~core~~ (#64), ~~command and replay~~ (#65). **Next:** `lab/scope.tf` renders the `strike:` block (off by default), then D-1 to D-5 as verdict evidence (approved, with the guardrail). S4 waits for a decision (Needs Daniel)
+4. Strike engine: ~~core~~ (#64), ~~command and replay~~ (#65). ~~`lab/scope.tf` strike block~~ (#66). **Next:** D-1 to D-5 as verdict evidence (approved, with the guardrail). S4 waits for a decision (Needs Daniel)
 5. M4 live runbook
 6. Report and UX
 7. v0.1 release prep (no tag, no publish)
@@ -58,6 +59,7 @@ Still pending (strike engine, #64; not in the approved list):
   before any write (hash, identity, scope, changed lab) are 4 (#65);
 - two Azure CLI config dirs for the agent and the scout (#65);
 - ARM strike targets must carry the lab tags (#65).
+- the `strike:` block is rendered only with `enable_strikes`, and lists only the built strikes' forms (#66).
 
 # Status after the M3 live run (2026-11-26)
 

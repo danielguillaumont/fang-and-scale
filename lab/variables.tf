@@ -96,3 +96,20 @@ variable "monitoring_daily_quota_gb" {
     error_message = "monitoring_daily_quota_gb must be between 0.1 and 10."
   }
 }
+
+variable "enable_strikes" {
+  description = "Render the strike: block into scope.lab.yaml (M4 sessions C and D). Off: the scope stays read-only."
+  type        = bool
+  default     = false
+}
+
+variable "strike_valid_hours" {
+  description = "Hours the strike: block is valid after it is rendered (re-render with -replace=time_offset.strike_expiry)."
+  type        = number
+  default     = 4
+
+  validation {
+    condition     = var.strike_valid_hours >= 1 && var.strike_valid_hours <= 24
+    error_message = "strike_valid_hours must be between 1 and 24."
+  }
+}
