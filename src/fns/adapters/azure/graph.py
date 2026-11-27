@@ -17,7 +17,7 @@ from fns.inventory.builder import (
     SnapshotBuilder,
 )
 from fns.models.armid import GUID_RE
-from fns.models.snapshot import EntityType, Provenance
+from fns.models.snapshot import AGENT_ID_ODATA_TYPES, AGENT_ID_PROPERTY, EntityType, Provenance
 from fns.scope.targets import DirectoryTarget
 
 OP_SERVICE_PRINCIPALS: Final = "graph:GET /servicePrincipals"
@@ -87,7 +87,20 @@ ODATA_TYPES: Final[dict[str, EntityType]] = {
     "#microsoft.graph.group": "group",
     "#microsoft.graph.servicePrincipal": "servicePrincipal",
     "#microsoft.graph.application": "application",
+    **{odata: base for odata, (_kind, base) in AGENT_ID_ODATA_TYPES.items()},
 }
+
+
+def _agent_id_props(item: dict[str, Any], base: EntityType) -> dict[str, str]:
+    """``{agentIdType: kind}`` for an Agent ID object of this base type, else ``{}``.
+
+    Set only on Agent ID objects, so every other entity (and every existing
+    snapshot digest) stays exactly as it was."""
+    found = AGENT_ID_ODATA_TYPES.get(str(item.get("@odata.type", "")))
+    if found is None or found[1] != base:
+        return {}
+    return {AGENT_ID_PROPERTY: found[0]}
+
 
 _DIR = DirectoryTarget()
 
@@ -179,8 +192,9 @@ def parse_service_principals(
         try:
             sp_id = _guid(item.get("id"))
             kind = item.get("servicePrincipalType")
+            agent = _agent_id_props(item, "servicePrincipal")
             etype: EntityType = (
-                "managedIdentity" if kind == "ManagedIdentity" else "servicePrincipal"
+                "managedIdentity" if kind == "ManagedIdentity" and not agent else "servicePrincipal"
             )
             app_roles = {
                 _guid(r.get("id")): str(r.get("value"))
@@ -200,6 +214,7 @@ def parse_service_principals(
                     if isinstance(owner_org, str)
                     else None,
                     "appRoles": tuple(f"{rid}={val}" for rid, val in app_roles.items()),
+                    **agent,
                 },
                 priority=PRIORITY_PRIMARY,
             )
@@ -218,7 +233,7 @@ def parse_applications(
                 _guid(item.get("id")),
                 "application",
                 display_name=item.get("displayName"),
-                properties={"appId": item.get("appId")},
+                properties={"appId": item.get("appId"), **_agent_id_props(item, "application")},
                 priority=PRIORITY_PRIMARY,
             )
             app_id = str(item.get("appId", "")).lower()
@@ -238,6 +253,7 @@ def _directory_object(b: SnapshotBuilder, item: dict[str, Any]) -> str | None:
         _guid(item.get("id")),
         etype,
         display_name=item.get("displayName"),
+        properties=_agent_id_props(item, etype),
         priority=PRIORITY_REFERENCE,
     )
 

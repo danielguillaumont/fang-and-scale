@@ -628,7 +628,7 @@ def evaluate(contract: Contract, snapshot: Snapshot) -> Evaluation:
         *(("must_still_do", i) for i in contract.must_still_do),
     ]
     for kind, item in items:
-        context = [who.reason]
+        context = [who.reason, *(closure.agent_ids if closure is not None else ())]
         target: Entity | None = None
         res = None
         if isinstance(item, ResourceTarget):

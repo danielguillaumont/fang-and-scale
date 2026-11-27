@@ -5,26 +5,35 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_ID = (ROOT / "docs" / "milestones" / "M6-agent-id.md").read_text(encoding="utf-8")
 BAKEOFF = (ROOT / "docs" / "milestones" / "M6-bakeoff.md").read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("text", [AGENT_ID, BAKEOFF], ids=["agent-id", "bakeoff"])
-def test_they_say_they_are_notes_and_list_their_pending_decisions(text: str) -> None:
-    assert "**Status: design notes only.** Nothing here is built." in text
-    assert "## Decisions this needs" in text and "pending review" in text
+def test_the_bakeoff_says_it_is_notes_and_lists_its_pending_decisions() -> None:
+    assert "**Status: design notes only.** Nothing here is built." in BAKEOFF
+    assert "## Decisions this needs" in BAKEOFF and "pending review" in BAKEOFF
 
 
-def test_the_agent_id_gap_is_still_the_gap() -> None:
-    # The note says the collector does not recognise agent identities. When it does,
-    # update "The gap today" in docs/milestones/M6-agent-id.md, then this test.
+def test_the_agent_id_notes_say_exactly_what_is_built() -> None:
+    assert "**Status: design notes, except the first step.**" in AGENT_ID
+    assert "## Decisions this needs" in AGENT_ID and "pending review" in AGENT_ID
+    assert "approved 2026-11-27 and\n   built" in AGENT_ID
+
+
+def test_the_agent_id_first_step_is_in_the_code() -> None:
+    # "The gap today" says the collector recognises the three types and that
+    # findings are not assessed. Keep it true; the behaviour is in test_agent_id.py.
     graph = (ROOT / "src" / "fns" / "adapters" / "azure" / "graph.py").read_text(encoding="utf-8")
-    assert "agentIdentity" not in graph
-    assert '"managedIdentity" if kind == "ManagedIdentity" else "servicePrincipal"' in graph
+    snapshot = (ROOT / "src" / "fns" / "models" / "snapshot.py").read_text(encoding="utf-8")
+    for odata in ("agentIdentity", "agentIdentityBlueprint", "agentIdentityBlueprintPrincipal"):
+        assert f'"#microsoft.graph.{odata}"' in snapshot
+        assert f"`{odata}`" in AGENT_ID
+    assert "AGENT_ID_ODATA_TYPES" in graph
+    assert '"Agent ID inheritance not modeled"' in snapshot
+    assert "agent-id-inheritance:not-modeled" in AGENT_ID
     assert "## The gap today" in AGENT_ID
+    assert (ROOT / "tests" / "contain" / "test_agent_id.py").is_file()
 
 
 def test_every_lab_check_is_numbered_once() -> None:
