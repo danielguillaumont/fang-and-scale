@@ -1,0 +1,377 @@
+# M4 live plan: record, harden, prove the fix, detections
+
+**Status: plan, waiting for your decisions (end of this file). Nothing in it has
+been built or run.** Written 2026-11-26, after the repository went public and the
+lab was torn down. The spec is `docs/milestones/M4.md` (K1 to K5). This file is
+the live half: what runs in the tenant, in what order, who does each step, what
+it costs, and what has to be built first.
+
+## Goal and exit gate
+
+M4 is done when, on a freshly built lab:
+
+1. **Record.** `fns record` turns real Log Analytics rows from the agent's
+   legitimate use into `must_still_do` items (`source: recorded`).
+2. **Harden.** `fns harden` proposes the smallest Terraform diff that turns the
+   recorded contract green in the model, with legitimate use kept.
+3. **Prove the fix.** After you apply that diff, a live `fns prove` as the agent
+   shows the result at rung 3: the forbidden reads are **observed** denied, the
+   invoices read is **observed** allowed, and no escalation path remains.
+4. **Detect.** Each of the four K5 strikes has a KQL rule deployed in Sentinel,
+   and a recorded detection result: fired, with its latency, or
+   `detection-gap`.
+
+Each live run is recorded, sanitized and committed as a fixture
+(`fixtures/lab-run-4`, plus `lab-run-5` after harden), and replayed as a
+regression test, as in M1 to M3.
+
+## What the recordings already tell us
+
+`fns harden` on the lab-run-3 replay (offline, today) proposes removing two
+grants:
+
+- `azurerm_role_assignment.billing_agent_rg_contributor` (Contributor on the RG);
+- `azuread_app_role_assignment.billing_agent_owned_by` (Graph
+  `Application.ReadWrite.OwnedBy`).
+
+The model then goes from 11 critical reachable to **0**, with both legitimate
+operations still allowed. It searched 45 combinations of 9 levers. The
+alternative it lists is the `escalation_target` ownership plus Contributor.
+
+Two consequences shape the order of the plan:
+
+- **The strikes must run before harden.** The four K5 strikes need exactly the
+  rights harden removes: Contributor for `listKeys` and the vault write, and
+  ownership plus `OwnedBy` for the credential and the app role. After harden
+  they can only be denied.
+- **Harden alone does not make every item pass.** A `must_not_reach` item passes
+  only with an observed denial. M3 has read probes for the Key Vault and
+  storage items. The directory and application items
+  (`roleAssignments/write`, `applications/credentials/update`,
+  `credentials/update`, `owners/update`) have no read-only probe, so after
+  harden they are refuted in the model but never observed. Under today's rules
+  they stay `inconclusive`, and the contract's `max_inconclusive: 2` fails on
+  more than 2. Decision D6 covers this.
+
+## Sessions
+
+Four live sessions, each with its own runbook section and its own report back.
+The lab can stay up between them: the scope renews with
+`"-replace=time_offset.scope_expiry"`, and every certificate lives for 1 day at
+most.
+
+| Session | Needs | Strikes? | Time (rough) |
+| --- | --- | --- | --- |
+| A. Rebuild, baseline scout, the `Directory.Read.All` and custom-role tests | the lab | no | 1.5 h |
+| B. Logging on, legitimate use, record | A; the workspace and the Sentinel trial | no | 1 h, plus up to a day for logs to settle |
+| C. Strikes and detection results | B; `fns strike` built and its plan approved (D4) | **4 writes** | 2 h, mostly waiting for alerts |
+| D. Harden, apply, prove the fix (and the denied strikes, D6) | C | only if D6 = b | 1.5 h |
+| Teardown | everything recorded and committed | | 15 min |
+
+### Session A: rebuild the lab
+
+The lab was destroyed, so this is a fresh M1 build (`docs/runbooks/m1-live-run.md`,
+steps 2 to 4). It gets a **new random suffix**: `random_string.suffix` went with
+the old state. The `tiin02` names in the fixtures stay valid as recordings of
+endpoints that no longer exist.
+
+1. **You:** `az login --tenant <TENANT_ID>`, `az account set --subscription
+   <SUBSCRIPTION_ID>`, and check the table shows the lab tenant and your account.
+2. **You:** keep `lab/terraform.tfvars` (it holds IDs only) or rewrite it with
+   M1 step 3. Leave `scout_directory_read_all` unset (the default is `true`).
+3. **You:** `uv run poe lab-check`, then `uv run poe lab-up`. Review the plan:
+   only additions, nothing to change or destroy. The M4 runbook gives the
+   expected count, worked out from the `.tf` files (M1 had 34; M2 added a Graph
+   grant). A plan with a different count is a stop. Type `yes`.
+4. **You:** `uv run fns scope check scope.lab.yaml`: lab tenant, subscription,
+   `rg-fns-lab`, 17 scout and 6 prove operations, expiry 7 days out. Then wait
+   about 10 minutes for the Graph grants to show up in tokens.
+5. **You:** scout once as yourself and once as `sp-fns-scout` (M1 steps 5 to 8,
+   with a 1-day certificate). Record the scout run as `fixtures/lab-run-4`.
+   Both digests must match.
+6. **Me:** a PR with `fixtures/lab-run-4` (sanitized, the no-real-IDs test,
+   a golden digest, the new contract rendered by `lab/contract.tf` with the new
+   suffix), after you send the report.
+
+### Session A, continued: can the scout drop `Directory.Read.All`?
+
+Today's evidence (FINDINGS, "Is `Directory.Read.All` needed?"): the full set is
+**sufficient**, and nobody has tested whether it is **minimal**. The old plan
+compared digests before and after the change. That doesn't work: the snapshot
+contains the scout's own Graph grants, so removing one changes the digest
+whatever else happens. The comparison has to be on the **same lab state**:
+
+1. **You:** in `lab/terraform.tfvars`, set `scout_directory_read_all = false`,
+   then `uv run poe lab-up`. The plan must show **1 to destroy** (the scout's
+   `Directory.Read.All` assignment) and nothing else.
+2. Wait about 10 minutes.
+3. **You:** scout as **yourself** (the reference for this lab state), then as
+   `sp-fns-scout` with a fresh 1-day certificate. Don't record either.
+4. **Pass:** both digests are equal, every collector is `complete`, and there is
+   no `http-403`. Then `Directory.Read.All` leaves the default; that is my PR,
+   with a FINDINGS entry and a DECISIONS row. **Fail:** any 403, `partial`, or
+   different owner, member or SKU counts. Then it stays, and FINDINGS records
+   which call needed it.
+5. This also answers the open question "is `LicenseAssignment.Read.All` alone
+   enough for `/subscribedSkus`?". It is the only grant left that covers it.
+6. **You:** set it back to `true` and apply (1 to add), so the later sessions
+   run on the known set. Or keep `false` if step 4 passed.
+
+The lab makes this a weak test: its owners are one user and three service
+principals, and no service principal is in a group, so `memberOf` returns
+nothing either way. D3 adds a lab group with `sp-billing-agent` as a member, so
+`/servicePrincipals/{id}/memberOf` has something to lose.
+
+### Session A, continued: narrow the scout from Reader to a custom role
+
+The scout's ARM side is **Reader on the subscription** (`*/read`). The collector
+uses 7 ARM read operations, the `arm:` lines of `scope.lab.yaml`:
+
+- `Microsoft.Authorization/roleAssignments/read`
+- `Microsoft.Authorization/roleDefinitions/read`
+- `Microsoft.Authorization/denyAssignments/read`
+- `Microsoft.Authorization/roleEligibilitySchedules/read`
+- `Microsoft.Resources/subscriptions/resourceGroups/resources/read`
+- `Microsoft.KeyVault/vaults/read`
+- `Microsoft.Storage/storageAccounts/read`
+
+**Me (offline, before the session):** a `scout_custom_role` variable, default
+`false`. When it is `true`, `lab/` creates an `azurerm_role_definition`
+"Fang & Scale scout (read)" with exactly those actions, assignable at the lab
+subscription, and assigns it to the scout instead of Reader. A test keeps the
+role's actions equal to the scope file's `arm:` operations, the same way
+`tests/test_lab.py` keeps the scope in step with the collector.
+
+**You (in session A, one change at a time):**
+
+1. Set `scout_custom_role = true` and apply. The plan: 1 role definition and 1
+   assignment to add, the Reader assignment to destroy. Wait 10 minutes; custom
+   roles take a while to apply.
+2. Scout as yourself and as `sp-fns-scout`, on the same state. The pass and fail
+   rules are as above.
+3. **Pass:** the custom role becomes the documented scout permission set (README,
+   "Scout permissions"), as a variable you can choose. **Fail:** the 403 names
+   the missing action. I add it if it is read-only, and FINDINGS records the
+   undocumented action.
+
+Unknown until it runs: whether `.../resourceGroups/resources/read` is the action
+ARM checks for the RG resource listing. It is the documented one, and a 403
+would say otherwise. Separate from this: H1, harden proposing a narrower custom
+role *for the agent*, stays on the roadmap after v0.1.
+
+### Session B: logging on, legitimate use, record
+
+**Me (offline, before the session):** `lab/monitoring.tf`, behind
+`enable_monitoring` (default `false`, so the M1 to M3 lab is unchanged):
+
+| Resource | Feeds | Detection rules that read it |
+| --- | --- | --- |
+| Log Analytics workspace, PerGB2018, 30-day retention | everything below | |
+| Sentinel onboarding on that workspace | the alert rules | |
+| Subscription diagnostic setting: Activity Log (Administrative, Security, Policy) | `AzureActivity` | listKeys, RBAC assignment, vault control-plane write, run code on the identity host |
+| Key Vault diagnostic setting: `AuditEvent` | `AzureDiagnostics` | secret access |
+| Blob service diagnostic settings on both accounts: StorageRead, StorageWrite | `StorageBlobLogs` | blob access or shared key |
+| Entra diagnostic setting: `AuditLogs` (plus `ServicePrincipalSignInLogs` only if D1 = b) | `AuditLogs` | credential added, owner added, app role assignment, directory role assigned |
+| The 10 rules from `detections/`, rendered by `fns detections export` | Sentinel scheduled rules | |
+
+Tests (offline): every table a rule names has a diagnostic setting that feeds
+it; the rules deployed are exactly the files in `detections/`; nothing in it
+deploys when `enable_monitoring = false`.
+
+**You:**
+
+1. Set `enable_monitoring = true` and apply. The Entra diagnostic setting needs
+   Global Administrator or Security Administrator: you are the former.
+2. Open the workspace in the Defender portal (Sentinel moved there; the Azure
+   portal experience retires on 2027-03-31). Check that **Free trial** shows 31
+   days.
+3. **Legitimate use, as the agent (by hand).** This is the "functional test as
+   the workload's identity" that record mode harvests (PLAN §5). With a 1-day
+   certificate on `sp-billing-agent` (the M3 runbook, step 5 and its cautions):
+   one `az storage blob download` and one `az storage blob upload` on
+   `stinvoices<suffix>/invoices`, with `--auth-mode login`. Then delete the
+   certificate.
+   - The upload is a write, and you make it by hand, not the tool. Rule 1 is
+     about the tool.
+4. Wait for the rows: Activity Log within minutes, Storage and Key Vault within
+   about 15 minutes, Entra audit logs up to an hour or so. Then export the agent's
+   rows from each table as JSON (the queries go in the runbook).
+5. **You:** `uv run fns record <exported files> --identity <agent object id>
+   --contract <rendered contract> --out <file>`. Send the output and the
+   `unmapped` list.
+
+**Me:** a log sanitizer (object IDs, resource IDs, caller IPs, UPNs, correlation
+IDs mapped to placeholders, as the scout sanitizer does) and
+`fixtures/lab-run-4/logs/`, so record mode has a real-log regression test next
+to the hand-written ones in `tests/harden/data/`.
+
+### Session C: strikes and detection results
+
+**Me, before any code: a separate plan for `fns strike`, for your approval
+(D4).** Rule 1 allows writes only through `strike` and `harden --apply`, only to
+the lab, and only after `--approve <plan-hash>`. None of that exists yet. The
+plan will cover:
+
+- the gate's first write forms, exactly the four operations below;
+- the plan hash;
+- a journaled cleanup for each write, run even when the strike step fails;
+- an emergency cleanup by hand;
+- negative tests for every gate rule.
+
+| Strike | Write (as `sp-billing-agent`) | Cleanup | Rule that should fire | Table |
+| --- | --- | --- | --- | --- |
+| listKeys | `POST .../storageAccounts/stpayroll<suffix>/listKeys` | none (reads keys, changes nothing) | `storage-listkeys-by-workload` | `AzureActivity` |
+| vault write | a tag on `kv-crown-<suffix>` through `vaults/write` | remove the tag | `keyvault-control-plane-write-by-workload` | `AzureActivity` |
+| owner adds credential | a password, valid for 1 hour, on `app-escalation-target` | delete it | `app-credential-added-by-workload` | `AuditLogs` |
+| app role self-grant | an app role assignment on the owned service principal | delete it | `app-role-assignment-by-workload` | `AuditLogs` |
+
+**You:** review the strike plan the tool prints, approve its hash, run it (one
+agent certificate for the session), then delete the certificate.
+
+**Detection result per strike:** fired or not, alert time minus strike time, and
+the rows that matched. A strike observed at rung 3 with no alert is a
+`detection-gap` finding (PLAN §4). Allow up to 2 hours for audit-log rules.
+Sentinel's shortest scheduled frequency is 5 minutes, but the logs arrive later
+than that. How the result gets read is D5.
+
+### Session D: harden, apply, prove the fix
+
+1. **You:** scout as `sp-fns-scout` and `fns contain` on the recorded contract
+   (from session B).
+2. **You:** `uv run fns harden --contract <recorded> --snapshot <snap> --out
+   harden.diff`. Send the proposal and its `plan sha256:`. I expect the two
+   grants above. Anything else is a FINDINGS entry before we go on.
+3. **You:** `git apply harden.diff`, then `uv run poe lab-up`. The plan must
+   show exactly the proposal's removals. `harden --apply` stays unbuilt: you
+   apply the diff, the tool does not.
+4. **You:** a fresh scout and contain: the model says 0 critical reachable.
+5. **You:** `fns prove --live` as the agent (the M3 runbook, steps 5 to 8),
+   recorded as `fixtures/lab-run-5`.
+   - **Expected:** the Key Vault and payroll reads are observed denied with no
+     path left, so they **pass**, at rung 3, `verified`. The invoices read is
+     observed allowed, so it **passes**. The directory and application items
+     depend on D6.
+6. **Me:** the `lab-run-5` PR: before-and-after verdicts, the observed result,
+   FINDINGS, and the prove golden.
+
+### Teardown
+
+**You:** `uv run poe lab-down` once every fixture is committed. It also removes
+the workspace, the Sentinel onboarding, the diagnostic settings and the rules.
+The Entra diagnostic setting is tenant-level: check it is gone
+(`az rest --method get --url "https://management.azure.com/providers/microsoft.aadiam/diagnosticSettings?api-version=2017-04-01-preview"`).
+Then end any trial you started (D1) before it converts or expires.
+
+## Trials, cost and expiry against the $100 credit
+
+Prices are in USD, from Microsoft's pages as of 2026-11-26. Check them in the
+Azure pricing calculator for your region on the day.
+
+| Item | Needed for | Cost | Expiry and limits |
+| --- | --- | --- | --- |
+| The lab (1 Key Vault, 2 LRS storage accounts) | every session | cents per day | until `lab-down` |
+| Log Analytics workspace | session B on | pay-as-you-go Analytics logs: the first 5 GB a month per billing account are free, then roughly $2 to $3 per GB (one Q&A cites $2.30 for East US). 31 days of retention included, 90 with Sentinel. Queries are free | none; it bills until deleted |
+| Activity Log into Log Analytics | 4 rules | free to ingest, as far as I know; **verify** on the Azure Monitor pricing page | |
+| Microsoft Sentinel | the 10 rules and alerts | **31-day free trial** from enabling it on the workspace: Log Analytics ingestion and Sentinel analysis are waived up to 10 GB a day. Automation and data lake charges still apply (we use neither). After the trial, Sentinel's per-GB price on top of Log Analytics | 31 days; at most 20 trial workspaces per tenant |
+| Entra ID P2 trial | only for D1 = b: `ServicePrincipalSignInLogs` export (P1 or P2), and a live test of the PIM `collected` path | free | **30 days, one trial per tenant.** Community reports say activation can need a payment method, or can fail on tenants created from a personal Microsoft account. Unverified until you try |
+| Key Vault operations, storage transactions | probes, strikes, legitimate use | well under $1 | |
+
+**Expected total for M4: under $5**, if the sessions fit in the 31-day Sentinel
+trial and the lab is torn down at the end. A lab this size logs megabytes a day.
+The 10 GB/day trial cap and the 5 GB/month free tier are both orders of magnitude
+above that. **The real risk is forgetting `lab-down`:** after the trial, a
+Sentinel workspace bills per GB for as long as it exists. A **$10 budget alert**
+on the subscription (portal: Cost Management → Budgets; by hand, D7) turns that
+into an email.
+
+Timing:
+
+- Start Sentinel (session B) only when sessions C and D can follow within the
+  same 31 days.
+- Start the P2 trial (if D1 = b) last, and only for the run that needs it. A P2
+  licence changes the tenant: `/subscribedSkus` is no longer empty, and the PIM
+  surface becomes `collected` instead of `not-applicable` with evidence. Do the
+  prove-the-fix run either entirely before the trial starts or entirely inside it.
+  If the trial expires halfway, the PIM surface is `not collected` and every
+  finding is `inconclusive`.
+
+## Who does what
+
+| You (by hand, in the tenant or the portal) | Me (offline, through PRs) |
+| --- | --- |
+| `az login`; review and approve every `terraform apply` and `destroy` | `lab/monitoring.tf`, the custom scout role, the lab group (D3), with offline tests |
+| Activate trials, set the budget alert, open Sentinel in the Defender portal | The detection deployment (D2) and its tests |
+| Create and delete every certificate (scout, agent), with the list checks | `docs/runbooks/m4-live-run.md`: exact commands, the expected plan for every apply, stop rules, emergency cleanup |
+| Legitimate use as the agent (one download, one upload) | The log sanitizer, and `fns record` regression tests on the real logs |
+| Run `fns scout`, `record`, `contain`, `harden`, `prove --live`, `strike` | The `fns strike` plan (D4), then its code with negative gate tests, after you approve it |
+| Approve every strike plan hash; apply the harden diff | Fixtures `lab-run-4` and `lab-run-5`, goldens, FINDINGS, DECISIONS, STATUS |
+| Read alerts (D5), send each report back | Reading the reports, and stopping you if anything deviates from the expected plan |
+| `lab-down`, and end the trials | The `m4` tag, after your review |
+
+I make no Azure, Graph or Log Analytics call myself, and I never hold a lab
+credential. As in M3, every live command is yours.
+
+## Not in this plan
+
+- `harden --apply`: you apply the diff by hand (D4 covers strikes only).
+- H1 narrowing for the agent (a custom role instead of removal): on the roadmap
+  after v0.1.
+- Strikes beyond the four (M6).
+
+## Decisions for you
+
+- **D1. Entra P2 trial.**
+  - **a.** No trial. **(Recommended.)** The 10 detection rules read
+    `AuditLogs`, `AzureActivity`, `AzureDiagnostics` and `StorageBlobLogs`, and
+    none of them needs sign-in logs. Community reports say `AuditLogs` export
+    works on Entra ID Free; session B tests that. If it doesn't, that is a
+    FINDINGS entry, and we fall back to b.
+  - **b.** Start the trial for session B, adding `ServicePrincipalSignInLogs`
+    and a live PIM `collected` test. Timing as above.
+- **D2. Deploying the rules.**
+  - **a.** Terraform `lab/monitoring.tf` reads `fns detections export` output.
+    **(Recommended:** you review it in the plan, and `lab-down` removes it.)
+  - **b.** You run `az rest --method put` for each rule.
+- **D3. A lab group for the `memberOf` test** (`grp-fns-billing`, with
+  `sp-billing-agent` as a member).
+  - **a.** Add it. **(Recommended:** without it the `Directory.Read.All` test
+    can't fail on `memberOf`.) It adds reach for the contract's "member-of" rule
+    only if the group has roles, and it gets none.
+  - **b.** Skip it.
+- **D4. `fns strike`.** Approve that I write its plan (gate write forms,
+  plan hash, journaled cleanup, emergency cleanup) as the next PR, with no strike
+  code until you approve that plan. Without it, session C does not happen, and
+  M4's gate item 4 is not met.
+- **D5. Reading detection results.**
+  - **a.** You run one KQL query per strike in the portal and paste the result
+    into the report. **(Recommended for M4:** no new read path.)
+  - **b.** A new read-only `fns detections verify` that queries the Log
+    Analytics API through the scope gate (a new `la:` operation form, its own
+    negative tests, its own identity).
+- **D6. The directory and application items after harden.**
+  - **a.** Accept `inconclusive` for them. Raise `max_inconclusive` in the
+    recorded contract to cover them, with a reason.
+  - **b.** Re-run the two Graph strikes *after* harden and require them to be
+    **denied**, so these items get an observed denial. **(Recommended:** it
+    turns "refuted in the model" into "observed blocked". It needs D4, and the
+    gate would treat a strike that succeeds after harden as a failed contract.)
+  - **c.** Defer them: M4 proves only the resource items.
+- **D7. A $10 budget alert** on the subscription before session B. Yes or no.
+  **(Recommended: yes.)**
+- **D8. Keep `scout_directory_read_all` and `scout_custom_role` as variables**
+  after the tests, even if both pass, so the documented minimum and the old set
+  are both one variable away. **(Recommended: yes**, with the defaults moved to
+  whatever passed.)
+
+## Sources
+
+- Microsoft Sentinel billing (31-day trial, 10 GB/day, 20 workspaces per
+  tenant): <https://learn.microsoft.com/azure/sentinel/billing>
+- Sentinel in the Azure portal retires 2027-03-31; new workspaces onboard to the
+  Defender portal: <https://learn.microsoft.com/azure/sentinel/overview>
+- Entra logs to Log Analytics (prerequisites: P1 or P2 for sign-in logs):
+  <https://learn.microsoft.com/entra/identity/monitoring-health/howto-integrate-activity-logs-with-azure-monitor-logs>
+- Log Analytics pricing (5 GB/month free per billing account):
+  <https://azure.microsoft.com/pricing/details/monitor/>
+- Entra ID P2 trial activation reports (community, not official):
+  <https://learn.microsoft.com/en-us/answers/questions/1464265/i-cant-activate-the-trial-of-microsoft-entra-id-p2>

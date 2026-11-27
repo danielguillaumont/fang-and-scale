@@ -327,7 +327,8 @@ so does an internal error, so a crash never looks like a verdict.
   Sigstore production signature of the recorded M3 replay.
 - **The lab is torn down.** The next live work is M4: harden the lab, prove the
   fix, and run the detections in a Log Analytics workspace. Spec:
-  `docs/milestones/M4.md`.
+  `docs/milestones/M4.md`; live plan, waiting for decisions:
+  `docs/milestones/M4-plan.md`.
 
 Day-to-day state: `docs/STATUS.md`. What each fixture proves: [Real vs.
 fixture](#real-vs-fixture).

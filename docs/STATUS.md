@@ -71,8 +71,12 @@ settings to turn on, four owner decisions, and the recommendation.
 
 ## Next
 
-M4 (Harden + detect) is built offline; its live loop is pending approval
-(`docs/milestones/M4.md`). It starts with a plan for your approval.
+M4 (Harden + detect) is built offline. Its live plan is
+`docs/milestones/M4-plan.md`: lab rebuild, the `Directory.Read.All` and
+custom-role scout tests, logging and record mode, the four strikes with their
+detection results, harden and prove the fix, trial costs against the $100
+credit, and who does what. It ends with eight decisions for you (D1 to D8).
+Nothing in it is built or run yet.
 
 ## The morning review (before the M2 and M3 runs)
 
