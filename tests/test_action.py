@@ -175,6 +175,7 @@ def test_codeql_is_read_only_apart_from_its_results() -> None:
         "security-events": "write",
     }
     assert set(job["strategy"]["matrix"]["language"]) == {"python", "actions"}
+    assert job["if"] == "${{ !github.event.repository.private }}"
 
 
 def test_dependabot_watches_every_ecosystem_we_pin() -> None:
