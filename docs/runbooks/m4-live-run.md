@@ -691,8 +691,8 @@ recorded.
 | `directory:tenant roleAssignments/write` | **`inconclusive`** | SD3: no direct attempt |
 
 So expect **exit 3** (inconclusive over the contract's budget of 2), not 0.
-Whether a strike denial may ever count toward `pass` is an open question
-(`docs/STATUS.md`, "Needs Daniel"). Any finding that **fails** is a stop.
+Whether a strike denial may count toward `pass` is planned, not built
+(`docs/milestones/M4-exit-gate-plan.md`, option B, waiting for approval). Any finding that **fails** is a stop.
 
 ### D8. Sign out and delete the certificates
 

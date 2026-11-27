@@ -16,7 +16,7 @@ is now required on `main`.
 | 3 | S4, with the runbook update | done | #78 |
 | 4 | Threat model open gaps (size caps, provenance attestation) | done | #79 |
 | 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | done | #80 |
-| 6 | M4 exit gate, option B: plan only, then stop | next | |
+| 6 | M4 exit gate, option B: plan only, then stop | done (plan only) | #81 |
 
 ### Decisions of 2026-11-27 (marked in `docs/DECISIONS.md`)
 
@@ -31,6 +31,20 @@ is now required on `main`.
 
 ### Needs Daniel
 
+- **Approve the option-B plan** (`docs/milestones/M4-exit-gate-plan.md`, #81).
+  Nothing is built for it. The plan:
+  - a LIVE D-2 to D-5 denial (403 only, as you decided) on the exact operation
+    and object counts like an observed probe denial, so `pass` still needs
+    every path refuted and no open surface;
+  - FIXTURE, D-1, S4, before-harden strikes and `roleAssignments/write` never
+    count;
+  - no committed golden moves. Two tests change, and a LIVE matrix and one
+    negative row per condition are added.
+
+  Two open points: (1) D-2 does not count for the tenant-wide
+  `directory:tenant applications/credentials/update` (one app is not every
+  app); (2) whether collecting `pim-eligibility` becomes a precondition of
+  session D, since an open surface keeps the gate at exit 3.
 - **Tag and publish v0.1.0** (prepared in #80; nothing is tagged or published).
   `CHANGELOG.md` is dated 2026-11-27, with the earlier "Unreleased" entries folded
   into 0.1.0 because the tag ships them, and `uv run poe release-check` prints
@@ -205,7 +219,8 @@ The queue is done. See the summary at the top.
     change to the guardrail and its own plan.
   - **c.** Something else.
 
-  Nothing is built for b.
+  Option b was chosen on 2026-11-27. Its plan is `docs/milestones/M4-exit-gate-plan.md`
+  (#81); nothing is built for it.
 
 - **Releasing v0.1.0** (when you want it; nothing is tagged or published).
   Steps 1 and 2 are done (#80); the exact commands are in the owner-decision
