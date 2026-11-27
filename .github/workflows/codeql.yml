@@ -8,6 +8,7 @@ on:
   pull_request:
   schedule:
     - cron: "17 6 * * 1"
+  workflow_dispatch:
 
 permissions: {}
 
@@ -19,7 +20,7 @@ jobs:
   analyze:
     name: codeql (${{ matrix.language }})
     # Code scanning needs a public repository (or GitHub Advanced Security).
-    # While the repository is private the job is skipped, not failed.
+    # The repository is public; if it ever goes private again, the job skips.
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
