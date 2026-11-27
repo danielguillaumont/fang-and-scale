@@ -228,3 +228,42 @@ def test_lab_contract_tf_references_real_resources() -> None:
         assert f'"{ref}"' in resources, ref
         assert ref in tf
     assert 'resource "azuread_application" "billing_agent"' in identities
+
+
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
+
+
+def test_the_budget_is_opt_in_and_its_email_lives_only_in_tfvars() -> None:
+    """M4 D7: no address in a committed file; no budget unless one is set."""
+    budget = (LAB / "budget.tf").read_text(encoding="utf-8")
+    blocks = re.findall(r'^resource "(\w+)" "(\w+)" \{(.*?)\n\}', budget, re.S | re.M)
+    assert {(k, n) for k, n, _ in blocks} == {
+        ("time_static", "budget_start"),
+        ("azurerm_consumption_budget_subscription", "lab"),
+    }
+    for _, _, body in blocks:
+        assert "count = local.budget_enabled ? 1 : 0" in body
+    assert 'budget_enabled = var.budget_alert_email != ""' in budget
+    variables = (LAB / "variables.tf").read_text(encoding="utf-8")
+    var = re.search(r'variable "budget_alert_email" \{(.*?)\n\}', variables, re.S)
+    assert var is not None
+    assert 'default     = ""' in var.group(1)
+    assert "sensitive   = true" in var.group(1)
+    committed = [*LAB.glob("*.tf"), *LAB.glob("*.tftpl"), LAB / "terraform.tfvars.example"]
+    for path in committed:
+        for address in EMAIL.findall(path.read_text(encoding="utf-8")):
+            assert address.endswith("@example.invalid"), (path.name, address)
+
+
+def test_the_budget_alerts_at_half_full_and_forecast() -> None:
+    budget = (LAB / "budget.tf").read_text(encoding="utf-8")
+    notes = re.findall(
+        r"threshold\s*=\s*(\d+)\s*\n\s*threshold_type\s*=\s*\"(\w+)\"\s*\n"
+        r"\s*contact_emails\s*=\s*\[var\.budget_alert_email\]",
+        budget,
+    )
+    assert sorted(notes) == [("100", "Actual"), ("100", "Forecasted"), ("50", "Actual")]
+    assert 'time_grain      = "Monthly"' in budget
+    assert 'subscription_id = "/subscriptions/${var.subscription_id}"' in budget
+    variables = (LAB / "variables.tf").read_text(encoding="utf-8")
+    assert re.search(r'variable "budget_amount" \{[^}]*default\s*=\s*10\b', variables, re.S)

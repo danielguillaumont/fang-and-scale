@@ -14,3 +14,8 @@ github_repository = ""
 
 # Optional: set false to test the scout without Directory.Read.All.
 # scout_directory_read_all = false
+
+# Optional (M4 D7): a monthly cost alert on the lab subscription. Leave empty on
+# Azure for Students, which Cost Management does not support (lab/README.md).
+# budget_alert_email = "you@example.invalid"
+# budget_amount      = 10
