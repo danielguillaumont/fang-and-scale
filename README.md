@@ -3,8 +3,10 @@
 **Unit tests for breach blast radius in Microsoft Entra and Azure.**
 
 Declare what a compromised workload or agent identity must never reach and what it
-must still do. Fang & Scale finds every path to the boundary, proposes the smallest
-fix, proves the result with signed evidence, and fails CI if it regresses.
+must still do. Fang & Scale finds the escalation paths its rules model to that
+boundary, proposes the smallest Terraform fix it can find, checks the result with
+read-only probes and signed evidence, and fails CI if it regresses. Anything it
+cannot model or probe is reported as `inconclusive`, never as a pass.
 
 *Challenge the defence. Reduce the damage. Prove the improvement.*
 
@@ -33,7 +35,8 @@ budget:
   max_critical_reachable: 0
 ```
 
-> **Status.** M1, M2 and M3 are done and ran live. In M3 the probes ran as the
+> **Status.** A personal research project: one maintainer, one lab tenant, no
+> release yet. M1, M2 and M3 are done and ran live. In M3 the probes ran as the
 > assumed-compromised identity itself (`docs/runbooks/m3-live-run.md`). M4 and M5
 > are built and tested offline, against the recorded lab runs and hand-written
 > fixtures. See [Real vs. fixture](#real-vs-fixture) before you trust any result.
@@ -76,9 +79,11 @@ It judges each path and signs an in-toto statement in a DSSE envelope. The demo
 uses an offline key, and the output labels it `TEST SIGNATURE`. Run
 `uv run fns verify .fns/runs/<run id>` to check a run; tampering exits 5.
 
-**3. Harden and mutate.** `fns harden` finds the smallest Terraform removal that
-takes the lab to 0 critical findings while keeping legitimate use: drop the agent's
-`Application.ReadWrite.OwnedBy` and its resource-group `Contributor`. Mutation
+**3. Harden and mutate.** `fns harden` searches the grants it can map in
+`lab/*.tf`, smallest set first, for the smallest removal that takes the lab to 0
+critical findings in the model while keeping legitimate use: drop the agent's
+`Application.ReadWrite.OwnedBy` and its resource-group `Contributor`. It writes a
+diff and a plan hash; it never applies anything. Mutation
 testing then puts back one dangerous grant at a time. **Mutation testing found a
 gap in our own contract:** the first run caught 5 of 8, because contract version 1
 could not name one application. Version 2 can, and the seeded contract now guards
@@ -193,8 +198,10 @@ cannot import adapters, credentials, the journal, strike or harden.
 
 ## Evidence ladder
 
-Every finding carries the highest rung it reached and a coverage state. Semantics
-the model does not support give `inconclusive`, never `pass`. A missing path is
+Every finding carries the highest rung its supporting evidence reached and a
+coverage state. Probe results that settle nothing (for example a denied read while
+an escalation path remains) stay in the finding as context and never raise its
+coverage. Semantics the model does not support give `inconclusive`, never `pass`. A missing path is
 not proof of absence either: a `must_not_reach` item passes only with an observed
 denial, every path refuted, and no open surfaces.
 
@@ -217,7 +224,7 @@ Coverage states: `verified`, `evaluated-only`, `modeled-only`, `not-assessed`,
 | PIM eligibility collector | **Live** in the M2 run, as `not-applicable` with evidence: the lab tenant is Entra ID Free (0 SKUs), and Graph and ARM both answered `400 AadPremiumLicenseRequired`. The `collected` path, in a tenant with P2, is mocked tests only. |
 | Reach engine and contracts (`fns contain`) | **Live** on the M2 snapshot, signed in as the read-only scout: 11 critical reachable, 2 inconclusive, exit 1, the same as the fixture replay. Results are rung 1 (modeled). The replay of `fixtures/lab-run-2` with its contract is a committed regression test. |
 | Prove: probe results | **Live** on the lab, 2026-11-26, signed in as `sp-billing-agent`. There were 14 `GET` and `HEAD` requests through the scope gate, all allowed by it. Result: passed 1 (invoices `blob/read`, observed), critical reachable 11, inconclusive 1, exit 1. The Key Vault and payroll reads were denied when probed, but escalation paths remain, so they still fail. The results are recorded and sanitized as `fixtures/lab-run-3/probes.json`, and its replay is the M3 regression test, with the same verdicts. The `probes.json` in lab-run-1 and lab-run-2 stays hand-written. |
-| Signing | The live run is signed with the offline test key, labelled `TEST`. In CI, `prove-sign` signs the lab-run-3 replay with Sigstore keyless signing on **staging** only, and verifies it against the workflow's identity. Production Sigstore needs approval. |
+| Signing | The live run is signed with the offline test key, labelled `TEST`. In CI, `prove-sign` signs the lab-run-3 replay with Sigstore keyless signing on **staging** only, and verifies it against the workflow's identity. Production Sigstore (the public Rekor log) stays off until the repository is public. |
 | Harden, mutate | Model only, on the recorded snapshot and `lab/*.tf`. Nothing applied. `fns mutate --harden` on the live M2 snapshot scored 6/8, with the two accepted app-owner survivors. |
 | Record mode | Hand-written sample logs. |
 | Detections | Structural lint only; never deployed. |
@@ -232,8 +239,8 @@ so in the title.
   to the lab, and only after `--approve <plan-hash>`. Neither is built:
   `harden --apply` refuses.
 - **Scope gate.** Every Azure and Graph request, page and retry goes through
-  `fns.scope.gate`. Anything missing, expired or mismatched is denied. The gate is
-  fuzzed with Hypothesis.
+  `fns.scope.gate`. Anything missing, expired or mismatched is denied. The gate has
+  negative tests for each rule and Hypothesis property tests.
 - **Tenant pinning.** A run stops (exit 4) if the token's tenant differs from the
   scope manifest.
 - **No secrets.** Sign-in goes through the Azure CLI or OIDC. Fixtures use
@@ -260,7 +267,7 @@ so does an internal error, so a crash never looks like a verdict.
 | --- | --- | --- |
 | M1 Lab + contracts | Terraform lab, scope gate, scout, schemas | done, live |
 | M2 Contain | reach engine, escalation rules, settings and PIM collectors | done, live (tag `m2`) |
-| M3 Prove | freeze, probes, isolated verifier, signed bundle | **done**: live probes ran on 2026-11-26 (`fixtures/lab-run-3`); Sigstore signing in CI on **staging** only; production pending approval |
+| M3 Prove | freeze, probes, isolated verifier, signed bundle | **done**: live probes ran on 2026-11-26 (`fixtures/lab-run-3`); Sigstore signing in CI on **staging** only; production stays off until the repository is public |
 | M4 Harden + detect | minimizer, record mode, KQL rules | built offline; live loop pending approval |
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
 | M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | not started |
@@ -333,6 +340,14 @@ Sync with `--all-extras` as well as `--all-groups` (`poe setup` does): `sigstore
 is an extra, because `fns prove --sign sigstore` is part of the installed tool,
 and a plain `uv sync --all-groups` uninstalls it.
 
+## Security and contributing
+
+Report vulnerabilities privately: [SECURITY.md](SECURITY.md). Contributions:
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 Apache-2.0. See `LICENSE`.
+
+Microsoft, Azure and Microsoft Entra are trademarks of the Microsoft group of
+companies. This project is not affiliated with or endorsed by Microsoft.
