@@ -7,6 +7,13 @@ version may change file formats; each change is listed here.
 
 ## [Unreleased]
 
+### Added
+
+- `docs/ARCHITECTURE.md`: the trust boundaries with diagrams, each with what
+  enforces it. `docs/THREAT-MODEL.md`: what happens when the tool, a fixture, a
+  scope file, a contract, tenant data, a run directory or a pull request is
+  hostile, including what does not hold.
+
 ## [0.1.0] - not tagged yet
 
 The first release: contracts, the reach model, read-only probes with signed
