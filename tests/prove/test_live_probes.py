@@ -230,7 +230,12 @@ def lab_routes(*, kv_get: Reply | None = None, metadata: Any = SECRET_METADATA) 
         if "/providers/Microsoft.Authorization/permissions" in url:
             body = [CONTRIBUTOR] + ([BLOB_DATA_CONTRIBUTOR] if "stinvoices" in url else [])
             return Reply(body={"value": body})
-        if url.startswith("https://management.azure.com") and "/secrets/" in url:
+        parts = urllib.parse.urlsplit(url)
+        if (
+            parts.scheme == "https"
+            and parts.hostname == "management.azure.com"
+            and "/secrets/" in parts.path
+        ):
             return Reply(body=metadata)
         if url == SECRET_URL:
             return kv_get or Reply(403, KV_DENIED)
