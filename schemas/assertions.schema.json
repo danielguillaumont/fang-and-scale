@@ -69,6 +69,20 @@
           "minLength": 1,
           "title": "Target",
           "type": "string"
+        },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f-]{36}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The directory object ID of an ``application:`` or ``service_principal:`` target,\nfrom the snapshot at freeze. An after-harden strike counts toward a verdict only\non this exact object (option B, approved 2026-11-27).",
+          "title": "Target Object Id"
         }
       },
       "required": [

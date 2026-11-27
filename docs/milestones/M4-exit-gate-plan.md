@@ -1,7 +1,46 @@
-# M4 exit gate: option B (plan only)
+# M4 exit gate: option B
 
-Status: **proposed, not approved.** No code until Daniel approves this plan.
-Decision row: `docs/DECISIONS.md`, 2026-11-27, "M4 exit gate: option B, plan only".
+Status: **approved as written on 2026-11-27, and built (#82).** Decision rows:
+`docs/DECISIONS.md`, 2026-11-27. The plan below is kept as approved; where the
+build found it wrong, "As built" says so.
+
+## As built (2026-11-27)
+
+- **Code:** `fns.verify.verdict`: `COUNTING`, `not_counting`, `counting_denials`,
+  `judge(..., counting)`, and `judge_with_strikes`, which holds the
+  two-judgement guardrail. Model fields:
+  - `StrikeObservation.request_operation` and `request_object_id`, copied by
+    `fns.prove.strikes`;
+  - `Assertion.target_object_id`, recorded by `fns.prove.freeze`.
+
+  All three are omit-empty.
+- **Tests:**
+  - `tests/prove/test_option_b.py`: the LIVE matrix, one negative row per
+    condition, the PIM precondition and the guardrail property;
+  - `tests/prove/test_after_strike.py`: FIXTURE stays context, and a forged
+    artifact fails with exit 5.
+- **Correction 1: three committed goldens move.** `tests/golden/lab-run-1/2/3-prove.digest`
+  are bundle digests. The bundle holds `assertions_digest`, and freeze now
+  records `target_object_id` for the four application items. Diffed against
+  `main`, nothing else in the bundles or assertions changed: every verdict,
+  coverage, reason and evidence row is the same. `prove-verdicts.json` and
+  `demo-prove.digest` (no application targets) do not move.
+- **Correction 2: session D still exits 3.** The four application items move to
+  `pass`. But the plan's count of 2 left out three items:
+  - payroll `listKeys` and invoices `listKeys`: after harden, only the
+    permissions API evaluates them, and no read-only probe or D-step observes a
+    denial;
+  - invoices `blob/write`: an observed success needs a write.
+
+  So after harden the inconclusive items are those three, the tenant-wide item
+  and `roleAssignments/write`: five against a budget of 2
+  (`test_the_rest_of_the_contract_after_harden`). The runbook's D7 now says so.
+  What could close them is in STATUS, "Needs Daniel".
+- **PIM precondition** (approved 2026-11-27): `pim-eligibility` is closed only
+  if its collector ran and the result was `complete`, or `not-applicable` with
+  evidence. If it did not run, or its result was `partial`, `failed` or
+  `not-collected`, the items stay `inconclusive`. The runbook checks this at D4,
+  and `test_pim_must_be_complete_or_not_applicable_with_evidence` pins it.
 
 ## The problem
 
@@ -110,7 +149,7 @@ check then shows the mismatch (exit 5), as it does today for a tampered artifact
 
 ## What moves, and why
 
-### Committed goldens: none
+### Committed goldens: none (corrected: three digests move, see "As built")
 
 - **`tests/golden/prove-verdicts.json`**: no change. It is the probe-only
   baseline of four FIXTURE runs (`demo-prove`, `lab-run-1/2/3-prove`), with no
@@ -149,7 +188,7 @@ check then shows the mismatch (exit 5), as it does today for a tampered artifact
   | `directory:tenant roleAssignments/write` | none | `inconclusive` | `inconclusive` | condition 5 (SD3) |
 
   The resulting inconclusive count is 2 against `max_inconclusive: 2`, so the
-  exit is 0. This holds only if the live snapshot has no open surface for the
+  exit is 0 (corrected: the count is 5, so the exit is 3; see "As built"). This holds only if the live snapshot has no open surface for the
   application items. lab-run-2 and lab-run-3 have none, but lab-run-1 had
   `pim-eligibility` open. With an open surface, the four items stay
   `inconclusive` ("denied (strike), but not collected: pim-eligibility") and the
@@ -208,12 +247,9 @@ import nothing from `fns.strike`.
   alike as `denied`, but only a 403 counts. A 401 stays `unknown`, as it does
   for the probes (V5).
 
-## Open points for Daniel
-
-1. **The tenant-wide item.** Should `directory:tenant applications/credentials/update`
-   count from D-2? This plan says no: one app is not every app. Saying yes would
-   make the gate exit 0 with one item fewer, but would claim more than the
-   evidence.
-2. **The PIM surface.** If the live snapshot leaves `pim-eligibility` open, the
-   gate still exits 3. Should the runbook make collecting it a precondition of
-   session D?
+- **The tenant-wide item** (Daniel, 2026-11-27): D-2 does not count for
+  `directory:tenant applications/credentials/update`.
+- **The PIM precondition** (Daniel, 2026-11-27): the `pim-eligibility` collector
+  must have run, and returned `complete` or `not-applicable` with evidence, as
+  in M2 and M3. Not applicable with evidence is a closed surface. Not collected,
+  or an error, keeps the items `inconclusive`.

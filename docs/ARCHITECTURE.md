@@ -108,8 +108,11 @@ flowchart TB
   re-derives each verdict from the inputs. `fns verify check` does all of that
   again on a finished run, plus the signature.
 - Strike results reach the verifier the same way: `prove --after-strike` writes
-  `StrikeObservation` artifacts and journals them after the freeze. A strike can
-  only add context or make a verdict stricter (`GuardrailError`).
+  `StrikeObservation` artifacts and journals them after the freeze. A LIVE 403
+  on an item's exact operation and object counts like an observed probe denial
+  (option B); any other strike result only adds context or makes a verdict
+  stricter. The verifier judges each finding with and without strikes and raises
+  `GuardrailError` if it loosened without such a denial.
 
 Enforced by:
 - the import contracts "Verifier is isolated from proposer, executor and

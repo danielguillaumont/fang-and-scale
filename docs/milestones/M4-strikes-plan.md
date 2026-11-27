@@ -142,11 +142,22 @@ contract fails (exit 1).
 `directory:tenant roleAssignments/write` gets **no direct attempt**. The only
 direct attempt is a directory role assignment, and if it succeeded it would
 break your rule. Its escalation path is refuted by D-1, an observed denial of
-the path's first hop. Its direct operation stays unobserved, so under the
-current verdict rules the item stays `inconclusive`. SD3 is the decision.
+the path's first hop. Its direct operation stays unobserved, so the item
+stays `inconclusive`. SD3 is the decision.
+
+**How the denials count (option B, approved 2026-11-27,
+`docs/milestones/M4-exit-gate-plan.md`).** A LIVE D-2 to D-5 denial with HTTP 403
+on the item's exact operation and object counts like an observed probe denial.
+So the four application items can `pass`, if no surface is open (the PIM
+precondition in the M4 runbook, D4). D-2 does not count for the tenant-wide
+`directory:tenant applications/credentials/update` (one app is not every app),
+and D-1 observes a first hop, so it counts for no item.
 
 S1 and S2 after harden (`listKeys` and the vault tag, both 403 without
-Contributor) are optional (SD4). The M3 read probes already observe those items.
+Contributor) are optional (SD4). The M3 read probes observe the vault reads and
+`blob/read`. They do **not** observe a `listKeys` denial: only the permissions
+API evaluates it. So both `listKeys` items stay `inconclusive` after harden
+(`tests/prove/test_option_b.py`).
 
 ## The stop line
 

@@ -9,6 +9,15 @@ is now required on `main`.
 
 ### Queue
 
+Second batch (Daniel's decisions after the option-B plan; marked in DECISIONS):
+
+| # | Item | State | PR |
+| --- | --- | --- | --- |
+| 7 | Build option B, with the PIM precondition and the runbook's session-D results | done | #82 |
+| 8 | The attestation token reachable from its step only | next | #83 |
+
+First batch:
+
 | # | Item | State | PR |
 | --- | --- | --- | --- |
 | 1 | Mark the decisions in `docs/DECISIONS.md` | done | #76 |
@@ -53,8 +62,10 @@ is now required on `main`.
   ```
   git switch main
   git pull --ff-only
+  git switch --detach 1c6a2b956a1358eae988d0b64c09430daeac8594
   uv run poe release-check
   git tag v0.1.0
+  git switch main
   git push origin v0.1.0
   gh run list --workflow release.yml --limit 1
   gh run watch <run id from the line above> --exit-status
@@ -64,6 +75,10 @@ is now required on `main`.
   gh release edit v0.1.0 --draft=false
   ```
 
+  - **The tag goes on #81's merge commit, not on `main`** (pending review in
+    DECISIONS). #82 changed the verdict rules after 0.1.0 was dated, so `main`
+    holds more than the 0.1.0 section lists. `git switch --detach` checks out
+    that commit; `git switch main` goes back after tagging it.
   - `release-check` must print `release check: ok` before you tag.
   - The workflow runs the full check, builds, writes the SBOM and
     `SHA256SUMS`, attests every file and creates a **draft**. `gh run watch`

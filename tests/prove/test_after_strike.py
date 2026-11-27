@@ -1,10 +1,12 @@
-"""``fns prove --after-strike``: D-1 to D-5 as evidence, never looser (D6, 2026-11-27).
+"""``fns prove --after-strike``: D-1 to D-5 as evidence (D6 and option B, 2026-11-27).
 
-The guardrail approved with this change: verdicts may only gain evidence or become
-stricter. Every prove golden is re-run with a synthetic after-harden strike run
-that observes **every** ``must_not_reach`` item of that golden, once with every
-attempt denied and once with every attempt succeeding, and compared with the
-recorded baseline (``tests/golden/prove-verdicts.json``):
+Every prove golden is FIXTURE, and FIXTURE never counts toward a verdict (option B:
+only a LIVE 403 on the exact operation and object does, ``test_option_b.py``). So
+here verdicts may only gain evidence or become stricter. Every prove golden is
+re-run with a synthetic after-harden strike run that observes **every**
+``must_not_reach`` item of that golden, once with every attempt denied and once
+with every attempt succeeding, and compared with the recorded baseline
+(``tests/golden/prove-verdicts.json``):
 
 - all denied: every verdict, coverage, gap, reason and supporting evidence stays
   exactly as recorded; only context is added;
@@ -138,7 +140,7 @@ def golden(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFact
     return name, aset, results
 
 
-def test_denials_change_no_decision_and_only_add_context(golden: Any) -> None:
+def test_fixture_denials_change_no_decision_and_only_add_context(golden: Any) -> None:
     name, aset, results = golden
     bundle, _ = results["denied"]
     before, after = BEFORE[name], decisions(bundle)
@@ -275,6 +277,32 @@ def test_a_tampered_strike_artifact_fails_the_check(tmp_path: Path, one_aset: As
     assert code == 5 and "EVIDENCE INVALID" in output
 
 
+@pytest.mark.parametrize(
+    "forge",
+    [
+        {"mode": "LIVE"},
+        {"request_operation": "graph:POST /applications/{id}/addPassword"},
+        {"request_object_id": "00000000-0000-4000-8000-00000000beef"},
+        {"http_status": 401},
+    ],
+    ids=["mode", "operation", "object", "status"],
+)
+def test_a_strike_artifact_forged_to_count_fails_the_check(
+    tmp_path: Path, one_aset: AssertionSet, forge: dict[str, Any]
+) -> None:
+    """Option B: editing an artifact to look like a counting denial is tampering."""
+    d = strike_dir(tmp_path / "s", one_aset, "denied")
+    assert prove_with(ONE, tmp_path / "out", d).exit_code in {0, 1, 3}
+    b = bundle_of(tmp_path / "out")
+    (run_dir,) = {p.parent for p in (tmp_path / "out").rglob("bundle.json")}
+    art = run_dir / "artifacts" / f"{b.strike_artifacts[0].sha256}.json"
+    data = json.loads(art.read_text())
+    data.update(forge)
+    art.write_text(json.dumps(data))
+    code, output = check_run(run_dir)
+    assert code == 5 and "EVIDENCE INVALID" in output
+
+
 # --- the real `fns strike run` output (fixtures/strike-demo, after harden) ------------
 
 
@@ -306,6 +334,13 @@ def test_a_real_strike_run_maps_onto_contract_items(
     assert {o.mode for o in got} == {"FIXTURE"}
     items = {(a.target, a.operation) for a in one_aset.assertions}
     assert all((o.target, o.operation) in items for o in got)
+    # Option B: each observation carries the planned write's operation and object.
+    planned = {w.key: w for w in plan.writes}
+    for o in got:
+        w = planned[o.write_key]
+        assert o.request_operation == w.request.operation
+        assert o.request_object_id is not None
+        assert f"/applications/{o.request_object_id}/" in w.request.url.lower()
 
 
 def test_the_demo_strike_tenant_is_not_the_prove_fixtures_tenant(

@@ -610,6 +610,23 @@ uv run fns contain --contract .fns\m4\recorded.fns.yaml --snapshot $snap
 Expected: **0 critical reachable**. Wait 10 minutes: removed grants can stay in
 cached tokens for a while.
 
+**Precondition for D6 and D7: PIM eligibility is a closed surface** (approved
+2026-11-27). D7 proves against this snapshot, and an open `pim-eligibility`
+surface keeps every application item `inconclusive`, whatever the D-steps show.
+
+```powershell
+$cov = (Get-Content $snap -Raw | ConvertFrom-Json).coverage
+$cov.collectors | Where-Object name -eq "pim.eligibility" | Select-Object name, status
+$cov.not_collected | Where-Object surface -eq "pim-eligibility"          # must print nothing
+($cov.not_applicable | Where-Object surface -eq "pim-eligibility").evidence
+```
+
+Expected: `pim.eligibility` with status `complete`, or `not-applicable` with its
+evidence lines (the eligibility listings' responses and `/subscribedSkus`), as in
+M2 and M3. Anything else is a stop: no `pim.eligibility` row (it did not run),
+`partial`, `failed` or `skipped`, a `pim-eligibility` row in `not_collected`, or
+`not-applicable` with no evidence. Send the four outputs.
+
 ### D5. Renew the strike expiry
 
 Only if the strike expiry printed by `scope check` is less than 1 hour away.
@@ -677,9 +694,11 @@ Remove-Item Env:AZURE_CONFIG_DIR
 ```
 
 `--after-strike` adds each D-step's result to the finding it observes
-(`docs/DECISIONS.md`, D6, approved 2026-11-27 with its guardrail). It refuses a
-strike run from another tenant, another plan or another mode before anything is
-recorded.
+(`docs/DECISIONS.md`: D6, and option B, approved 2026-11-27). A D-step counts like
+an observed probe denial only if it is LIVE, a 403, on the item's exact operation
+and object (`docs/milestones/M4-exit-gate-plan.md`). Every other result is context,
+or fails the finding. It refuses a strike run from another tenant, another plan
+or another mode before anything is recorded.
 
 **Expected:**
 
@@ -687,12 +706,17 @@ recorded.
 | --- | --- | --- |
 | Key Vault `secrets/get`, `secrets/list`; payroll `blob/read` | **`pass`**, `verified` | observed denied, no path left |
 | invoices `blob/read` (must still do) | **`pass`**, `verified` | observed allowed |
-| `application:id-verifier`, `application:sp-fns-scout` (`credentials/update`, `owners/update`), `directory:tenant applications/credentials/update` | **`inconclusive`**, with the D-step's `denied` attached as context | the guardrail: a strike can add evidence or fail a finding, never pass one |
-| `directory:tenant roleAssignments/write` | **`inconclusive`** | SD3: no direct attempt |
+| `application:id-verifier`, `application:sp-fns-scout` (`credentials/update`, `owners/update`) | **`pass`**, `verified`, the D-step's 403 as supporting evidence; reason "denied by an after-harden strike (D-2) (observed), and every modeled path is refuted" (D-3, D-4, D-5 likewise) | option B: a LIVE 403 on the exact operation and object, no path, and no open surface (D4's PIM check) |
+| `directory:tenant applications/credentials/update` | **`inconclusive`**, D-2's `denied` attached as context | D-2 is one application, not every application (approved 2026-11-27) |
+| `directory:tenant roleAssignments/write` | **`inconclusive`** | SD3: no direct attempt; never counts |
+| payroll `listKeys`, invoices `listKeys` | **`inconclusive`** | the permissions API shows the action is gone (evaluated), but neither a read-only probe nor a D-step observes a `listKeys` denial |
+| invoices `blob/write` (must still do) | **`inconclusive`** | allowed when evaluated; an observed success needs a write, which `prove` never makes |
 
-So expect **exit 3** (inconclusive over the contract's budget of 2), not 0.
-Whether a strike denial may count toward `pass` is planned, not built
-(`docs/milestones/M4-exit-gate-plan.md`, option B, waiting for approval). Any finding that **fails** is a stop.
+So expect **exit 3**: five inconclusive over the contract's budget of 2. Option B
+moves the four application items to `pass`, and the five above stay
+(`tests/prove/test_option_b.py`, `test_the_rest_of_the_contract_after_harden`).
+Any finding that **fails** is a stop, and so is an application item that is not
+`pass` although its D-step printed `denied` and `403` in D6: send its reasons.
 
 ### D8. Sign out and delete the certificates
 

@@ -218,8 +218,17 @@ run directory by hand, to get a `pass`.*
   copies one. Any failure exits 5 and writes no bundle.
 - **Re-checking.** `fns verify check` re-does all of that on a finished run,
   plus the signature and every subject digest.
-- **Strike evidence only tightens.** It cannot move a finding toward `pass`
-  (`GuardrailError`), and a test re-runs every prove golden to check that.
+- **Strike evidence moves a finding toward `pass` only through a counting
+  denial** (option B, 2026-11-27): LIVE, D-2 to D-5, a 403, on the item's exact
+  operation and object (`request_operation` and `request_object_id`, checked
+  against the frozen `target_object_id` by a table in the verifier), never on
+  `roleAssignments/write`. It fills the observed-denial slot, so every path must
+  still be refuted with no open surface. Anything else only tightens
+  (`GuardrailError`). FIXTURE never counts, and a test re-runs every prove
+  golden to check that nothing moves; `tests/prove/test_option_b.py` has one
+  negative row per condition and a property over any strike observation.
+- **An edited strike artifact is tampering.** Changing its mode, status,
+  operation or object breaks its digest: exit 5.
 - **Size caps.** The verifier reads every run-directory file through
   `fns.inputcap` (16 MiB each); an oversized file is an integrity failure.
 

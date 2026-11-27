@@ -10,6 +10,13 @@ judges each assertion by the rules frozen into it:
   it settled the path;
 - ``must_still_do`` passes only with an observed success.
 
+An after-harden strike denial counts like an observed probe denial only when it is
+a *counting denial* (option B, approved 2026-11-27; :func:`not_counting`): LIVE,
+D-2 to D-5, HTTP 403, on the item's exact operation and object, and never on
+``directory:tenant roleAssignments/write``. It enters :func:`judge` in the
+observed-denial slot, so ``pass`` keeps every other requirement. Every other strike
+result is context, or fails the finding (:func:`with_strikes`).
+
 Every probe result of an assertion ends up in its finding. Results that the
 verdict rests on are supporting evidence. Every other result that came back
 ``allowed`` or ``denied`` is attached with ``role="context"``. Coverage and the
@@ -19,14 +26,72 @@ verdict, a coverage state or an exit code (2026-11-26 decision).
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Final, Literal
 
 from fns.models.assertions import Assertion, ProbeObservation, StrikeObservation, Thresholds
 from fns.models.bundle import BundleSummary
 from fns.models.evidence import RUNG_ORDER, CoverageState, Evidence, Finding, Gap, Verdict
 
 Obs = dict[str, tuple[ProbeObservation, str]]
+Strikes = list[tuple[StrikeObservation, str]]
 MODEL_SOURCE = "frozen-assertions/fns.contain"
+STRIKE_SOURCE = "fns.strike/after-harden"
+
+COUNTING_STATUS: Final = 403
+"""The probes' rule (V5): only a 403 is a denial. A 401 can be an expired or wrong
+token, so it says nothing about the request (approved 2026-11-27)."""
+COUNTING: Final[dict[str, tuple[str, frozenset[str]]]] = {
+    "graph:POST /applications/{id}/addPassword": ("credentials/update", frozenset({"D-2", "D-3"})),
+    "graph:POST /applications/{id}/owners/$ref": ("owners/update", frozenset({"D-4", "D-5"})),
+}
+"""Option B's exact-operation table: a planned write's operation, the one contract
+operation of an ``application:`` item it observes, and the strikes that may make it.
+Held here and not imported from ``fns.strike``: the verifier's rule stays put when
+the strike engine changes."""
+COUNTING_TARGET_KIND: Final = "application"
+NEVER_COUNTS: Final = frozenset({("directory:tenant", "roleAssignments/write")})
+"""SD3: no direct attempt is possible, so nothing may stand in for one."""
+
+
+def not_counting(o: StrikeObservation, a: Assertion, *, live: bool) -> str | None:
+    """Why ``o`` is not a counting denial for ``a``, or None if it is one."""
+    row = COUNTING.get(o.request_operation or "")
+    checks = (
+        (live and o.mode == "LIVE", "not LIVE: FIXTURE never counts"),
+        (a.item_kind == "must_not_reach", "not a must_not_reach item"),
+        ((a.target, a.operation) not in NEVER_COUNTS, "roleAssignments/write never counts (SD3)"),
+        ((o.target, o.operation) == (a.target, a.operation), "observes another item"),
+        (o.outcome == "denied", "not a denial"),
+        (o.http_status == COUNTING_STATUS, f"HTTP {o.http_status}, not 403"),
+        (row is not None, "not a write in the exact-operation table"),
+        (row is not None and row[0] == a.operation, "not the item's exact operation"),
+        (row is not None and o.strike in row[1], f"{o.strike} does not make that request"),
+        (a.target.partition(":")[0] == COUNTING_TARGET_KIND, "not an application item"),
+        (
+            a.target_object_id is not None and o.request_object_id == a.target_object_id,
+            "not the item's exact object",
+        ),
+    )
+    return next((why for ok, why in checks if not ok), None)
+
+
+def counting_denials(a: Assertion, strikes: Strikes, *, live: bool) -> Strikes:
+    return sorted(
+        (s for s in strikes if not_counting(s[0], a, live=live) is None),
+        key=lambda s: (s[0].write_key, s[1]),
+    )
+
+
+def strike_evidence(o: StrikeObservation, sha: str) -> Evidence:
+    return Evidence(
+        rung="observed",
+        outcome=o.outcome,
+        source=STRIKE_SOURCE,
+        artifact_digest=sha,
+        observed_at=o.observed_at,
+        notes=f"{o.write_key}: HTTP {o.http_status}"[:500],
+    )
+
 
 _COVERAGE: dict[str, CoverageState] = {
     "modeled": "modeled-only",
@@ -94,11 +159,18 @@ class _Judge:
         ]
 
 
-def judge(a: Assertion, obs: Obs, contract: str) -> Finding:
+def judge(a: Assertion, obs: Obs, contract: str, counting: Strikes | None = None) -> Finding:
+    """Judge one assertion. ``counting`` holds only counting denials
+    (:func:`counting_denials`); they fill the observed-denial slot."""
+    counting = counting or []
     j = _Judge(a, obs)
     modeled = Evidence(rung="modeled", outcome=a.modeled_outcome, source=MODEL_SOURCE)
     d_obs_ids, d_eval_ids = j.direct("data-read"), j.direct("arm-permissions")
-    d_obs = _combined([j.outcome(p) for p in d_obs_ids if j.outcome(p) != "not-run"])
+    probe_obs = [j.outcome(p) for p in d_obs_ids if j.outcome(p) != "not-run"]
+    d_obs = _combined([*probe_obs, *("denied" for _ in counting)])
+    by_probe = _combined(probe_obs) == "denied"
+    struck = ", ".join(sorted({o.strike for o, _ in counting}))
+    denied_how = "when probed" if by_probe else f"by an after-harden strike ({struck})"
     d_eval = _combined([j.outcome(p) for p in d_eval_ids if j.outcome(p) != "not-run"])
     model_note = f"model: {a.modeled_reasons[0]}" if a.modeled_reasons else "model: no reasons"
     verdict: Verdict
@@ -130,7 +202,7 @@ def judge(a: Assertion, obs: Obs, contract: str) -> Finding:
             evidence = [modeled, *j.results(sorted(set(confirming)), only="allowed")]
             if d_obs == "denied":
                 reasons.append(
-                    "the operation itself was denied when probed, but escalation paths remain"
+                    f"the operation itself was denied {denied_how}, but escalation paths remain"
                 )
             for p in unrefuted:
                 why = (
@@ -146,17 +218,18 @@ def judge(a: Assertion, obs: Obs, contract: str) -> Finding:
                 *j.results(d_obs_ids),
                 *j.results(d_eval_ids),
                 *j.results(sorted(set(refuting) - set(d_obs_ids) - set(d_eval_ids))),
+                *(strike_evidence(o, sha) for o, sha in counting),
             ]
             if d_obs == "denied" and not a.open_surfaces:
                 verdict = "pass"
-                reasons.append("denied when probed (observed), and every modeled path is refuted")
+                reasons.append(f"denied {denied_how} (observed), and every modeled path is refuted")
                 if a.modeled_outcome == "allowed":
                     gap = "model-gap"
                     reasons.append("the model said reachable (model-gap)")
             elif d_obs == "denied":
                 verdict = "inconclusive"
                 reasons.append(
-                    "denied when probed, but not collected: " + ", ".join(a.open_surfaces)
+                    f"denied {denied_how}, but not collected: " + ", ".join(a.open_surfaces)
                 )
             else:
                 verdict = "inconclusive"
@@ -208,22 +281,48 @@ def judge(a: Assertion, obs: Obs, contract: str) -> Finding:
     )
 
 
-STRIKE_SOURCE = "fns.strike/after-harden"
 VERDICT_RANK: dict[str, int] = {"fail": 0, "inconclusive": 1, "pass": 2}
 """Higher is looser. Strike evidence may only keep a verdict or lower its rank."""
 
 
 class GuardrailError(AssertionError):
-    """Strike evidence would have moved a finding toward pass (must never happen)."""
+    """Strike evidence moved a finding toward pass other than through a counting
+    denial (must never happen)."""
 
 
-def with_strikes(f: Finding, strikes: list[tuple[StrikeObservation, str]]) -> Finding:
-    """Add after-harden strike observations to a judged finding (D6, 2026-11-27).
+def judge_with_strikes(
+    a: Assertion, obs: Obs, contract: str, strikes: Strikes, *, live: bool
+) -> Finding:
+    """Judge an assertion with its after-harden strike observations (option B).
 
-    The guardrail: verdicts may only gain evidence or become stricter, never looser.
+    The guardrail, narrowed on 2026-11-27: a strike may move a finding toward
+    ``pass`` only through a counting denial, and only where the probe rules, given
+    that denial, pass it. The finding is judged twice, without strikes and with the
+    counting denials; if the result is looser than the first, every strike it rests
+    on is checked again, or :class:`GuardrailError` is raised.
+    """
+    baseline = judge(a, obs, contract)
+    counting = counting_denials(a, strikes, live=live)
+    f = judge(a, obs, contract, counting) if counting else baseline
+    used = {e.artifact_digest for e in f.evidence if e.source == STRIKE_SOURCE}
+    new = with_strikes(f, [s for s in strikes if s[1] not in used])
+    if VERDICT_RANK[new.verdict] > VERDICT_RANK[baseline.verdict]:
+        resting = [s for s in strikes if s[1] in used]
+        if not resting or any(not_counting(o, a, live=live) for o, _ in resting):
+            raise GuardrailError(
+                f"strike evidence moved {a.target} {a.operation} toward pass "
+                "without a counting denial"
+            )
+    return new
+
+
+def with_strikes(f: Finding, strikes: Strikes) -> Finding:
+    """Add the strike observations that are not counting denials (D6, 2026-11-27).
+
+    These may only add evidence or make the verdict stricter, never looser.
 
     - A denied attempt is attached as ``context``: it settles nothing, so the
-      verdict, coverage and gap stay exactly as judged from the probes.
+      verdict, coverage and gap stay exactly as judged.
     - A successful attempt against a ``must_not_reach`` item is supporting
       evidence that the operation is reachable: the finding fails.
     - A successful attempt on a ``must_still_do`` item is context only.
@@ -233,14 +332,7 @@ def with_strikes(f: Finding, strikes: list[tuple[StrikeObservation, str]]) -> Fi
     added: list[Evidence] = []
     succeeded: list[StrikeObservation] = []
     for o, sha in sorted(strikes, key=lambda x: (x[0].write_key, x[1])):
-        e = Evidence(
-            rung="observed",
-            outcome=o.outcome,
-            source=STRIKE_SOURCE,
-            artifact_digest=sha,
-            observed_at=o.observed_at,
-            notes=f"{o.write_key}: HTTP {o.http_status}"[:500],
-        )
+        e = strike_evidence(o, sha)
         if o.outcome == "allowed" and f.item_kind == "must_not_reach":
             succeeded.append(o)
             added.append(e)

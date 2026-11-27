@@ -7,6 +7,26 @@ version may change file formats; each change is listed here.
 
 ## [Unreleased]
 
+### Changed
+
+- `fns prove --after-strike` / `fns verify`: an after-harden strike denial can
+  now count like an observed probe denial (option B). It counts only if it is
+  LIVE, D-2 to D-5, a 403, and on the item's exact operation and exact object.
+  It never counts for `directory:tenant roleAssignments/write`, and D-2 never
+  counts for the tenant-wide `applications/credentials/update`. `pass` still
+  needs every path refuted and no open surface. FIXTURE, D-1, S4 and
+  before-harden strikes never count. Any other strike result only adds context,
+  or fails the finding. The verifier judges each finding with and without strikes,
+  and raises `GuardrailError` if it loosened without a counting denial.
+- Frozen assertions record the object ID of `application:` and
+  `service_principal:` targets (`target_object_id`), and strike observations
+  record the planned write's operation and object ID. All three fields are
+  omitted when empty. The lab-run prove bundle digests change for that reason
+  only; no verdict changes.
+- The M4 runbook checks the PIM precondition before session D's strikes, and its
+  expected results now include `listKeys` and `blob/write`. With them, session D
+  still exits 3.
+
 ## [0.1.0] - 2026-11-27
 
 The first release: contracts, the reach model, read-only probes with signed
