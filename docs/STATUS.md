@@ -1,6 +1,40 @@
 # Status
 
-## Summary: the queue is done (2026-11-27)
+## Owner-decision session (2026-11-27)
+
+Working through Daniel's decisions of 2026-11-27, one focused PR per item. Same
+hard rules as before: no Azure, Graph or Log Analytics call, no `az`, Terraform
+only as `poe lab-check`, fixtures and mocked transports only. CI (three checks)
+is now required on `main`.
+
+### Queue
+
+| # | Item | State | PR |
+| --- | --- | --- | --- |
+| 1 | Mark the decisions in `docs/DECISIONS.md` | done | #76 |
+| 2 | Agent ID findings `not-assessed` | next | |
+| 3 | S4, with the runbook update | | |
+| 4 | Threat model open gaps (size caps, provenance attestation) | | |
+| 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | | |
+| 6 | M4 exit gate, option B: plan only, then stop | | |
+
+### Decisions of 2026-11-27 (marked in `docs/DECISIONS.md`)
+
+- Every "Pending review" row from the build session: **approved**, including
+  exit 5 for a failed post-undo verification (revisit with a dedicated exit code
+  in a later release).
+- Agent ID `not-assessed`: approved, being built (item 2).
+- S4: approved with conditions (item 3).
+- M4 exit gate: option B, **plan only** (item 6).
+- **M6 Agent ID licensing and the LLM bake-off: deferred.**
+- Threat model open gaps: size caps and build provenance approved (item 4).
+
+### Needs Daniel
+
+Nothing yet in this session.
+
+
+## Summary of the build session: the queue is done (2026-11-27)
 
 All ten queue items are merged, except S4, which waits for your decision. No
 Azure, Graph or Log Analytics call was made, no `az` command ran, and Terraform
@@ -39,7 +73,7 @@ Findings along the way, each with a test or a DECISIONS row:
   percent-encoding. From 17 rounds, the strict URL rule refuses the request
   instead. That defence in depth is now pinned by a test.
 
-### Decisions pending review
+### Decisions pending review (all approved 2026-11-27)
 
 All are in `docs/DECISIONS.md`, marked "Pending review". The ones from this
 session:
@@ -60,7 +94,7 @@ session:
   modeled, and the bake-off's output is limited to the lever set.
 - **Tests** (#75): test journals skip fsync; the product keeps FULL.
 
-### Needs Daniel
+### Needs Daniel (as of the build session; see the owner-decision session above)
 
 Each item is described in full below, under "Needs Daniel":
 1. **S4 gate rules:** S4 needs a token form and a write as a non-test identity.
@@ -118,7 +152,7 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 
 The queue is done. See the summary at the top.
 
-### Needs Daniel
+### Needs Daniel (as of the build session; see the owner-decision session above)
 
 - **S4 gate rules** (`docs/DECISIONS.md`, "Proposal, pending review: S4"). S4 signs in as
   `app-escalation-target` with S3's password and assigns the marker role. That needs a
@@ -159,7 +193,7 @@ The queue is done. See the summary at the top.
   - **The bake-off:** which models and providers to compare, and who pays for the
     runs (`docs/milestones/M6-bakeoff.md`).
 
-### Pending review
+### Pending review (all approved 2026-11-27)
 
 Approved on 2026-11-27 (marked in `docs/DECISIONS.md`): the KQL evaluator, the
 two rule choices, the 1 GB cap, both ID kinds monitored, the plan expiry and
