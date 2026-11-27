@@ -1,0 +1,67 @@
+# Sample rows for detections/object-owner-added-by-workload.yaml, checked by `fns detections check` and
+# tests/harden/test_detections.py through fns.harden.kql (a model of KQL, not Kusto).
+# Placeholder IDs only. Shapes follow the rows seen in the 2026-11-27 log path check
+# (docs/FINDINGS.md) and Microsoft's documented table columns.
+cases:
+- name: a workload makes itself an owner of an application
+  alert: true
+  expect:
+    TargetObjectId: 00000000-0000-4000-8000-000000000303
+    NewOwnerId: 00000000-0000-4000-8000-000000000301
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add owner to application
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000301
+        displayName: sp-billing-agent
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000303
+      displayName: app-escalation-target
+      type: Application
+      modifiedProperties: []
+    - id: 00000000-0000-4000-8000-000000000301
+      displayName: sp-billing-agent
+      type: ServicePrincipal
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000927
+- name: the admin adds an owner (Terraform)
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Add owner to application
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      user:
+        id: 00000000-0000-4000-8000-000000000304
+        displayName: null
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000303
+      displayName: app-escalation-target
+      type: Application
+      modifiedProperties: []
+    - id: 00000000-0000-4000-8000-000000000301
+      displayName: sp-billing-agent
+      type: ServicePrincipal
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000928
+- name: a workload removes an owner
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: Remove owner from application
+    Category: ApplicationManagement
+    Result: success
+    InitiatedBy:
+      app:
+        servicePrincipalId: 00000000-0000-4000-8000-000000000301
+        displayName: sp-billing-agent
+    TargetResources:
+    - id: 00000000-0000-4000-8000-000000000303
+      displayName: app-escalation-target
+      type: Application
+      modifiedProperties: []
+    CorrelationId: 00000000-0000-4000-8000-000000000929

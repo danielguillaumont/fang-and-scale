@@ -3,6 +3,11 @@
 One YAML file per rule in ``detections/``. Linting is structural; it needs no
 workspace: tables, brackets and quotes, parameters, banned operators, projected
 entity columns, schedule. Deployment and detection results are M4 K4 (live).
+
+Each rule also has sample rows in ``detections/samples/<id>.yaml``: at least one
+that must alert and one that must not. They run through ``fns.harden.kql``, a
+small evaluator of the KQL subset the rules use. That tests the rule's logic on
+rows of a known shape; it is not a run in Kusto.
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ from typing import Any, Final, Literal
 
 from pydantic import Field, ValidationError
 
+from fns.harden import kql
 from fns.models.base import FnsModel
 from fns.yamlio import YamlError, loads_yaml
 
@@ -212,3 +218,77 @@ def sentinel_rule(rule: DetectionRule, params: dict[str, str]) -> dict[str, Any]
             ],
         },
     }
+
+
+class SampleCase(FnsModel):
+    name: str = Field(min_length=3)
+    alert: bool
+    """True: the rule must return at least one row for this input. False: none."""
+    row: dict[str, Any]
+    table: str | None = None
+    """Defaults to the rule's only table."""
+    expect: dict[str, Any] = Field(default_factory=dict)
+    """Columns the first alert row must carry, with these values."""
+
+
+class RuleSamples(FnsModel):
+    params: dict[str, str] = Field(default_factory=dict)
+    cases: tuple[SampleCase, ...] = Field(min_length=2)
+
+
+def load_samples(directory: Path) -> tuple[dict[str, RuleSamples], list[str]]:
+    """``<directory>/samples/<rule id>.yaml``, keyed by rule id."""
+    found: dict[str, RuleSamples] = {}
+    errors: list[str] = []
+    for path in sorted((directory / "samples").glob("*.yaml")):
+        try:
+            found[path.stem] = RuleSamples.model_validate(
+                loads_yaml(path.read_text(encoding="utf-8"))
+            )
+        except (ValidationError, YamlError) as exc:
+            errors.append(f"samples/{path.name}: invalid: {exc}")
+    return found, errors
+
+
+def check_samples(rule: DetectionRule, samples: RuleSamples) -> list[str]:
+    """Run each sample row through the rule; report every case that disagrees."""
+    problems: list[str] = []
+    if not any(c.alert for c in samples.cases):
+        problems.append("samples: no case that must alert")
+    if all(c.alert for c in samples.cases):
+        problems.append("samples: no case that must stay quiet")
+    try:
+        query = kql.parse(render_query(rule, samples.params))
+    except (ValueError, kql.KqlError) as exc:
+        return [*problems, f"samples: {exc}"]
+    for case in samples.cases:
+        table = case.table or (rule.tables[0] if len(rule.tables) == 1 else None)
+        if table is None or table not in rule.tables:
+            problems.append(f"samples: {case.name}: name one of the rule's tables")
+            continue
+        try:
+            rows = query.run({table: [case.row]})
+        except kql.KqlError as exc:
+            problems.append(f"samples: {case.name}: {exc}")
+            continue
+        if bool(rows) != case.alert:
+            want = "alert" if case.alert else "stay quiet"
+            problems.append(f"samples: {case.name}: should {want}, got {len(rows)} row(s)")
+            continue
+        if not rows:
+            continue
+        if all(kql.tostring(rows[0].get(c)) == "" for c in rule.entities.values()):
+            problems.append(f"samples: {case.name}: every entity column is empty")
+        for column, value in sorted(case.expect.items()):
+            if rows[0].get(column) != value:
+                problems.append(
+                    f"samples: {case.name}: {column} is {rows[0].get(column)!r}, expected {value!r}"
+                )
+    return problems
+
+
+def sample_gaps(rules: list[DetectionRule], samples: dict[str, RuleSamples]) -> list[str]:
+    ids = {r.id for r in rules}
+    return [f"{r} has no samples/{r}.yaml" for r in sorted(ids - set(samples))] + [
+        f"samples/{s}.yaml names no rule" for s in sorted(set(samples) - ids)
+    ]

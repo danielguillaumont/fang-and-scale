@@ -14,11 +14,15 @@ from fns.cli import app
 from fns.harden.coverage import coverage_gaps, coverage_keys
 from fns.harden.detections import (
     DetectionRule,
+    RuleSamples,
+    check_samples,
     lint,
     load_exempt,
     load_rules,
+    load_samples,
     minutes,
     render_query,
+    sample_gaps,
     sentinel_rule,
 )
 
@@ -148,3 +152,97 @@ def test_cli_check(tmp_path: Path) -> None:
     result = runner.invoke(app, ["detections", "check", "--dir", str(tmp_path)])
     assert result.exit_code == 1
     assert "invalid" in result.output
+
+
+RULES, _ = load_rules(DETECTIONS)
+SAMPLES, SAMPLE_ERRORS = load_samples(DETECTIONS)
+
+
+def test_every_rule_has_samples_that_alert_and_stay_quiet() -> None:
+    assert SAMPLE_ERRORS == []
+    assert sample_gaps(RULES, SAMPLES) == []
+    for r in RULES:
+        cases = SAMPLES[r.id].cases
+        assert any(c.alert for c in cases) and not all(c.alert for c in cases), r.id
+
+
+@pytest.mark.parametrize("rule", RULES, ids=lambda r: r.id)
+def test_rule_against_its_samples(rule: DetectionRule) -> None:
+    assert check_samples(rule, SAMPLES[rule.id]) == []
+
+
+def _mutated(rule_id: str, old: str, new: str) -> list[str]:
+    rule = next(r for r in RULES if r.id == rule_id)
+    assert old in rule.query
+    return check_samples(
+        rule.model_copy(update={"query": rule.query.replace(old, new)}), SAMPLES[rule_id]
+    )
+
+
+def test_the_samples_catch_a_rule_that_fires_on_a_key_delete() -> None:
+    problems = _mutated(
+        "app-credential-added-by-workload", '| where Change != "delete"' + chr(10), ""
+    )
+    assert any("S3 undo" in p and "should stay quiet" in p for p in problems), problems
+
+
+def test_the_samples_catch_a_rule_that_fires_on_a_certificate_sign_in() -> None:
+    problems = _mutated("workload-sign-in-with-secret", '"clientAssertion", ', "")
+    assert any("clientAssertion" in p and "should stay quiet" in p for p in problems), problems
+
+
+def test_the_samples_catch_a_rule_that_ignores_failures() -> None:
+    problems = _mutated(
+        "storage-listkeys-by-workload", 'ActivityStatusValue in~ ("Success", "Succeeded")', "true"
+    )
+    assert any("after harden" in p for p in problems), problems
+
+
+def test_a_sample_that_disagrees_is_reported() -> None:
+    rule = next(r for r in RULES if r.id == "rbac-assignment-by-workload")
+    flipped = RuleSamples.model_validate(
+        {
+            "params": SAMPLES[rule.id].params,
+            "cases": [{**c.model_dump(), "alert": not c.alert} for c in SAMPLES[rule.id].cases],
+        }
+    )
+    problems = check_samples(rule, flipped)
+    assert len(problems) == len(flipped.cases)
+
+
+def test_sample_problems_are_specific() -> None:
+    rule = next(r for r in RULES if r.id == "rbac-assignment-by-workload")
+    only_alerts = RuleSamples.model_validate(
+        {
+            "params": {"monitored_identities": "[]"},
+            "cases": [{"name": "abc", "alert": True, "row": {}}] * 2,
+        }
+    )
+    problems = check_samples(rule, only_alerts)
+    assert "samples: no case that must stay quiet" in problems
+    assert any("unknown column" in p for p in problems)
+    missing = check_samples(
+        rule, RuleSamples.model_validate({"cases": SAMPLES[rule.id].model_dump()["cases"]})
+    )
+    assert any("missing parameter" in p for p in missing)
+    wrong_table = RuleSamples.model_validate(
+        {
+            "params": SAMPLES[rule.id].params,
+            "cases": [{**c.model_dump(), "table": "AuditLogs"} for c in SAMPLES[rule.id].cases],
+        }
+    )
+    assert all("name one of the rule's tables" in p for p in check_samples(rule, wrong_table))
+    assert sample_gaps(RULES, {}) and sample_gaps([], SAMPLES)
+
+
+def test_cli_check_runs_the_samples(tmp_path: Path) -> None:
+    import shutil
+
+    shutil.copytree(DETECTIONS, tmp_path / "d")
+    sample = tmp_path / "d" / "samples" / "storage-listkeys-by-workload.yaml"
+    sample.write_text(
+        sample.read_text(encoding="utf-8").replace("alert: false", "alert: true"), encoding="utf-8"
+    )
+    result = runner.invoke(app, ["detections", "check", "--dir", str(tmp_path / "d")])
+    assert result.exit_code == 1
+    assert "should alert" in result.output

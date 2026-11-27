@@ -160,11 +160,23 @@ def record(
 
 def detections_check(con: Console, directory: Path) -> int:
     from fns.harden.coverage import coverage_gaps
-    from fns.harden.detections import lint, load_exempt, load_rules
+    from fns.harden.detections import (
+        check_samples,
+        lint,
+        load_exempt,
+        load_rules,
+        load_samples,
+        sample_gaps,
+    )
 
     rules, errors = load_rules(directory)
+    samples, sample_errors = load_samples(directory)
+    errors.extend(sample_errors)
+    errors.extend(sample_gaps(rules, samples))
     for r in rules:
         errors.extend(f"{r.id}: {p}" for p in lint(r))
+        if r.id in samples:
+            errors.extend(f"{r.id}: {p}" for p in check_samples(r, samples[r.id]))
     try:
         exempt = load_exempt(directory)
     except (ValueError, YamlError) as exc:

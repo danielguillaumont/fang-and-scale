@@ -1,0 +1,57 @@
+# Sample rows for detections/blob-access-by-workload-or-shared-key.yaml, checked by `fns detections check` and
+# tests/harden/test_detections.py through fns.harden.kql (a model of KQL, not Kusto).
+# Placeholder IDs only. Shapes follow the rows seen in the 2026-11-27 log path check
+# (docs/FINDINGS.md) and Microsoft's documented table columns.
+params:
+  monitored_identities: '["00000000-0000-4000-8000-000000000301", "00000000-0000-4000-8000-000000000302"]'
+cases:
+- name: the agent reads a payroll blob with its token
+  alert: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: GetBlob
+    StatusCode: 200
+    RequesterObjectId: 00000000-0000-4000-8000-000000000301
+    AuthenticationType: OAuth
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayrollsample
+    CorrelationId: 00000000-0000-4000-8000-000000000911
+- name: anyone writes with the account key
+  alert: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: PutBlob
+    StatusCode: 201
+    RequesterObjectId: ''
+    AuthenticationType: AccountKey
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayrollsample
+    CorrelationId: 00000000-0000-4000-8000-000000000912
+- name: the agent's read is denied
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: GetBlob
+    StatusCode: 403
+    RequesterObjectId: 00000000-0000-4000-8000-000000000301
+    AuthenticationType: OAuth
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayrollsample
+    CorrelationId: 00000000-0000-4000-8000-000000000913
+- name: an unmonitored identity reads with a token
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: GetBlob
+    StatusCode: 200
+    RequesterObjectId: 00000000-0000-4000-8000-000000000305
+    AuthenticationType: OAuth
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayrollsample
+    CorrelationId: 00000000-0000-4000-8000-000000000914
+- name: the agent lists blobs (not a data read)
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationName: ListBlobs
+    StatusCode: 200
+    RequesterObjectId: 00000000-0000-4000-8000-000000000301
+    AuthenticationType: OAuth
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayrollsample
+    CorrelationId: 00000000-0000-4000-8000-000000000915

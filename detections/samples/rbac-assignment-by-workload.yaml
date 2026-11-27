@@ -1,0 +1,34 @@
+# Sample rows for detections/rbac-assignment-by-workload.yaml, checked by `fns detections check` and
+# tests/harden/test_detections.py through fns.harden.kql (a model of KQL, not Kusto).
+# Placeholder IDs only. Shapes follow the rows seen in the 2026-11-27 log path check
+# (docs/FINDINGS.md) and Microsoft's documented table columns.
+params:
+  monitored_identities: '["00000000-0000-4000-8000-000000000301", "00000000-0000-4000-8000-000000000302"]'
+cases:
+- name: the agent writes a role assignment
+  alert: true
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE
+    ActivityStatusValue: Success
+    Caller: 00000000-0000-4000-8000-000000000301
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab
+    CorrelationId: 00000000-0000-4000-8000-000000000930
+- name: the agent's attempt fails
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE
+    ActivityStatusValue: Failure
+    Caller: 00000000-0000-4000-8000-000000000301
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab
+    CorrelationId: 00000000-0000-4000-8000-000000000931
+- name: the admin writes one (Terraform)
+  alert: false
+  row:
+    TimeGenerated: '2026-11-27T05:41:07Z'
+    OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE
+    ActivityStatusValue: Success
+    Caller: 00000000-0000-4000-8000-000000000304
+    _ResourceId: /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab
+    CorrelationId: 00000000-0000-4000-8000-000000000932
