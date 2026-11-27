@@ -115,6 +115,17 @@ def test_a_leftover_strike_tag_stops_planning() -> None:
         plan_for(("S2",), lab)
 
 
+@pytest.mark.parametrize("what", ["storage", "vault"])
+def test_an_untagged_arm_target_is_not_a_lab_resource(what: str) -> None:
+    lab = Lab()
+    if what == "storage":
+        lab.tenant.storage_tags = {"project": "fang-and-scale"}
+    else:
+        lab.tenant.vault_tags = {"purpose": "lab", "project": "something-else"}
+    with pytest.raises(PlanError, match="not a lab resource"):
+        plan_for(("S1",) if what == "storage" else ("S2",), lab)
+
+
 def test_no_strike_block_no_plan() -> None:
     lab = Lab()
     lab.m = lab.m.model_copy(update={"strike": None})

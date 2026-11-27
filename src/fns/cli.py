@@ -145,10 +145,100 @@ def contain(
     raise typer.Exit(report.summary.exit_code)
 
 
-@app.command()
-def strike() -> None:
-    """Approved, lab-only attack scenarios (Fang, M6)."""
-    _not_implemented("strike")
+strike_app = typer.Typer(
+    help="Approved, lab-only strikes: plan, approve by hash, run with undo (M4).",
+    no_args_is_help=True,
+)
+app.add_typer(strike_app, name="strike")
+
+_FIXTURE_OPT = typer.Option(help="Replay this recorded strike set (FIXTURE) instead of live.")
+_SCOPE_OPT = typer.Option(help="Live: the scope manifest with a strike: block.")
+_SCOUT_OPT = typer.Option(help="Live: Azure CLI config dir signed in as sp-fns-scout.")
+_AGENT_OPT = typer.Option(help="Live: Azure CLI config dir signed in as sp-billing-agent.")
+
+
+@strike_app.command("plan")
+def strike_plan(
+    strikes: Annotated[str, typer.Option(help="S1,S2,S3 before harden; D-1,...,D-5 after.")],
+    fixture: Annotated[Path | None, _FIXTURE_OPT] = None,
+    scope: Annotated[Path, _SCOPE_OPT] = Path("scope.lab.yaml"),
+    scout_config: Annotated[Path | None, _SCOUT_OPT] = None,
+    out: Annotated[Path, typer.Option(help="Directory for <run id>/plan.json.")] = Path(
+        ".fns/strike"
+    ),
+) -> None:
+    """Read the pre-state as the scout and write the plan. Sends no write."""
+    from fns import strike_cli
+
+    raise typer.Exit(
+        strike_cli.plan(
+            make_console(),
+            make_console(stderr=True),
+            strikes=strikes,
+            fixture=fixture,
+            scope=scope,
+            scout_config=scout_config,
+            out=out,
+        )
+    )
+
+
+def _strike_run(cleanup_only: bool, **kwargs: Any) -> None:
+    from fns import strike_cli
+
+    raise typer.Exit(
+        strike_cli.run(
+            make_console(), make_console(stderr=True), cleanup_only=cleanup_only, **kwargs
+        )
+    )
+
+
+@strike_app.command("run")
+def strike_run(
+    plan: Annotated[Path, typer.Option(help="plan.json written by `fns strike plan`.")],
+    approve: Annotated[str, typer.Option(help="The plan hash printed by `fns strike plan`.")],
+    fixture: Annotated[Path | None, _FIXTURE_OPT] = None,
+    scope: Annotated[Path, _SCOPE_OPT] = Path("scope.lab.yaml"),
+    agent_config: Annotated[Path | None, _AGENT_OPT] = None,
+    scout_config: Annotated[Path | None, _SCOUT_OPT] = None,
+    journal: Annotated[
+        Path | None, typer.Option(help="Journal file (default: next to the plan).")
+    ] = None,
+) -> None:
+    """Run an approved plan: every write journaled, every undo run, then verified."""
+    _strike_run(
+        False,
+        plan_path=plan,
+        approve=approve,
+        fixture=fixture,
+        scope=scope,
+        agent_config=agent_config,
+        scout_config=scout_config,
+        journal_path=journal,
+    )
+
+
+@strike_app.command("cleanup")
+def strike_cleanup(
+    plan: Annotated[Path, typer.Option(help="plan.json of the run to clean up.")],
+    approve: Annotated[str, typer.Option(help="The same plan hash the run was approved with.")],
+    journal: Annotated[Path, typer.Option(help="That run's journal file.")],
+    fixture: Annotated[Path | None, _FIXTURE_OPT] = None,
+    scope: Annotated[Path, _SCOPE_OPT] = Path("scope.lab.yaml"),
+    agent_config: Annotated[Path | None, _AGENT_OPT] = None,
+    scout_config: Annotated[Path | None, _SCOUT_OPT] = None,
+) -> None:
+    """Finish every undo the journal shows as missing, then verify (after a crash)."""
+    _strike_run(
+        True,
+        plan_path=plan,
+        approve=approve,
+        fixture=fixture,
+        scope=scope,
+        agent_config=agent_config,
+        scout_config=scout_config,
+        journal_path=journal,
+    )
 
 
 @app.command()

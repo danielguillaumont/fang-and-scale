@@ -1,0 +1,49 @@
+# FIXTURE scope for fns strike --fixture (placeholder IDs; never a real tenant)
+allowed_operations:
+  scout:
+  - arm:Microsoft.KeyVault/vaults/read
+  - arm:Microsoft.Storage/storageAccounts/read
+  - graph:GET /applications
+  - graph:GET /applications/{id}/owners
+  strike:
+  - arm:Microsoft.KeyVault/vaults/write
+  - arm:Microsoft.Storage/storageAccounts/listKeys/action
+  - arm:Microsoft.Storage/storageAccounts/regenerateKey/action
+  - graph:DELETE /applications/{id}/owners/{id}/$ref
+  - graph:POST /applications/{id}/addPassword
+  - graph:POST /applications/{id}/owners/$ref
+  - graph:POST /applications/{id}/removePassword
+allowed_resource_groups:
+- /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab
+budget:
+  max_api_calls: 200
+  max_minutes: 60
+expires_at: '2026-12-02T12:00:00Z'
+strike:
+  expires_at: '2026-11-25T13:00:00Z'
+  targets:
+  - id: /subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels
+    kind: arm
+  - id: /subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest
+    kind: arm
+  - display_name: app-escalation-target
+    id: 00000000-0000-4000-8000-000000000200
+    kind: graph-application
+  - display_name: id-verifier
+    id: 00000000-0000-4000-8000-000000000202
+    kind: graph-application
+  - display_name: sp-fns-scout
+    id: 00000000-0000-4000-8000-000000000203
+    kind: graph-application
+  - application: 00000000-0000-4000-8000-000000000200
+    display_name: app-escalation-target
+    id: 00000000-0000-4000-8000-000000000201
+    kind: graph-service-principal
+subscription_ids:
+- 00000000-0000-4000-8000-000000000010
+tenant_id: 00000000-0000-4000-8000-000000000001
+test_identities:
+- kind: servicePrincipal
+  name: agent
+  object_id: 00000000-0000-4000-8000-000000000100
+version: 1

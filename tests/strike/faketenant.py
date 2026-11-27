@@ -81,6 +81,9 @@ class FakeTenant:
     owners: dict[str, list[str]] = field(
         default_factory=lambda: {APP_ESC: [ADMIN], APP_VER: [ADMIN], APP_SCOUT: [ADMIN]}
     )
+    storage_tags: dict[str, str] = field(
+        default_factory=lambda: {"project": "fang-and-scale", "purpose": "lab"}
+    )
     hardened: bool = False
     """After harden: every Graph write by the agent is 403 (D6)."""
     leaky: set[str] = field(default_factory=set)
@@ -159,6 +162,7 @@ class FakeTenant:
                 body = {
                     "id": PAYROLL,
                     "name": "stpayrolltest",
+                    "tags": dict(self.storage_tags),
                     "properties": {"keyCreationTime": dict(self.key_times)},
                 }
             else:

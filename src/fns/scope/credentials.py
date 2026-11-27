@@ -17,10 +17,14 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import os
+import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Final, Protocol
 
 from fns.models.operations import Api
@@ -170,3 +174,39 @@ def _cli_credential(tenant_id: str) -> _TokenSource:
     from azure.identity import AzureCliCredential
 
     return AzureCliCredential(tenant_id=tenant_id, process_timeout=30)
+
+
+_ENV_LOCK = threading.Lock()
+
+
+@contextmanager
+def _config_dir(path: Path) -> Iterator[None]:
+    """Set ``AZURE_CONFIG_DIR`` for one Azure CLI call (it copies the environment)."""
+    with _ENV_LOCK:
+        old = os.environ.get("AZURE_CONFIG_DIR")
+        os.environ["AZURE_CONFIG_DIR"] = str(path)
+        try:
+            yield
+        finally:
+            if old is None:
+                os.environ.pop("AZURE_CONFIG_DIR", None)
+            else:
+                os.environ["AZURE_CONFIG_DIR"] = old
+
+
+class ConfigDirSource:
+    """A token source that runs the Azure CLI with one config dir (M4 strikes).
+
+    ``fns strike`` needs two identities at once (the agent and the scout); the
+    Azure CLI keeps one sign-in per config dir.
+    """
+
+    def __init__(self, tenant_id: str, config_dir: Path, inner: _TokenSource | None = None) -> None:
+        if not config_dir.is_dir():
+            raise CredentialError(f"no Azure CLI config dir at {config_dir}")
+        self.config_dir = config_dir
+        self._inner = inner if inner is not None else _cli_credential(str(uuid.UUID(tenant_id)))
+
+    def get_token(self, *scopes: str, **kwargs: Any) -> Any:
+        with _config_dir(self.config_dir):
+            return self._inner.get_token(*scopes, **kwargs)
