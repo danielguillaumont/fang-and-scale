@@ -75,8 +75,16 @@ M4 (Harden + detect) is built offline. Its live plan is
 `docs/milestones/M4-plan.md`: lab rebuild, the `Directory.Read.All` and
 custom-role scout tests, logging and record mode, the four strikes with their
 detection results, harden and prove the fix, trial costs against the $100
-credit, and who does what. It ends with eight decisions for you (D1 to D8).
-Nothing in it is built or run yet.
+credit, and who does what. D1 to D8 were approved on 2026-11-26. D1 changed:
+step 1 is now a live check of whether Entra audit and service principal sign-in
+logs reach Log Analytics on Entra ID Free. The current Microsoft page lists no
+licence, older guidance says P1 or P2. D7 is `lab/budget.tf`, which is opt-in,
+because Cost Management does not support Azure for Students.
+
+The strike plan (D4, plan only) is `docs/milestones/M4-strikes-plan.md`. It lists
+every request in order with its undo, the stop line (no directory role is ever
+assigned), the write gate limited to lab objects, with fuzz tests, the journal,
+cleanup and emergency steps, and decisions SD1 to SD5. No strike code exists.
 
 ## The morning review (before the M2 and M3 runs)
 
