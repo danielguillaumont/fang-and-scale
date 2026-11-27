@@ -1,5 +1,48 @@
 # Public-readiness audit (2026-11-26)
 
+## Status: PUBLIC (2026-11-26)
+
+The owner made the repository public on 2026-11-26, after this audit. Settings
+read back through the GitHub API the same day:
+
+| Setting | State |
+| --- | --- |
+| Visibility | public |
+| Secret scanning | enabled |
+| Push protection | enabled |
+| Dependabot alerts | enabled |
+| Dependabot security updates | enabled |
+| Private vulnerability reporting | enabled |
+| Code scanning default setup | not configured (correct: `codeql.yml` is the advanced setup) |
+| Branch protection on `main` | classic rule: force pushes blocked, deletion blocked. **No required status checks yet**: see "Require CI to pass" below |
+| Workflow token | read-only; cannot approve pull requests |
+| Fork PR workflows | approval required for first-time contributors |
+| Automatically delete head branches | off (settings step 4, optional) |
+
+Owner decisions, as reported by the owner:
+
+- **Decision 2 (lab names):** option a. The lab is torn down (`rg-fns-lab`
+  destroyed), and the next rebuild gets a new random suffix. `tiin02` remains in
+  the fixtures and history as a recording of endpoints that no longer exist.
+- **Decision 3 (school email):** option a. New commits use the GitHub noreply
+  address; history is unchanged.
+- **Decision 1 (exact-ID check)** and **decision 4 (Claude Code working files)**:
+  no outcome recorded here.
+
+Since then:
+
+- **CodeQL** runs on pull requests, on `main`, weekly and by hand (#46, #50).
+- **Sigstore production signing** is on for pushes to `main` (V3, #49). The
+  first production signature is Rekor log index 4138528019, for commit
+  `2a176dc`. See README, "Verify a signed result".
+- **A Sigstore verification failure now exits 5** instead of printing a
+  traceback (#51).
+
+The audit as written before the change of visibility follows, unchanged except
+where marked *(updated)*.
+
+---
+
 Audit before making `danielguillaumont/fang-and-scale` public. Nothing here
 changed visibility, rewrote history or force-pushed. Every fix went through its
 own PR with CI green.
@@ -134,7 +177,9 @@ Already fine: no Actions secrets, variables or environments exist, and the defau
 workflow token is read-only. Every third-party action is pinned to a commit SHA
 (tested). `blast-radius` uses `pull_request`, never `pull_request_target`, so fork
 PRs get no write token and no secrets. Only `prove-sign` can mint an OIDC token,
-and only on `main` (tested).
+and only on `main` (tested). *(updated, #49: also on pull requests from branches
+of this repository, for Sigstore staging only; never for forks or Dependabot,
+never via `pull_request_target` or `workflow_run`.)*
 
 ## e. README review (fixed, #47)
 
@@ -213,6 +258,7 @@ Kept on purpose, because it is the strongest material for a reviewer:
   nothing changes.
 - Sigstore production stays refused (`PRODUCTION_APPROVED = False`, decision V3)
   until the repository is public. After that it is a separate decision.
+  *(updated: approved and done in #49.)*
 
 ## PRs from this audit and the M3 decisions
 

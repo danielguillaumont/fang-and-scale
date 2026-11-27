@@ -9,6 +9,22 @@
 | M3 Prove | 2026-11-26, probes as `sp-billing-agent` | passed 1 (invoices `blob/read`, observed and verified), critical reachable 11, still-do failed 0, inconclusive 1, exit 1. The Key Vault and payroll reads were denied when probed and still fail: escalation paths remain | `tests/fixtures/test_lab_run_3.py` |
 
 
+## The repository is public (2026-11-26)
+
+The owner made the repository public, turned on secret scanning with push
+protection, Dependabot alerts and security updates, private vulnerability
+reporting, and branch protection on `main` (no force push, no deletion, no
+required checks yet). The lab is torn down, and new commits use the noreply
+address. Details and the settings as read back from the API:
+`docs/PUBLIC-READINESS.md`, "Status: PUBLIC".
+
+| PR | Change |
+| --- | --- |
+| #49 | **V3 done:** `prove-sign` signs on Sigstore **production** on every push to `main` (first entry: Rekor log index 4138528019), and on staging for pull requests from branches of this repository. Production is refused in code anywhere else. README: "Verify a signed result" |
+| #50 | CodeQL can be started by hand (`workflow_dispatch`); it runs green on `main` |
+| #51 | A Sigstore verification failure (for example a wrong identity) exits 5 with `EVIDENCE INVALID`, not a traceback |
+| this PR | PUBLIC-READINESS status, this section, README "Project status" |
+
 ## After the M3 live run
 
 Each item from the M3 run report got its own branch and PR. CI passed on ubuntu
@@ -38,7 +54,7 @@ Tests: 1128 before these PRs, 1152 after.
    Linking it is more honest, but it changes the evidence model and every
    prove golden, so it needs a plan and your approval. The verdicts would not
    change.
-2. **Decided 2026-11-26: stays refused until the repository is public (V3).** The text below is the original question.
+2. **Decided 2026-11-26: stays refused until the repository is public (V3). Done after it went public: production signing on `main` (#49).** The text below is the original question.
    **Sigstore production (Rekor).** Still refused in code
    (`PRODUCTION_APPROVED = False`). `prove-sign` signs `fixtures/lab-run-3` on
    staging on every push to `main`.
