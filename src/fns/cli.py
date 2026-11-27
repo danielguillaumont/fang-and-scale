@@ -324,10 +324,26 @@ def detections_export(
     out: Annotated[Path, typer.Option(help="Directory for the rule bodies.")] = Path(
         ".fns/detections"
     ),
+    terraform: Annotated[
+        Path | None,
+        typer.Option(
+            help="Write the rules as one JSON file for lab/monitoring.tf instead "
+            "(placeholders kept; Terraform fills them at apply time)."
+        ),
+    ] = None,
+    check: Annotated[
+        bool, typer.Option("--check", help="With --terraform: fail if the file is out of date.")
+    ] = False,
 ) -> None:
     """Render Sentinel scheduled alert rule bodies as JSON (not deployed)."""
     from fns import harden_cli
 
+    if terraform is not None:
+        raise typer.Exit(
+            harden_cli.detections_export_terraform(make_console(), directory, terraform, check)
+        )
+    if check:
+        raise typer.BadParameter("--check needs --terraform")
     raise typer.Exit(harden_cli.detections_export(make_console(), directory, param or [], out))
 
 

@@ -51,3 +51,12 @@ output "billing_agent" {
     object_id = azuread_service_principal.billing_agent.object_id
   }
 }
+
+output "monitoring" {
+  description = "The M4 workspace (null unless enable_monitoring = true)."
+  value = var.enable_monitoring ? {
+    workspace_id          = azurerm_log_analytics_workspace.lab[0].id
+    workspace_customer_id = azurerm_log_analytics_workspace.lab[0].workspace_id
+    rules                 = sort(keys(azurerm_sentinel_alert_rule_scheduled.rules))
+  } : null
+}

@@ -15,9 +15,9 @@ over-privileged on purpose.
 | `id-verifier` | Reader on the RG; used only by `fns prove` (M3) |
 | `sp-fns-scout` | Read-only scout: Reader on the subscription + Graph read permissions (see the root README) |
 
-Not in the lab (yet): Log Analytics and diagnostic settings (M4), and a deny
-assignment. Deny assignments cannot be created directly; the bundled demo fixture
-covers them.
+Not in the lab: a deny assignment. Deny assignments cannot be created directly;
+the bundled demo fixture covers them. Logging and the detection rules are in the
+lab but off by default (`enable_monitoring`, below).
 
 No client secrets or certificates are created. State is local
 (`lab/terraform.tfstate`, gitignored) and contains the synthetic secret and the lab's
@@ -72,3 +72,33 @@ Offer / Offer ID**.
   after each M4 session. The cost that matters in M4 is Log Analytics and
   Sentinel ingestion, so its monitoring can also alert on ingested volume
   (M4 plan).
+
+## Monitoring (M4, decision D2)
+
+`monitoring.tf` adds logging and the detection rules for M4 sessions B to D. It
+exists only when `enable_monitoring = true` in `terraform.tfvars`; with the
+default `false`, the lab is the M1 to M3 lab. `lab-down` removes all of it.
+
+| Resource | Feeds |
+| --- | --- |
+| `law-<prefix>-<suffix>`, PerGB2018, 30-day retention, daily cap `monitoring_daily_quota_gb` (1 GB) | everything below |
+| Sentinel onboarding on that workspace (starts the 31-day trial) | the alert rules |
+| Subscription Activity Log: Administrative, Security, Policy | `AzureActivity` |
+| Key Vault `AuditEvent`, into `AzureDiagnostics` | `AzureDiagnostics` |
+| Blob service of both accounts: StorageRead, StorageWrite | `StorageBlobLogs` |
+| Entra (tenant-level): AuditLogs, ServicePrincipalSignInLogs | `AuditLogs`, `AADServicePrincipalSignInLogs` |
+| One Sentinel scheduled rule per file in `detections/` | alerts |
+
+With monitoring on, the plan adds **18** more resources: 7 for the workspace and
+its feeds, and 11 rules.
+
+- **The rules** come from `detections.json`, generated from `detections/` by
+  `uv run fns detections export --terraform lab/detections.json`. A test fails if
+  the file is out of date. Terraform fills `{{monitored_identities}}` at apply time
+  with `sp-billing-agent` and `app-escalation-target`, each by object ID and by
+  client ID.
+- **The Entra setting is tenant-level.** If a destroy fails halfway, it can
+  outlive the lab. Check after `lab-down`:
+  `az rest --method get --url "https://management.azure.com/providers/microsoft.aadiam/diagnosticSettings?api-version=2017-04-01-preview"`.
+- **Both Entra categories work on Entra ID Free.** The log path check showed it
+  on 2026-11-27 (`docs/FINDINGS.md`).

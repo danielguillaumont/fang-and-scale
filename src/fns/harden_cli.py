@@ -189,6 +189,37 @@ def detections_check(con: Console, directory: Path) -> int:
     return int(ExitCode.CHECK_FAILED) if errors else 0
 
 
+def detections_export_terraform(con: Console, directory: Path, out: Path, check: bool) -> int:
+    from fns.harden.detections import load_rules, terraform_rules
+
+    rules, errors = load_rules(directory)
+    if errors:
+        for e in errors:
+            con.print(e, style="fns.fail", markup=False)
+        return int(ExitCode.INVALID_INPUT)
+    try:
+        text = json.dumps(terraform_rules(rules), indent=2, sort_keys=True) + "\n"
+    except ValueError as exc:
+        con.print(str(exc), style="fns.fail", markup=False)
+        return int(ExitCode.INVALID_INPUT)
+    where = out.as_posix()
+    if check:
+        current = out.read_text(encoding="utf-8") if out.exists() else ""
+        if current != text:
+            con.print(
+                f"{where} is out of date: run fns detections export --terraform {where}",
+                style="fns.fail",
+                markup=False,
+            )
+            return int(ExitCode.CHECK_FAILED)
+        con.print(f"ok {where} matches {len(rules)} rule(s)", markup=False)
+        return 0
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8", newline="\n")
+    con.print(f"wrote {len(rules)} rule(s) to {where} for lab/monitoring.tf", markup=False)
+    return 0
+
+
 def detections_export(con: Console, directory: Path, params: list[str], out: Path) -> int:
     from fns.harden.detections import load_rules, sentinel_rule
 
