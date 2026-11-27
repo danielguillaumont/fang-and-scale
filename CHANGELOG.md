@@ -9,6 +9,18 @@ version may change file formats; each change is listed here.
 
 ### Added
 
+- `fns strike` S4 (approved 2026-11-27), right after S3 in the same run: a
+  token as `app-escalation-target` with S3's password, whose claims must show
+  `AppRoleAssignment.ReadWrite.All`, then, as that identity, the marker role
+  assigned to the agent and removed. S3's password is removed as soon as the
+  token is held. The token is never written anywhere; the journal gets its `oid`
+  and `roles` claims only. The claims check is a safety stop, never verdict evidence:
+  `fns prove --after-strike` counts only D-1 to D-5. The marker role is defined by Terraform
+  (`enable_strikes`), and the scope's new `strike.escalation` block authorises
+  the token request and the escalated identity. `fns strike cleanup` can't undo
+  the assignment (no token): it exits 5 and the M4 runbook's emergency cleanup
+  removes it. Fixture mode refuses S4: the recording has S1 to S3.
+
 - M6 design notes: `docs/milestones/M6-agent-id.md` (what Agent ID changes about
   blast radius, the gap in today's collector, and six lab checks) and
   `docs/milestones/M6-bakeoff.md` (how an LLM proposer would be compared with
@@ -148,7 +160,7 @@ built and tested offline only (see "Not in 0.1.0").
 
 - M4 sessions A to D have not run live (`docs/runbooks/m4-live-run.md`), so no
   strike, detection result or after-harden prove comes from a real tenant yet.
-- S4 (the escalated sign-in and the marker role) waits for its own decision.
+- S4 is built and tested against a fake tenant only: it has not run live either.
 - `harden --apply` is not built: you apply the diff yourself.
 - Not published to PyPI. Install from a Git tag (`docs/QUICKSTART.md`).
 

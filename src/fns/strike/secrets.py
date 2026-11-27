@@ -8,7 +8,10 @@ removes goes into a :class:`SecretHolder`, in memory only:
 
 - nothing ever reads the storage keys; they are kept only so the holder can say
   how many it dropped, then wiped;
-- S4 alone reads the password it needs, and the holder is wiped when the run ends.
+- S4 alone reads the password it needs (to ask for the token) and the token (to
+  read its ``oid`` and ``roles`` claims, and to send its two requests through
+  :class:`HeldToken`). The holder is wiped when the run ends. The token is never
+  written anywhere: the journal gets its ``oid`` and ``roles`` claims only.
 
 The holder never prints its values: ``repr`` and ``str`` show names and counts.
 """
@@ -18,6 +21,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Final
+
+from fns.adapters.azure.http import TransportError
+from fns.models.operations import Api
 
 SECRET_FIELDS: Final[frozenset[str]] = frozenset(
     {
@@ -98,6 +104,13 @@ class SecretHolder:
         """The one read path: S4 asks for S3's ``/secretText``."""
         return self._held.get(step, {}).get(json_path)
 
+    def drop(self, step: str) -> None:
+        """Forget one step's secrets now (S3's password once S4 holds its token, or a
+        token whose claims prove nothing)."""
+        held = self._held.pop(step, None)
+        if held is not None:
+            held.clear()
+
     def count_for(self, step: str) -> int:
         return len(self._held.get(step, {}))
 
@@ -114,3 +127,23 @@ class SecretHolder:
         return f"SecretHolder({names})"
 
     __str__ = __repr__
+
+
+ACCESS_TOKEN: Final = "/access_token"  # noqa: S105 - a JSON path, not a secret
+
+
+@dataclass(frozen=True)
+class HeldToken:
+    """The escalated identity's token provider (S4): Graph only, read from the holder
+    on every call, so a wipe or :meth:`SecretHolder.drop` ends it at once."""
+
+    holder: SecretHolder = field(repr=False)
+    step: str
+
+    def token(self, api: Api) -> str:
+        if api != "graph":
+            raise TransportError(f"the escalated identity has no {api} token")
+        value = self.holder.get(self.step, ACCESS_TOKEN)
+        if not isinstance(value, str) or not value:
+            raise TransportError("the escalated token is gone")
+        return value

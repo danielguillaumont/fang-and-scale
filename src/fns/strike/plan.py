@@ -19,7 +19,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Final, Literal
+from typing import Any, ClassVar, Final, Literal
 
 from pydantic import Field
 
@@ -29,7 +29,7 @@ from fns.scope.gate import WriteRequest
 from fns.scope.writes import canonical_body
 
 StrikeId = Literal["S1", "S2", "S3", "S4", "D-1", "D-2", "D-3", "D-4", "D-5"]
-BEFORE_HARDEN: Final[tuple[StrikeId, ...]] = ("S1", "S2", "S3")
+BEFORE_HARDEN: Final[tuple[StrikeId, ...]] = ("S1", "S2", "S3", "S4")
 AFTER_HARDEN: Final[tuple[StrikeId, ...]] = ("D-1", "D-2", "D-3", "D-4", "D-5")
 PLAN_LIFETIME: Final = timedelta(hours=1)
 _LEARNED = re.compile(r"\{\{learned:([A-Za-z0-9/._-]+):([A-Za-z0-9_]+)\}\}")
@@ -40,13 +40,19 @@ class PlanError(ValueError):
 
 
 class PlannedRequest(FnsModel):
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"acts_as"})
+
     operation: str
-    """The write form (one of ``WRITE_FORM_OPERATIONS``)."""
+    """The write form (one of ``WRITE_FORM_OPERATIONS``), or S4's
+    ``token:client_credentials``."""
     method: Literal["POST", "PATCH", "DELETE"]
     url: str
     body: Any = None
     learn: tuple[str, ...] = ()
     """Top-level response fields to journal (IDs only; secrets are stripped first)."""
+    acts_as: Literal["escalated"] | None = None
+    """``escalated``: sent as the escalation target, with S4's token, through a gate
+    signed in as that identity. Absent: sent as the agent."""
 
 
 class PlannedWrite(FnsModel):

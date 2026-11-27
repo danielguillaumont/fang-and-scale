@@ -17,6 +17,21 @@ Order for ``fns strike run`` (M4 strike plan, "Plan, approval, journal and clean
 5. verification: the scout reads every object back and compares it with the
    pre-state.
 
+S4 (approved 2026-11-27) runs only right after S3's password went through. Its
+token request goes through the agent's gate and the :class:`Escalation`'s token
+transport. The token's claims must show the capability (``oid`` is the escalation
+target, ``roles`` has ``AppRoleAssignment.ReadWrite.All``, and ``tid`` and
+``appid`` match), or S4 stops there. That check reads the claims without verifying
+the token's signature, so it is a **safety stop only** (approved 2026-11-27): it
+decides whether S4 may go on, and is never verdict evidence. Its result is
+journaled as ``safety_stop`` for the operator, never written to
+``strike-run.json``, and ``fns prove --after-strike`` counts no S4 write. Either
+way S3's password is removed at once, before anything else is sent. Only ``oid``
+and ``roles`` are journaled; the token stays in the secret holder. The assignment
+and its undo go through a second gate, signed in as the token's ``oid``.
+:func:`cleanup` has no token, so it can't undo the assignment: it says so, and the
+verification fails (exit 5) until the runbook's emergency cleanup removes it.
+
 Exit codes: 0 clean; 1 an after-harden attempt succeeded (the contract fails); 4
 the gate denied a planned write; 5 the verification found a difference (the
 runbook's emergency cleanup applies). 5 wins over 4, and 4 over 1.
@@ -35,8 +50,9 @@ from typing import Any, Final, Literal, Protocol
 from fns.adapters.azure.http import TransportError
 from fns.exitcodes import ExitCode
 from fns.journal.sqlite import StrikePhase
+from fns.scope.credentials import CredentialError, TokenProvider, token_claims
 from fns.scope.gate import Clock, Gate, ScopeDeniedError, SystemClock, WriteRequest
-from fns.scope.writes import CREDENTIAL_PREFIX
+from fns.scope.writes import CAPABILITY_ROLE, CREDENTIAL_PREFIX, TOKEN_OPERATION
 from fns.strike.plan import (
     ApprovedPlan,
     PlannedRequest,
@@ -48,9 +64,15 @@ from fns.strike.plan import (
     render_request,
 )
 from fns.strike.reader import LabReader, ReadError
-from fns.strike.secrets import SecretHolder
-from fns.strike.strikes import LabTargets, read_pre_state
-from fns.strike.transport import StrikeRequest, StrikeResponse, StrikeTransport
+from fns.strike.secrets import ACCESS_TOKEN, HeldToken, SecretHolder
+from fns.strike.strikes import ASSIGN_KEY, S3_KEY, TOKEN_KEY, LabTargets, read_pre_state
+from fns.strike.transport import (
+    StrikeRequest,
+    StrikeResponse,
+    StrikeTransport,
+    TokenTransport,
+    TokenWire,
+)
 
 Outcome = Literal[
     "succeeded",  # an expected-allowed write went through: capability observed
@@ -76,6 +98,47 @@ class StrikeJournal(Protocol):
 
 class StrikeStartError(RuntimeError):
     """Nothing was sent: wrong identity, changed scope, changed pre-state."""
+
+
+@dataclass(frozen=True)
+class Escalation:
+    """What S4 needs besides the agent's gate and transport."""
+
+    token_transport: TokenTransport
+    gate_factory: Callable[[ApprovedPlan, str], Gate]
+    """A gate signed in as the given principal (the proven token's ``oid``)."""
+    transport_factory: Callable[[TokenProvider], StrikeTransport]
+    """A write transport that authorises with the given provider (S4's token)."""
+
+
+def token_proof(claims: Mapping[str, object], plan: StrikePlan) -> str | None:
+    """Why S4 must stop here, or None when it may go on.
+
+    A safety stop only: the signature is not verified (the token came straight
+    from the issuer over TLS), so the answer is never verdict evidence."""
+    t = plan.targets
+    roles = claims.get("roles")
+    if str(claims.get("tid", "")).lower() != plan.tenant_id:
+        return "the token is for another tenant"
+    if str(claims.get("oid", "")).lower() != t.get("escalation_sp"):
+        return "the token's oid is not app-escalation-target's service principal"
+    app = claims.get("appid") or claims.get("azp") or ""  # v1 tokens: appid; v2: azp
+    if str(app).lower() != t.get("escalation_app_id"):
+        return "the token's appid is not app-escalation-target's"
+    if not isinstance(roles, list) or not all(isinstance(r, str) for r in roles):
+        return "the token has no roles claim"
+    if CAPABILITY_ROLE not in roles:
+        return f"the token's roles do not include {CAPABILITY_ROLE}"
+    return None
+
+
+def recorded_claims(claims: Mapping[str, object]) -> dict[str, object]:
+    """The only token content ever journaled: ``oid`` and ``roles``."""
+    roles = claims.get("roles")
+    return {
+        "oid": str(claims.get("oid", "")).lower()[:64],
+        "roles": sorted(str(r)[:128] for r in roles)[:50] if isinstance(roles, list) else [],
+    }
 
 
 @dataclass
@@ -162,22 +225,31 @@ class _Engine:
     journal: StrikeJournal
     holder: SecretHolder = field(default_factory=SecretHolder)
     learned: dict[str, dict[str, str]] = field(default_factory=dict)
-    checked: set[str] = field(default_factory=set)
+    checked: dict[int, set[str]] = field(default_factory=dict)
+    escalation: Escalation | None = None
+    esc_gate: Gate | None = None
+    esc_transport: StrikeTransport | None = None
 
     def event(self, key: str, phase: StrikePhase, **detail: object) -> None:
         self.journal.strike_event(self.plan.run_id, key, phase, dict(detail))
 
-    def lab_check(self, w: PlannedWrite) -> None:
+    def lab_check(self, w: PlannedWrite, gate: Gate | None = None) -> None:
+        gate = gate or self.gate
+        done = self.checked.setdefault(id(gate), set())
         for oid in w.lab_objects:
-            if oid in self.checked:
+            if oid in done:
                 continue
-            denied = self.gate.record_lab_check(oid, self.reader.application(oid))
+            if oid == self.plan.targets.get("escalation_sp"):
+                observed = self.reader.service_principal(oid)
+            else:
+                observed = self.reader.application(oid)
+            denied = gate.record_lab_check(oid, observed)
             if denied is not None:
                 raise ScopeDeniedError(denied)
-            self.checked.add(oid)
+            done.add(oid)
 
-    def send(self, key: str, r: Rendered) -> StrikeResponse:
-        request = WriteRequest(
+    def _request(self, r: Rendered) -> WriteRequest:
+        return WriteRequest(
             verb="strike",
             operation=r.operation,
             method=r.method,
@@ -185,22 +257,100 @@ class _Engine:
             body=r.body,
             tenant_id=self.plan.tenant_id,
         )
+
+    def send(self, key: str, r: Rendered, *, escalated: bool = False) -> StrikeResponse:
+        gate, transport = self.gate, self.transport
+        if escalated:
+            if self.esc_gate is None or self.esc_transport is None:
+                raise UnresolvedError(f"{key}: the escalated identity is not signed in")
+            gate, transport = self.esc_gate, self.esc_transport
         wire = StrikeRequest(_api(r.operation), r.method, r.url, r.body)
         self.binding.arm(r)
         try:
-            return self.gate.call_write(
-                request, lambda: self.transport.send(wire, self.holder, key)
-            )
+            return gate.call_write(self._request(r), lambda: transport.send(wire, self.holder, key))
         finally:
             self.binding.disarm()
 
+    def token(self, w: PlannedWrite, out: WriteOutcome) -> bool:
+        """S4 step 1: S3's password for a token, then the safety stop on its claims."""
+        r = render_request(w.request, self.learned)
+        secret = self.holder.get(S3_KEY, "/secretText")
+        if self.escalation is None or not isinstance(secret, str) or not secret:
+            out.outcome = "not-run"
+            self.event(w.key, "error", kind="not-run", detail="S3's password is not held")
+            return False
+        esc = self.escalation
+        self.event(w.key, "intent", method=r.method, url=r.url, body_sha256=r.body_digest)
+        form = {str(k): str(v) for k, v in dict(r.body).items()} if isinstance(r.body, dict) else {}
+        try:
+            self.lab_check(w)
+            self.binding.arm(r)
+            try:
+                resp = self.gate.call_write(
+                    self._request(r),
+                    lambda: esc.token_transport.send_token(
+                        TokenWire(r.url, form), secret, self.holder, w.key
+                    ),
+                )
+            finally:
+                self.binding.disarm()
+        except ScopeDeniedError as exc:
+            out.outcome = "gate-denied"
+            self.event(w.key, "error", kind="gate-denied", detail=_short(str(exc)))
+            raise
+        except BaseException as exc:
+            out.outcome = "unknown"
+            self.event(w.key, "error", kind="unknown", detail=type(exc).__name__)
+            raise
+        secret = ""  # this frame's reference; the holder dropped S3's copy (_remove_s3_now)
+        claims: dict[str, object] = {}
+        held = self.holder.get(w.key, ACCESS_TOKEN)
+        if resp.ok and isinstance(held, str):
+            try:
+                claims = token_claims(held)
+            except CredentialError:
+                claims = {}
+        del held
+        why = (
+            (token_proof(claims, self.plan) if claims else "no readable token") if resp.ok else None
+        )
+        out.status = resp.status
+        if resp.ok and why is None:
+            out.outcome = "succeeded"
+        else:
+            out.outcome = "denied" if resp.denied else "failed"
+            self.holder.drop(w.key)  # a token that proves nothing is not kept
+        self.event(
+            w.key,
+            "result",
+            status=resp.status,
+            outcome=out.outcome,
+            learned={},
+            claims=recorded_claims(claims),
+            safety_stop="passed" if out.outcome == "succeeded" else _short(why or "no token"),
+            request_id=resp.request_id,
+            secrets_removed=resp.secrets_removed,
+        )
+        if out.outcome == "succeeded":
+            oid = str(claims["oid"]).lower()
+            self.esc_gate = esc.gate_factory(self.binding, oid)
+            self.esc_transport = esc.transport_factory(HeldToken(self.holder, w.key))
+        return out.outcome == "succeeded"
+
     def write(self, w: PlannedWrite, out: WriteOutcome) -> bool:
         """Send one planned write. Returns True when it went through."""
+        if w.request.operation == TOKEN_OPERATION:
+            return self.token(w, out)
+        escalated = w.request.acts_as == "escalated"
+        if escalated and self.esc_gate is None:
+            out.outcome = "not-run"
+            self.event(w.key, "error", kind="not-run", detail="S4's token did not prove it")
+            return False
         r = render_request(w.request, self.learned)
         self.event(w.key, "intent", method=r.method, url=r.url, body_sha256=r.body_digest)
         try:
-            self.lab_check(w)
-            resp = self.send(w.key, r)
+            self.lab_check(w, self.esc_gate if escalated else None)
+            resp = self.send(w.key, r, escalated=escalated)
         except ScopeDeniedError as exc:
             out.outcome = "gate-denied"
             self.event(w.key, "error", kind="gate-denied", detail=_short(str(exc)))
@@ -242,9 +392,26 @@ class _Engine:
                 for c in (creds if isinstance(creds, list) else [])
                 if isinstance(c, dict) and c.get("displayName") == name and c.get("keyId")
             ]
+        if w.key == ASSIGN_KEY:
+            t = self.plan.targets
+            return [
+                {"id": a["id"]}
+                for a in self.reader.assigned_to(t["escalation_sp"])
+                if a["principalId"] == self.plan.agent_object_id
+                and a["appRoleId"] == t["marker_role"]
+            ]
         raise UnresolvedError(f"{w.key}: cannot find what to undo")
 
     def undo(self, w: PlannedWrite, out: WriteOutcome) -> None:
+        if any(u.acts_as == "escalated" for u in w.undo) and self.esc_gate is None:
+            out.undo.append("needs-emergency-cleanup")
+            self.event(
+                w.key,
+                "undo-error",
+                kind="no-escalated-identity",
+                detail="the escalated token is gone: run the runbook's emergency cleanup",
+            )
+            return
         try:
             found = self.resolve(w)
         except (UnresolvedError, ReadError, ScopeDeniedError, TransportError) as exc:
@@ -265,8 +432,9 @@ class _Engine:
         try:
             r = render_request(u, {**self.learned, w.key: values})
             self.event(w.key, "undo-intent", method=r.method, url=r.url, body_sha256=r.body_digest)
-            self.lab_check(w)
-            resp = self.send(w.key, r)
+            escalated = u.acts_as == "escalated"
+            self.lab_check(w, self.esc_gate if escalated else None)
+            resp = self.send(w.key, r, escalated=escalated)
         except Exception as exc:  # noqa: BLE001 - one failed undo must not stop the others
             out.undo.append("error")
             self.event(w.key, "undo-error", kind=type(exc).__name__, detail=_short(str(exc)))
@@ -338,6 +506,9 @@ def verify(plan: StrikePlan, reader: LabReader, exposed: set[str]) -> list[Check
                 checks.append(_check_credentials(oid, reader.application(oid), before, name))
             elif kind == "owners":
                 checks.append(_same(f"owners {oid}", reader.app_owners(oid) == before["owners"]))
+            elif kind == "assigned":
+                same = reader.assigned_to(oid) == before["assignments"]
+                checks.append(_same(f"app role assignments {oid}", same))
             else:
                 checks.append(Check(obj, False, "unknown pre-state entry"))
         except (ReadError, ScopeDeniedError, TransportError) as exc:
@@ -389,15 +560,20 @@ def run_plan(
     journal: StrikeJournal,
     mode: Literal["LIVE", "FIXTURE"],
     clock: Clock | None = None,
+    escalation: Escalation | None = None,
 ) -> StrikeRun:
     """Run every planned write, always undo, then verify. See the module docstring."""
     clock = clock or SystemClock()
     binding = ApprovedPlan(plan, approved_hash)  # PlanRejectedError on a mismatch
     if journal.has_run(plan.run_id):
         raise StrikeStartError("this plan already ran: use fns strike cleanup, or plan again")
+    if "S4" in plan.strikes and escalation is None:
+        raise StrikeStartError("S4 needs the token transport and the escalated gate")
     _start(plan, binding, signed_in_principal, scope_sha256, reader, clock)
     journal.begin_run(plan.run_id, "strike", mode)
-    engine = _Engine(plan, binding, gate_factory(binding), transport, reader, journal)
+    engine = _Engine(
+        plan, binding, gate_factory(binding), transport, reader, journal, escalation=escalation
+    )
     outcomes = [WriteOutcome(w.key, w.strike, w.expect, observes=w.observes) for w in plan.writes]
     run = StrikeRun(plan.run_id, plan.plan_hash(), outcomes)
     to_undo: list[tuple[PlannedWrite, WriteOutcome]] = []
@@ -406,11 +582,13 @@ def run_plan(
             try:
                 wrote = engine.write(w, out)
             finally:
-                if out.outcome == "unknown":
+                if out.outcome == "unknown" and w.undo:
                     to_undo.append((w, out))
+                if w.key == TOKEN_KEY:
+                    _remove_s3_now(engine, to_undo)
             if wrote and w.expect == "denied":
                 engine.undo(w, out)  # D6: an attempt that should have failed, undone at once
-            elif wrote:
+            elif wrote and w.undo:
                 to_undo.append((w, out))
     except ScopeDeniedError as exc:
         run.aborted = f"the gate denied a planned write: {exc.decision.reason.value}"
@@ -423,6 +601,15 @@ def run_plan(
     run.checks = verify(plan, reader, {o.key for o in outcomes if o.outcome in EXPOSED})
     _record_checks(engine, run.checks)
     return run
+
+
+def _remove_s3_now(engine: _Engine, to_undo: list[tuple[PlannedWrite, WriteOutcome]]) -> None:
+    """S4 holds its token (or failed to get one): S3's password goes now, before
+    anything else is sent, in Entra and in memory."""
+    engine.holder.drop(S3_KEY)
+    for item in [x for x in to_undo if x[0].key == S3_KEY]:
+        to_undo.remove(item)
+        engine.undo(*item)
 
 
 def _rows(

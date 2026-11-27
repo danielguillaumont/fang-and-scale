@@ -93,7 +93,7 @@ def test_after_harden_plan_expects_denials() -> None:
 @pytest.mark.parametrize(
     ("strikes", "message"),
     [
-        (("S4",), "not built yet"),
+        (("S4",), "S4 runs only right after S3"),
         (("S1", "D-1"), "separately"),
         (("S1", "S1"), "twice"),
         (("X9",), "not built yet"),

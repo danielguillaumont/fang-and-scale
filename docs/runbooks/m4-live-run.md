@@ -22,7 +22,7 @@ apart from the tenant and subscription you type in step A1.
 | --- | --- | --- | --- |
 | A | Rebuild the lab, baseline scout recorded as `fixtures/lab-run-4` | everything in `lab/`, with a new random suffix; a 1-day scout certificate | A4 (certificate); Teardown (lab) |
 | B | Monitoring on (workspace, Sentinel, diagnostic settings, the 11 rules); legitimate use as the agent; `fns record` | 18 resources; a 1-day agent certificate | B2 (certificate); Teardown |
-| C | `fns strike` S1 to S3, then one KQL query per strike (D5) | 1 resource (the strike expiry); 1-day scout and agent certificates; each strike's writes, all undone by the tool | C5 (certificates); C4 (strike writes) |
+| C | `fns strike` S1 to S4, then one KQL query per strike (D5) | 2 resources (the strike expiry, the marker role's ID) and the marker role on `app-escalation-target`; 1-day scout and agent certificates; each strike's writes, all undone by the tool | C5 (certificates); C4 (strike writes); Teardown (marker role) |
 | D | Harden, apply, prove the fix, D-1 to D-5 (D6), recorded as `fixtures/lab-run-5` | 1-day certificates; nothing else, unless a D-step succeeds (undone at once) | D8 |
 | Teardown | `lab-down`, then the checks | | |
 
@@ -33,9 +33,14 @@ apart from the tenant and subscription you type in step A1.
 - **Writes the tool makes:** only `fns strike run` in C4 and D6. Each write is
   in a plan you approve by its hash, goes only to a lab object, and is undone
   and verified before the command exits.
-- **Not in this run:** S4 (the escalated sign-in and the marker role). It waits
-  for its own decision (`docs/DECISIONS.md`, "Proposal, pending review: S4").
-  `harden --apply` is not built: you apply the diff yourself.
+- **S4** (approved 2026-11-27) runs right after S3, in the same `fns strike
+  run`. It asks for a token as `app-escalation-target` with S3's password, which
+  is removed as soon as the token is held. As that identity it assigns the marker
+  role (defined by Terraform in C1, grants nothing) to the agent, then removes
+  the assignment. The token exists only in the tool's memory, for seconds: only
+  its `oid` and `roles` claims are journaled.
+- **Not in this run:** `harden --apply` is not built: you apply the diff
+  yourself.
 
 > [!CAUTION]
 > **`sp-billing-agent` is the escalation-capable identity.** Until harden it
@@ -303,7 +308,7 @@ list (they name operations, not IDs).
 
 ---
 
-## Session C: strikes S1 to S3 and detection results
+## Session C: strikes S1 to S4 and detection results
 
 ### C1. Turn strikes on
 
@@ -319,18 +324,23 @@ Then paste this line **on its own**:
 uv run poe lab-up
 ```
 
-**The plan:** `time_offset.strike_expiry[0]` is created, and `local_file.scope` is
-replaced, because its content gains the `strike:` block. That is **2 to add, 0
-to change, 1 to destroy**. Anything else is a stop.
+**The plan:** `time_offset.strike_expiry[0]` and `random_uuid.strike_marker[0]`
+are created, `azuread_application.escalation_target` is updated in place (it
+gains the marker `app_role`: `fns.strike.marker`, "Grants nothing",
+`Application` only), and `local_file.scope` is replaced, because its content
+gains the `strike:` block. That is **3 to add, 1
+to change, 1 to destroy**.
+Anything else is a stop.
 
 ```powershell
 uv run fns scope check scope.lab.yaml
 terraform -chdir=lab output -raw scope_expires_at
 ```
 
-`scope check` now also lists 7 `strike` operations and a strike expiry 4 hours
-out (`strike_valid_hours`). Sessions C and D must each start inside that
-window. D5 renews it.
+`scope check` now also lists 9 `strike` operations, a strike expiry 4 hours out
+(`strike_valid_hours`) and the `escalation` block (S4's service principal and
+the marker role). Sessions C and D must each start inside that window. D5 renews
+it.
 
 ### C2. A certificate for the scout and one for the agent, each in its own profile
 
@@ -360,19 +370,21 @@ az account show --query "user.name" -o tsv                       # you, in this 
 ### C3. Plan the strikes (reads only)
 
 ```powershell
-uv run fns strike plan --strikes S1,S2,S3 --scope scope.lab.yaml --scout-config $scoutDir
+uv run fns strike plan --strikes S1,S2,S3,S4 --scope scope.lab.yaml --scout-config $scoutDir
 $plan = (Get-ChildItem .fns\strike\*\plan.json | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 (Get-Content $plan | ConvertFrom-Json).writes | ForEach-Object { "{0}  {1} {2}" -f $_.key, $_.request.method, $_.request.url; ($_.request.body | ConvertTo-Json -Compress -Depth 6); "  undo: " + (($_.undo | ForEach-Object { "{0} {1}" -f $_.method, $_.url }) -join "; ") }
 ```
 
 The table the command prints shortens the URLs, so the last line prints each
-write in full. **Review every line.** Expected: three writes, all `allowed`:
+write in full. **Review every line.** Expected: five writes, all `allowed`:
 
 | Write | Request | Undo |
 | --- | --- | --- |
 | `S1/list-keys` | `POST .../storageAccounts/stpayroll<suffix>/listKeys` | `regenerateKey` key1, then key2 (SD1) |
 | `S2/vault-tag` | `PATCH .../vaults/kv-crown-<suffix>`, body `tags` only, with `fns-strike` added | `PATCH` the pre-state tags back |
-| `S3/add-password` | `POST /applications/<app-escalation-target>/addPassword`, `fns-strike-<run>`, ending within 1 hour | `removePassword` of that `keyId` |
+| `S3/add-password` | `POST /applications/<app-escalation-target>/addPassword`, `fns-strike-<run>`, ending within 1 hour | `removePassword` of that `keyId`, right after `S4/token` |
+| `S4/token` | `POST https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token`, body `client_id` (`app-escalation-target`'s appId), `grant_type` `client_credentials`, `scope` `https://graph.microsoft.com/.default`, and **no secret** (the tool adds S3's password on the wire only) | none |
+| `S4/assign` | `POST /servicePrincipals/<app-escalation-target SP>/appRoleAssignedTo`, `acts_as` `escalated`, body `principalId` the agent, `resourceId` that SP, `appRoleId` the marker | `DELETE` that assignment, as the escalated identity |
 
 Any other target, method or body key is a stop. The plan expires 1 hour after it
 was made. If you need longer, plan again.
@@ -402,14 +414,30 @@ strike run <run id> (plan sha256:<hash>)
 | S1/list-keys    | allowed | succeeded | 200    | 200, 200 |
 | S2/vault-tag    | allowed | succeeded | 200    | 200      |
 | S3/add-password | allowed | succeeded | 200    | 204      |
+| S4/token        | allowed | succeeded | 200    | -        |
+| S4/assign       | allowed | succeeded | 201    | 204      |
 verify ok   credentials <app>: as before
 verify ok   tags <vault>: as before
 verify ok   keys <payroll account>: both regenerated
+verify ok   app role assignments <app-escalation-target SP>: as before
 exit 0: clean: every write undone and verified
 ```
 
-The keys from `listKeys` and the password from `addPassword` are never printed,
-journaled or written to disk: the transport strips them first.
+The fixture recording has S1 to S3 only (`fns strike plan --fixture` refuses
+S4: a recording can't replay a token exchange), so the two S4 rows are the shape
+the tests show against the fake tenant.
+
+The keys from `listKeys`, the password from `addPassword` and S4's token are
+never printed, journaled or written to disk: the transport strips them first.
+For the token, the journal holds only its `oid` and `roles` claims.
+
+- **`S4/token` `failed`:** the token's claims did not prove the capability
+  (`oid` not `app-escalation-target`'s service principal, or `roles` without
+  `AppRoleAssignment.ReadWrite.All`). Nothing was assigned and S3's password is
+  already removed. That is a FINDINGS entry, not a stop.
+- **`needs-emergency-cleanup` in the undo column:** the marker assignment is
+  still there and only the token could have removed it. Go to
+  [Emergency cleanup](#emergency-cleanup), step 2, "S4".
 
 - **Exit 4:** the scope gate or the plan check refused. Everything before it was
   undone. Send the message.
@@ -465,6 +493,8 @@ $qS2 = "AzureActivity | where TimeGenerated > datetime($since) | where Caller in
 
 $qS3 = "AuditLogs | where TimeGenerated > datetime($since) | where OperationName contains 'Certificates and secrets management' | mv-expand Target = TargetResources | where tostring(Target.displayName) == 'app-escalation-target' | mv-apply P = Target.modifiedProperties on (summarize Before = sumif(array_length(todynamic(tostring(P.oldValue))), tostring(P.displayName) == 'KeyDescription'), After = sumif(array_length(todynamic(tostring(P.newValue))), tostring(P.displayName) == 'KeyDescription')) | project TimeGenerated, OperationName, Result, Change = case(After > Before, 'add', After < Before, 'delete', 'unknown'), By = iff(isnotempty(tostring(InitiatedBy.app.servicePrincipalId)), 'app', 'user')"
 
+$qS4 = "AuditLogs | where TimeGenerated > datetime($since) | where OperationName in ('Add app role assignment to service principal', 'Remove app role assignment from service principal') | where TargetResources has '$agentOid' | project TimeGenerated, OperationName, Result, By = iff(isnotempty(tostring(InitiatedBy.app.servicePrincipalId)), 'app', 'user')"
+
 $qAlerts = "SecurityAlert | where TimeGenerated > datetime($since) | where AlertName startswith 'fns: ' | summarize First = min(TimeGenerated), Alerts = count() by AlertName"
 ```
 
@@ -475,13 +505,14 @@ $deadline = $strikeAt.AddHours(2)
 do {
     $alerts = @(az monitor log-analytics query -w $ws --analytics-query $qAlerts -o json | ConvertFrom-Json)
     "{0:u}  alerts: {1}" -f (Get-Date).ToUniversalTime(), (@($alerts | ForEach-Object { $_.AlertName }) -join "; ")
-    if ($alerts.Count -ge 3) { break }
+    if ($alerts.Count -ge 4) { break }
     Start-Sleep -Seconds 600
 } while ((Get-Date).ToUniversalTime() -lt $deadline)
 
 az monitor log-analytics query -w $ws --analytics-query $qS1 -o table
 az monitor log-analytics query -w $ws --analytics-query $qS2 -o table
 az monitor log-analytics query -w $ws --analytics-query $qS3 -o table
+az monitor log-analytics query -w $ws --analytics-query $qS4 -o table
 az monitor log-analytics query -w $ws --analytics-query $qAlerts -o table
 "strike run started {0:u}" -f $strikeAt
 ```
@@ -493,6 +524,7 @@ az monitor log-analytics query -w $ws --analytics-query $qAlerts -o table
 | S1 | `qS1` | `LISTKEYS/ACTION` and two `REGENERATEKEY/ACTION`, `Success` | `storage-listkeys-by-workload`: "fns: Storage account keys listed by a monitored workload" |
 | S2 | `qS2` | two `VAULTS/WRITE`, `Success` (the tag and its undo) | `keyvault-control-plane-write-by-workload`: "fns: Key Vault configuration changed by a monitored workload" |
 | S3 | `qS3` | two rows, `By` = `app`: `Change` = `add`, then `delete` (the undo) | `app-credential-added-by-workload`: "fns: Credential added to an application or service principal by a workload identity" |
+| S4 | `qS4` | `Add app role assignment to service principal`, then `Remove app role assignment from service principal` (the undo), both `By` = `app` | `app-role-assignment-by-workload`: "fns: Graph app role granted by a workload identity" |
 
 **Detection result per strike:** fired or not, and `First` minus the strike
 time. A strike whose rows arrived but whose rule did not fire within 2 hours is
@@ -710,7 +742,7 @@ Per session, paste:
 - **B:** the plan summary line; `$mon.rules.Count`; the `fns record` output.
 - **C:** the plan summary line; the C3 review lines **with the IDs replaced by
   the lab names**; the full `fns strike run` output; `$LASTEXITCODE`; the C5
-  checks; the four query outputs and the start time from C6.
+  checks; the five query outputs and the start time from C6.
 - **D:** the harden proposal; the D3 plan summary; the D4 contain summary; the
   D6 run output; the D7 output and exit code; the D8 checks.
 - **Teardown:** that every check printed what it should.
@@ -726,6 +758,11 @@ appears, or you are unsure. Sign in as **yourself** first
 `fns strike cleanup` runs, in reverse order, every undo the journal does not show
 as done. It repeats an undo until it gets a 2xx. It needs both profiles signed
 in (C2). If either certificate is already deleted, skip to step 2.
+
+It **cannot** undo `S4/assign`: only S4's token could, and that token was never
+kept. It prints `needs-emergency-cleanup` for it and exits 5 until step 2's S4
+block has removed the assignment. Run step 1 again afterwards: exit 0 means
+everything is back and verified.
 
 ```powershell
 $plan = (Get-ChildItem .fns\strike\*\plan.json | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
@@ -778,6 +815,21 @@ foreach ($n in "id-verifier", "sp-fns-scout") {
 }
 ```
 
+**S4: the marker role assignment.** Delete every assignment of the marker role
+on `app-escalation-target`'s service principal. The marker grants nothing, but
+it is a strike write and must not stay. As yourself, not as the agent:
+
+```powershell
+$escSp = (terraform -chdir=lab output -json identities | ConvertFrom-Json).escalation_target
+$marker = az ad app show --id $apps["app-escalation-target"] --query "appRoles[?value=='fns.strike.marker'].id | [0]" -o tsv
+if ($marker) {
+    foreach ($a in @(az rest --method get --url "https://graph.microsoft.com/v1.0/servicePrincipals/$escSp/appRoleAssignedTo" --query "value[?appRoleId=='$marker'].id" -o tsv)) {
+        az rest --method delete --url "https://graph.microsoft.com/v1.0/servicePrincipals/$escSp/appRoleAssignedTo/$a"
+    }
+    @(az rest --method get --url "https://graph.microsoft.com/v1.0/servicePrincipals/$escSp/appRoleAssignedTo" --query "value[?appRoleId=='$marker']" -o tsv).Count   # must be 0
+}
+```
+
 **S2: the vault tag.** Remove only the `fns-strike` tag:
 
 ```powershell
@@ -796,7 +848,7 @@ az storage account keys renew -g rg-fns-lab -n $payroll --key secondary -o none
 
 If the journal is lost, these blocks are also the search by name. They look for
 every credential named `fns-strike-*`, any owner reference to the agent on the
-two apps, and the vault tag `fns-strike`.
+two apps, every assignment of the marker role, and the vault tag `fns-strike`.
 
 ### 3. Delete the certificates and the profiles
 
@@ -830,6 +882,8 @@ uv run poe lab-down
 - **A certificate:** if nobody deletes it, it stops working within 24 hours, and
   `lab-down` deletes the application anyway.
 - **A strike password:** it ends 1 hour after it was made (the gate refuses a
-  longer one).
+  longer one). S3's is removed as soon as S4 holds its token.
+- **The marker role assignment:** it grants nothing, and `lab-down` deletes the
+  application that defines it.
 - **The Entra diagnostic setting:** it is tenant-level. Check, as in Teardown,
   that it is gone.

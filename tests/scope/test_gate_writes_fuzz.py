@@ -40,6 +40,7 @@ from tests.scope.writekit import (
     APP_VER,
     APPS,
     ASSIGN,
+    ESCALATED_FORMS,
     GRAPH_APP_ID,
     LIST_KEYS,
     MARKER,
@@ -247,13 +248,13 @@ def ready_gate(p: Parts) -> Gate:
         journal=InMemoryJournal(),
         clock=clock,
         run_id="fuzz",
-        signed_in_principal=SP_AGENT,
+        # S4: only the escalated identity sends the marker assignment and its removal.
+        signed_in_principal=SP_ESC if p.op in ESCALATED_FORMS else SP_AGENT,
         plan=plan,
     )
     for oid in (APP_ESC, APP_VER):  # APP_SCOUT and SP_SCOUT stay unchecked
-        assert gate.record_lab_check(oid, app_json(oid)) is None
+        assert gate.record_lab_check(oid, app_json(oid)) is None  # APP_ESC: Terraform's marker
     assert gate.record_lab_check(SP_ESC, sp_json()) is None
-    gate.call_write(valid(APP_PATCH), lambda: None)  # the marker, for ASSIGN
     plan.allow = p.plan
     clock.at = {"none": NOW, "scope": LATER, "strike": STRIKE_UNTIL}[p.expiry]
     return gate

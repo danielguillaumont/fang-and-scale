@@ -158,6 +158,15 @@ def test_wrong_strikes_for_the_recording(tmp_path: Path) -> None:
     assert r.exit_code == 2 and "S1, S2, S3" in r.output
 
 
+def test_s4_is_refused_in_fixture_mode(tmp_path: Path) -> None:
+    r = runner.invoke(
+        app,
+        ["strike", "plan", "--strikes", "S1,S2,S3,S4", "--fixture", FIX, "--out", str(tmp_path)],
+    )
+    assert r.exit_code == 2 and "S4 runs live only" in r.output
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.parametrize(
     "args",
     [

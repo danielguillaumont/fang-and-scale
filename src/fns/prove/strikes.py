@@ -8,11 +8,14 @@ Before anything is recorded:
 - the plan's tenant must be the frozen assertions' tenant, and both runs must be
   the same mode (a FIXTURE strike never becomes LIVE evidence, nor the reverse).
 
-Only after-harden attempts count, and only two outcomes: ``denied`` (a 401 or
-403) and ``unexpected-success``. Anything else (a gate denial, an unknown
-outcome, another status, not run) says nothing about the boundary and is
-dropped. Each one becomes a :class:`~fns.models.assertions.StrikeObservation`
-per contract item it observes, journaled after the freeze as a read step.
+Only after-harden attempts (D-1 to D-5, planned ``expect: denied``) count, and
+only two outcomes: ``denied`` (a 401 or 403) and ``unexpected-success``. A
+before-harden strike never counts, whatever its plan says: S4's token claims, in
+particular, are a safety stop and never evidence (approved 2026-11-27). Anything
+else (a gate denial, an unknown outcome, another status, not run) says nothing
+about the boundary and is dropped. Each one becomes a
+:class:`~fns.models.assertions.StrikeObservation` per contract item it observes,
+journaled after the freeze as a read step.
 
 The verifier decides what they mean, under the guardrail that a strike can never
 move a finding toward ``pass``.
@@ -28,7 +31,7 @@ from fns.journal.sqlite import SqliteJournal
 from fns.models.assertions import AssertionSet, StrikeObservation
 from fns.models.strike_record import StrikeRunRecord
 from fns.probes.runner import FREEZE_STEP, sha256_bytes, write_artifact
-from fns.strike.plan import StrikePlan
+from fns.strike.plan import AFTER_HARDEN, StrikePlan
 
 PLAN_FILE: Final = "plan.json"
 RUN_FILE: Final = "strike-run.json"
@@ -63,7 +66,7 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
         if p is None:
             raise AfterStrikeError(f"strike-run.json names a write the plan lacks: {w.key}")
         outcome = COUNTED.get(w.outcome)
-        if p.expect != "denied" or outcome is None:
+        if p.strike not in AFTER_HARDEN or p.expect != "denied" or outcome is None:
             continue
         status = w.status
         for item in p.observes:

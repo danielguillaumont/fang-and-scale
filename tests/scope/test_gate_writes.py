@@ -74,8 +74,9 @@ from tests.scope.writekit import (
     AllowAll,
     Exactly,
     app_json,
-    define_marker,
     end_time,
+    escalated_gate,
+    gate_for,
     req,
     sp_json,
     strike_dict,
@@ -89,9 +90,7 @@ NOT_A_REQUEST: Any = "POST /x"
 
 
 def _ready(op: str) -> tuple[Gate, WriteRequest]:
-    gate, _, _ = write_gate()
-    if op == ASSIGN:
-        define_marker(gate)
+    gate, _, _ = gate_for(op)
     return gate, valid(op)
 
 
@@ -193,33 +192,36 @@ def _no_lab_check() -> Gate:
     return write_gate(confirm=False)[0]
 
 
-def _marker_on(app: str) -> Callable[[], Gate]:
+def _escalated_no_lab_check() -> Gate:
+    return escalated_gate(confirm=False)[0]
+
+
+def _escalated_with_roles(**roles: list[dict[str, Any]]) -> Callable[[], Gate]:
+    """An escalated gate whose live check read these ``appRoles`` (by app object ID)."""
+
     def build() -> Gate:
-        gate, _, _ = write_gate()
-        r = valid(APP_PATCH)
-        gate.call_write(replace(r, url=f"{GRAPH}/applications/{app}"), lambda: None)
+        gate, _, _ = escalated_gate(confirm=False)
+        for oid in APPS:
+            assert gate.record_lab_check(oid, app_json(oid, roles=roles.get(oid))) is None
+        assert gate.record_lab_check(SP_ESC, sp_json()) is None
         return gate
 
     return build
 
 
-def _marker_disabled() -> Gate:
-    gate, _, _ = write_gate()
-    define_marker(gate)
-    off = {**MARKER, "isEnabled": False}
-    gate.call_write(replace(valid(APP_PATCH), body={"appRoles": [*PRE_ROLES, off]}), lambda: None)
-    return gate
+def _marker_on(app: str) -> Callable[[], Gate]:
+    """The marker is defined on another lab app, not on the SP's own."""
+    return _escalated_with_roles(**{APP_ESC: PRE_ROLES, app: [*PRE_ROLES, MARKER]})
 
 
-def _marker_patch_failed() -> Gate:
-    gate, _, _ = write_gate()
-
-    def fail() -> None:
-        raise RuntimeError("Graph said no")
-
-    with pytest.raises(RuntimeError):
-        gate.call_write(valid(APP_PATCH), fail)
-    return gate
+_marker_disabled = _escalated_with_roles(**{APP_ESC: [*PRE_ROLES, {**MARKER, "isEnabled": False}]})
+_marker_not_defined = _escalated_with_roles(**{APP_ESC: PRE_ROLES})
+_marker_grants_something = _escalated_with_roles(
+    **{APP_ESC: [*PRE_ROLES, {**MARKER, "description": "Admin"}]}
+)
+_marker_for_users = _escalated_with_roles(
+    **{APP_ESC: [*PRE_ROLES, {**MARKER, "allowedMemberTypes": ["User", "Application"]}]}
+)
 
 
 class _Raises:
@@ -549,7 +551,11 @@ WRITE_ROWS: list[tuple[str, DenyReason, Case]] = [
     ),
     # 8. the live lab check
     ("app not checked live", DenyReason.LAB_CHECK_FAILED, _with(ADD_PASSWORD, gate=_no_lab_check)),
-    ("SP not checked live", DenyReason.LAB_CHECK_FAILED, _with(UNASSIGN, gate=_no_lab_check)),
+    (
+        "SP not checked live",
+        DenyReason.LAB_CHECK_FAILED,
+        _with(UNASSIGN, gate=_escalated_no_lab_check),
+    ),
     # 9. bodies
     ("listKeys with a body", DenyReason.BAD_BODY, _body(LIST_KEYS, {"expand": "kerb"})),
     ("regenerate key3", DenyReason.BAD_BODY, _body(REGEN_KEY, {"keyName": "kerb1"})),
@@ -674,14 +680,23 @@ WRITE_ROWS: list[tuple[str, DenyReason, Case]] = [
         _body(ASSIGN, {**ASSIGN_BODY, "appRoleId": PRE_ROLES[0]["id"]}),
     ),
     ("assignment with an extra key", DenyReason.BAD_BODY, _body(ASSIGN, {**ASSIGN_BODY, "x": 1})),
-    ("assignment before the marker exists (SD2)", DenyReason.BAD_BODY, _with(ASSIGN, gate=_gate())),
+    (
+        "marker not defined by Terraform on the app (SD2)",
+        DenyReason.BAD_BODY,
+        _with(ASSIGN, gate=_marker_not_defined),
+    ),
     (
         "marker defined on another lab app (SD2)",
         DenyReason.BAD_BODY,
         _with(ASSIGN, gate=_marker_on(APP_VER)),
     ),
     ("marker disabled", DenyReason.BAD_BODY, _with(ASSIGN, gate=_marker_disabled)),
-    ("marker write failed", DenyReason.BAD_BODY, _with(ASSIGN, gate=_marker_patch_failed)),
+    (
+        "marker that may grant something",
+        DenyReason.BAD_BODY,
+        _with(ASSIGN, gate=_marker_grants_something),
+    ),
+    ("marker for users too", DenyReason.BAD_BODY, _with(ASSIGN, gate=_marker_for_users)),
     (
         "owner who is not a test identity",
         DenyReason.BAD_BODY,
@@ -809,8 +824,7 @@ def test_a_leftover_marker_may_be_disabled_and_removed() -> None:
 
 
 def test_sd2_marker_assignment_needs_the_marker_on_the_sps_own_lab_app() -> None:
-    gate, _, _ = write_gate()
-    define_marker(gate)
+    gate, _, _ = escalated_gate()
     assert isinstance(gate.check_write(valid(ASSIGN)), Allowed)
     # The same body against any service principal that is not a lab target
     # (Microsoft Graph's, or any first-party one, has a tenant-specific object ID).

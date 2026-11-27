@@ -45,7 +45,9 @@ Writes (M4, ``docs/milestones/M4-strikes-plan.md``) have their own entry points,
  4. verb is strike, operation is a write form and listed
                                        VERB_NOT_ALLOWED / MALFORMED_OPERATION /
                                        NOT_A_WRITE_FORM / OPERATION_NOT_ALLOWED
- 5. signed in as a test identity       PRINCIPAL_NOT_ALLOWED
+ 5. signed in as a test identity, or as the escalated identity (S4) for the
+    marker assignment and its removal only
+                                       PRINCIPAL_NOT_ALLOWED
  6. method, host, exact path, pinned query   BAD_URL
  7. every ID a strike target of the right kind, inside the scope
                                        STRIKE_TARGET_NOT_ALLOWED / RG_NOT_ALLOWED / ...
@@ -55,9 +57,21 @@ Writes (M4, ``docs/milestones/M4-strikes-plan.md``) have their own entry points,
                                        NO_APPROVED_PLAN / NOT_IN_APPROVED_PLAN
 11. budget                             BUDGET_CALLS / BUDGET_TIME
 
-No strike code exists yet: nothing calls the write path except tests. The plan
-binding (step 10) comes from ``fns strike plan`` and ``--approve <hash>``, in a
-later PR; until then no gate has one, so every write is denied.
+The plan binding (step 10) comes from ``fns strike plan`` and ``--approve <hash>``;
+a gate without one denies every write.
+
+S4 (approved 2026-11-27) needs the scope's ``strike.escalation`` block for two
+things, both denied without it:
+
+- the token request (:data:`~fns.scope.writes.TOKEN_OPERATION`), sent by the agent:
+  exactly ``POST https://login.microsoftonline.com/<scope tenant>/oauth2/v2.0/token``
+  with client credentials for the escalation target's appId and the Graph
+  ``.default`` scope, after the live check of that application and its service
+  principal, and inside the approved plan. The gate never sees the secret;
+- a gate signed in as the escalation target's service principal (the token's
+  ``oid``) may send only the marker assignment to that same service principal, with
+  a test identity as ``principalId`` and the scope's marker role as ``appRoleId``,
+  and the removal of an assignment there. A test identity may send neither.
 """
 
 from __future__ import annotations
@@ -72,7 +86,13 @@ from typing import Final, Literal, Protocol, TypeVar
 
 from fns.models.armid import GUID_RE, parse_arm_id
 from fns.models.base import sha256_hex
-from fns.models.operations import Operation, OperationError, parse_operation
+from fns.models.firstparty import is_first_party
+from fns.models.operations import (
+    WRITE_FORM_OPERATIONS,
+    Operation,
+    OperationError,
+    parse_operation,
+)
 from fns.models.scope import DATA_PLANE_VERB, READ_ONLY_VERBS, ScopeManifest, data_resource
 from fns.scope.targets import (
     ArmTarget,
@@ -85,15 +105,17 @@ from fns.scope.targets import (
 )
 from fns.scope.writes import (
     FORMS_BY_KEY,
+    TOKEN_OPERATION,
     BodyContext,
     LabObject,
     WriteRefusedError,
     canonical_body,
     check_body,
     check_lab_object,
+    check_token_body,
     hard_deny,
-    marker_roles,
     match_form,
+    token_url,
 )
 
 T = TypeVar("T")
@@ -316,6 +338,15 @@ class _Policy:
     arm_targets: dict[str, str] = field(default_factory=dict)
     """Strike ARM targets: lowercased ID to ``data_resource`` kind (kv or blob)."""
     graph_targets: dict[uuid.UUID, _GraphTarget] = field(default_factory=dict)
+    escalation_sp: uuid.UUID | None = None
+    """``strike.escalation.service_principal`` (S4), or None: no escalation at all."""
+    marker_role: uuid.UUID | None = None
+
+
+_ESCALATED_KEYS: Final = frozenset(
+    parse_operation(op).key for op in (WRITE_FORM_OPERATIONS[6], WRITE_FORM_OPERATIONS[7])
+)
+"""The marker assignment and its removal: the escalated identity's only writes."""
 
 
 def _policy_from(manifest: object) -> _Policy | None:
@@ -341,6 +372,13 @@ def _policy_from(manifest: object) -> _Policy | None:
         strike_expires: datetime | None = None
         arm_targets: dict[str, str] = {}
         graph_targets: dict[uuid.UUID, _GraphTarget] = {}
+        escalation_sp: uuid.UUID | None = None
+        marker_role: uuid.UUID | None = None
+        if strike is not None and strike.escalation is not None:
+            escalation_sp = _as_uuid(str(strike.escalation.service_principal))
+            marker_role = _as_uuid(str(strike.escalation.marker_role_id))
+            if escalation_sp is None or marker_role is None:
+                return None
         if strike is not None:
             strike_expires = strike.expires_at
             if not isinstance(strike_expires, datetime) or strike_expires.tzinfo is None:
@@ -359,15 +397,27 @@ def _policy_from(manifest: object) -> _Policy | None:
                         t.display_name,
                         None if t.application is None else _as_uuid(str(t.application)),
                     )
+        test_identities = frozenset(
+            u for i in manifest.test_identities if (u := _as_uuid(i.object_id))
+        )
+        if escalation_sp is not None:
+            # Re-checked here because a forged manifest skips the model's validators.
+            esc_target = graph_targets.get(escalation_sp)
+            if (
+                esc_target is None
+                or esc_target.kind != "graph-service-principal"
+                or esc_target.application is None
+                or escalation_sp in test_identities
+                or is_first_party(str(marker_role))
+            ):
+                return None
         return _Policy(
             tenant_id=tenant,
             subscriptions=frozenset(u for s in manifest.subscription_ids if (u := _as_uuid(s))),
             resource_groups=frozenset(
                 ArmTarget.parse(rg).path.format() for rg in manifest.allowed_resource_groups
             ),
-            test_identities=frozenset(
-                u for i in manifest.test_identities if (u := _as_uuid(i.object_id))
-            ),
+            test_identities=test_identities,
             operations=ops,
             data_objects=frozenset(
                 (parse_arm_id(d.resource).format(), parse_operation(d.operation).key)
@@ -379,6 +429,8 @@ def _policy_from(manifest: object) -> _Policy | None:
             strike_expires_at=strike_expires,
             arm_targets=arm_targets,
             graph_targets=graph_targets,
+            escalation_sp=escalation_sp,
+            marker_role=marker_role,
         )
     except Exception:  # noqa: BLE001 - any oddity in the manifest means deny everything
         return None
@@ -401,7 +453,6 @@ class Gate:
         self._policy = _policy_from(manifest)
         self._plan = plan
         self._lab: dict[uuid.UUID, LabObject] = {}
-        self._markers: dict[uuid.UUID, frozenset[uuid.UUID]] = {}
         self._signed_in = _as_uuid(signed_in_tenant)
         self._principal = _as_uuid(signed_in_principal)
         self._journal = journal
@@ -622,6 +673,8 @@ class Gate:
 
         if r.verb != "strike" or "strike" not in p.operations:
             return Denied(DenyReason.VERB_NOT_ALLOWED, "only strike writes"), ""
+        if r.operation == TOKEN_OPERATION:
+            return self._check_token(r, p)
         try:
             op = parse_operation(r.operation)
         except OperationError:
@@ -631,11 +684,20 @@ class Gate:
             return Denied(DenyReason.NOT_A_WRITE_FORM, f"{op.raw} is not a write form"), ""
         if op.key not in p.operations["strike"]:
             return Denied(DenyReason.OPERATION_NOT_ALLOWED, f"{op.raw} not listed for strike"), ""
-        if self._principal is None or self._principal not in p.test_identities:
-            reason = DenyReason.PRINCIPAL_NOT_ALLOWED
+        escalated = p.escalation_sp is not None and self._principal == p.escalation_sp
+        reason = DenyReason.PRINCIPAL_NOT_ALLOWED
+        if self._principal is None or not (escalated or self._principal in p.test_identities):
             return Denied(reason, "strike writes only signed in as a test identity"), ""
+        if escalated and op.key not in _ESCALATED_KEYS:
+            detail = "the escalated identity may only assign the marker role and remove it"
+            return Denied(reason, detail), ""
+        if not escalated and op.key in _ESCALATED_KEYS:
+            return Denied(reason, "only the escalated identity (S4) assigns the marker role"), ""
 
         m = match_form(form, r.method, r.url, p.arm_targets)
+        if escalated and m.sp != p.escalation_sp:
+            reason = DenyReason.STRIKE_TARGET_NOT_ALLOWED
+            return Denied(reason, "the escalated identity writes only to its own SP"), ""
         if m.arm_target is not None:
             denied = self._check_arm_scope(ArmTarget.parse(m.arm_target), p)
             if denied is not None:
@@ -662,20 +724,46 @@ class Gate:
             sp_application={
                 k: t.application for k, t in p.graph_targets.items() if t.application is not None
             },
-            markers=dict(self._markers),
+            marker_role=p.marker_role,
         )
         check_body(form, r.body, m, ctx)
 
+        return self._admit(r, p, digest, Allowed(op, m.target))
+
+    def _admit(self, r: WriteRequest, p: _Policy, digest: str, ok: Allowed) -> tuple[Decision, str]:
+        """The last two steps of every write: the approved plan, then the budget."""
         if self._plan is None:
             return Denied(DenyReason.NO_APPROVED_PLAN, "no approved strike plan"), digest
         if self._plan.admits(r, digest) is not True:
             return Denied(DenyReason.NOT_IN_APPROVED_PLAN, "not a step of the plan"), digest
-
         if self._calls >= p.max_api_calls:
             return Denied(DenyReason.BUDGET_CALLS, f"{p.max_api_calls} API calls used"), digest
         if self._clock.monotonic() - self._started >= p.max_seconds:
             return Denied(DenyReason.BUDGET_TIME, "run time budget used"), digest
-        return Allowed(op, m.target), digest
+        return ok, digest
+
+    def _check_token(self, r: WriteRequest, p: _Policy) -> tuple[Decision, str]:
+        """S4 step 1: the escalation target's client-credentials token request."""
+        esc = p.escalation_sp
+        if esc is None or p.marker_role is None:
+            return Denied(DenyReason.NO_STRIKE_SCOPE, "the scope has no strike.escalation"), ""
+        if self._principal is None or self._principal not in p.test_identities:
+            reason = DenyReason.PRINCIPAL_NOT_ALLOWED
+            return Denied(reason, "the token request is sent by a test identity"), ""
+        if r.method != "POST" or r.url != token_url(p.tenant_id):
+            detail = f"the token request is exactly POST {token_url(p.tenant_id)}"
+            return Denied(DenyReason.BAD_URL, detail), ""
+        target = p.graph_targets.get(esc)
+        app = None if target is None else target.application
+        lab_sp = self._lab.get(esc)
+        lab_app = None if app is None else self._lab.get(app)
+        if lab_sp is None or lab_app is None:
+            reason = DenyReason.LAB_CHECK_FAILED
+            return Denied(reason, "the escalation target has not passed the live lab check"), ""
+        check_token_body(r.body, lab_app.app_id)
+        digest = sha256_hex(canonical_body(r.body))
+        op = Operation("graph", TOKEN_OPERATION, TOKEN_OPERATION, is_read=False)
+        return self._admit(r, p, digest, Allowed(op, f"directory/{esc}"))
 
     def record_lab_check(self, object_id: uuid.UUID | str, observed: object) -> Denied | None:
         """Feed the gate a live ``GET`` of a Graph strike target (strike plan rule 5).
@@ -760,9 +848,6 @@ class Gate:
                 self.run_id, seq, "failed", type(exc).__name__, self._clock.now()
             )
             raise
-        if FORMS_BY_KEY[decision.operation.key].body == "app-roles":
-            app = uuid.UUID(decision.target.removeprefix("directory/"))
-            self._markers[app] = marker_roles(r.body)
         self._journal.record_call_result(self.run_id, seq, "succeeded", "", self._clock.now())
         return result
 

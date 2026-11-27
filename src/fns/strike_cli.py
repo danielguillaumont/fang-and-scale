@@ -72,6 +72,10 @@ def _fixture_session(
     from fns.strike.plan import AFTER_HARDEN
     from fns.strike.replay import SCOPE_FILE, ReplayReads, ReplayWrites, load_recording
 
+    if strikes is not None and "S4" in strikes:
+        raise _UsageError(
+            "S4 runs live only: a recording can't replay its token exchange without the token"
+        )
     after = bool(strikes) and all(s in AFTER_HARDEN for s in strikes or ())
     rec = load_recording(fixture, "after-harden" if after else "before-harden")
     if strikes is not None and tuple(strikes) != rec.strikes:
@@ -282,21 +286,37 @@ def _load_plan(path: Path) -> Any:
     return StrikePlan.model_validate_json(path.read_bytes())
 
 
-def _gate_factory(s: _Session, journal: Any) -> Callable[[Any], Any]:
+def _gate_factory(s: _Session, journal: Any) -> Callable[..., Any]:
     from fns.scope.gate import Gate
 
-    def make(binding: Any) -> Gate:
+    def make(binding: Any, principal: str | None = None) -> Gate:
         return Gate(
             s.manifest,
             signed_in_tenant=s.tenant_id,
             journal=journal,
             clock=s.clock,
             run_id=binding.plan.run_id,
-            signed_in_principal=s.agent_oid,
+            signed_in_principal=principal or s.agent_oid,
             plan=binding,
         )
 
     return make
+
+
+def _escalation(s: _Session, journal: Any) -> Any:
+    """S4's live pieces: the token request, then a gate and a transport signed in as
+    the proven token's ``oid``, with that token only."""
+    from fns.strike.run import Escalation
+    from fns.strike.transport import HttpStrikeTransport, HttpTokenTransport
+
+    if s.mode != "LIVE":
+        raise _UsageError("S4 runs live only")
+    make = _gate_factory(s, journal)
+    return Escalation(
+        token_transport=HttpTokenTransport(),
+        gate_factory=lambda binding, principal: make(binding, principal),
+        transport_factory=HttpStrikeTransport,
+    )
 
 
 def run(
@@ -340,8 +360,15 @@ def run(
             if cleanup_only:
                 result = cleanup(p, approve, **common)
             else:
+                esc = _escalation(s, journal) if "S4" in p.strikes else None
                 result = run_plan(
-                    p, approve, scope_sha256=s.scope_sha256, mode=s.mode, clock=s.clock, **common
+                    p,
+                    approve,
+                    scope_sha256=s.scope_sha256,
+                    mode=s.mode,
+                    clock=s.clock,
+                    escalation=esc,
+                    **common,
                 )
         o = _labelled(con, s.mode)
         _print_run(o, result, cleanup_only)
