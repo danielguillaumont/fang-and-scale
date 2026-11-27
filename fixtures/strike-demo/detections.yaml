@@ -1,0 +1,28 @@
+# FIXTURE: hand-written detection results for the strike demo (no workspace was queried).
+# The format of decision D5: per strike, the rule that should fire, the source rows its
+# KQL query returned, and when the first alert came. A live run writes this file from the
+# queries in docs/runbooks/m4-live-run.md, step C6. S3 is marked missed on purpose, so the
+# report's detection-gap state has something to show. It says nothing about the real rule.
+version: 1
+mode: FIXTURE
+strike_run_id: 202611251200-demo01
+source: hand-written for the strike demo, not from a workspace
+results:
+  - strike: S1
+    rule: storage-listkeys-by-workload
+    strike_at: 2026-11-25T12:00:00Z
+    rows: 3
+    fired: true
+    first_alert_at: 2026-11-25T12:21:30Z
+  - strike: S2
+    rule: keyvault-control-plane-write-by-workload
+    strike_at: 2026-11-25T12:00:00Z
+    rows: 2
+    fired: true
+    first_alert_at: 2026-11-25T12:36:00Z
+  - strike: S3
+    rule: app-credential-added-by-workload
+    strike_at: 2026-11-25T12:00:00Z
+    rows: 2
+    fired: false
+    note: hand-written miss, to show a detection gap

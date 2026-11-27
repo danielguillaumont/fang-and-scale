@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "DetectionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "fired": {
+          "title": "Fired",
+          "type": "boolean"
+        },
+        "first_alert_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "First Alert At"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "rows": {
+          "description": "Source rows the strike's query returned (its event reached the workspace).",
+          "minimum": 0,
+          "title": "Rows",
+          "type": "integer"
+        },
+        "rule": {
+          "description": "A rule ID from ``detections/`` (its file name without ``.yaml``).",
+          "maxLength": 80,
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "title": "Rule",
+          "type": "string"
+        },
+        "strike": {
+          "pattern": "^(S[1-4]|D-[1-9])$",
+          "title": "Strike",
+          "type": "string"
+        },
+        "strike_at": {
+          "format": "date-time",
+          "title": "Strike At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "strike",
+        "rule",
+        "strike_at",
+        "rows",
+        "fired"
+      ],
+      "title": "DetectionResult",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/DetectionResult"
+      },
+      "minItems": 1,
+      "title": "Results",
+      "type": "array"
+    },
+    "source": {
+      "description": "Who wrote it down and from what, e.g. the runbook step whose KQL was run.",
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Source",
+      "type": "string"
+    },
+    "strike_run_id": {
+      "description": "The ``fns strike run`` these results are for.",
+      "pattern": "^[a-z0-9-]{8,40}$",
+      "title": "Strike Run Id",
+      "type": "string"
+    },
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "mode",
+    "strike_run_id",
+    "source",
+    "results"
+  ],
+  "title": "DetectionResults",
+  "type": "object"
+}

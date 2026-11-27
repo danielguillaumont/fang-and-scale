@@ -90,7 +90,20 @@ def strike_dir(
                 "mode": mode or aset.mode,
                 "run_id": plan.run_id,
                 "plan_hash": f"sha256:{plan.plan_hash()}",
-                "writes": [{"key": w["key"], "outcome": word, "status": status} for w in writes],
+                "writes": [
+                    {
+                        "key": w["key"],
+                        "strike": w["strike"],
+                        "expect": "denied",
+                        "outcome": word,
+                        "status": status,
+                        "undo": [] if word == "denied" else ["204"],
+                        "observes": w["observes"],
+                    }
+                    for w in writes
+                ],
+                "verification": [],
+                "exit_code": 0 if word == "denied" else 1,
             }
         )
     )

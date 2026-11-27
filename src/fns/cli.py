@@ -336,8 +336,16 @@ def report(
         Path | None, typer.Option("--prove", help="Run directory written by `fns prove`.")
     ] = None,
     out: Annotated[Path, typer.Option(help="HTML file to write.")] = Path(".fns/report.html"),
+    strike: Annotated[
+        list[Path] | None,
+        typer.Option(help="A `fns strike run` directory (plan.json and strike-run.json); repeat."),
+    ] = None,
+    detections: Annotated[
+        Path | None,
+        typer.Option(help="Detection results per strike (YAML, D5), for one of the --strike runs."),
+    ] = None,
 ) -> None:
-    """Write a static HTML report: coverage, reach graph, findings, proof, mutation (M5)."""
+    """Write a static HTML report: coverage, graph, findings, proof, strikes, mutation."""
     from pydantic import ValidationError
 
     from fns import report_cli
@@ -345,7 +353,9 @@ def report(
 
     err = make_console(stderr=True)
     try:
-        inputs = report_cli.load_inputs(contain, mutation, prove_dir)
+        inputs = report_cli.load_inputs(
+            contain, mutation, prove_dir, strikes=strike or [], detections=detections
+        )
     except (OSError, ValidationError, ValueError) as exc:
         err.print(f"invalid input: {type(exc).__name__}: {exc}", style="fns.fail", markup=False)
         raise typer.Exit(ExitCode.INVALID_INPUT) from exc

@@ -1,4 +1,5 @@
-"""Static HTML report: coverage first, then the reach graph, findings, proof and mutation.
+"""Static HTML report: coverage first, then the reach graph, findings, proof, strikes,
+detections and mutation.
 
 One self-contained file. Every value from a tenant (names, step texts, sources)
 is untrusted (PLAN section 9) and is escaped; the graph data is embedded as
@@ -22,9 +23,12 @@ from importlib.resources import files
 from typing import Any, Final
 
 from fns.models.bundle import EvidenceBundle
-from fns.models.evidence import RUNG_ORDER, CoverageState, Finding
+from fns.models.detection_results import DetectionResult, DetectionResults
+from fns.models.evidence import RUNG_ORDER, CoverageState, Evidence, Finding
 from fns.models.mutation import MutationReport
 from fns.models.report import ContainReport
+from fns.models.strike_record import StrikeRunRecord, StrikeWriteRecord
+from fns.strike.plan import StrikePlan
 
 CYTOSCAPE_VERSION: Final = "3.30.2"
 CYTOSCAPE_FILE: Final = f"cytoscape-{CYTOSCAPE_VERSION}.min.js"
@@ -68,8 +72,30 @@ OUTCOME_CLASS: Final[dict[str, str]] = {
 }
 
 
+STRIKE_EXIT: Final[dict[int, str]] = {
+    0: "clean: every write undone and verified",
+    1: "an after-harden attempt succeeded: the contract fails (it was undone)",
+    4: "the gate denied a planned write (everything before it was undone)",
+    5: "verification found a difference: emergency cleanup needed",
+}
+DETECTION_TEXT: Final[dict[str, tuple[str, str]]] = {
+    "fired": ("fired", "pass"),
+    "detection-gap": ("missed: detection-gap", "fail"),
+    "no-rows": ("no source rows: the log path did not deliver", "inconclusive"),
+}
+
+
 class ReportInputError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class StrikeView:
+    """One ``fns strike`` run directory: the plan, and what the run (or a cleanup) wrote."""
+
+    plan: StrikePlan
+    run: StrikeRunRecord
+    cleanup: StrikeRunRecord | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +105,8 @@ class Inputs:
     bundle: EvidenceBundle | None = None
     signing: dict[str, str] | None = None
     """``signing.json`` from the prove run: signer and its warning, if any."""
+    strikes: tuple[StrikeView, ...] = ()
+    detections: DetectionResults | None = None
 
 
 def check(inputs: Inputs) -> list[str]:
@@ -96,7 +124,61 @@ def check(inputs: Inputs) -> list[str]:
             problems.append(f"{name} was made from a different snapshot")
     if inputs.bundle is not None and inputs.bundle.report_digest != c.digest():
         problems.append("bundle was made from a different contain report")
+    tenant = c.tenant_id.lower()
+    for v in inputs.strikes:
+        name = f"strike run {v.run.run_id}"
+        if v.plan.tenant_id != tenant:
+            problems.append(f"{name} ran in another tenant")
+        for rec in (v.run, v.cleanup):
+            if rec is None:
+                continue
+            if rec.mode != c.mode:
+                problems.append(f"{name} is {rec.mode} but the contain report is {c.mode}")
+            if rec.run_id != v.plan.run_id or rec.plan_hash != f"sha256:{v.plan.plan_hash()}":
+                problems.append(f"{name} does not match its plan.json")
+    ids = [v.run.run_id for v in inputs.strikes]
+    if len(ids) != len(set(ids)):
+        problems.append("a strike run is given twice")
+    d = inputs.detections
+    if d is not None:
+        if d.mode != c.mode:
+            problems.append(f"detections are {d.mode} but the contain report is {c.mode}")
+        run = next((v.run for v in inputs.strikes if v.run.run_id == d.strike_run_id), None)
+        if run is None:
+            problems.append(f"detections are for strike run {d.strike_run_id}, which is not given")
+        else:
+            extra = sorted({r.strike for r in d.results} - set(run.strikes))
+            if extra:
+                problems.append(f"detections name strikes that run did not make: {extra}")
     return problems
+
+
+def _good(f: Finding, outcome: str) -> bool:
+    """Whether an outcome is what the contract wants for this item."""
+    return outcome == ("denied" if f.item_kind == "must_not_reach" else "allowed")
+
+
+def _ladder(f: Finding) -> str:
+    """One cell per rung: what supporting evidence found there, then any context."""
+    cells = []
+    for rung, meaning in RUNGS:
+        found = sorted({e.outcome for e in f.supporting if e.rung == rung})
+        ctx = sorted({e.outcome for e in f.context if e.rung == rung})
+        results = [o for o in found if o in {"allowed", "denied"}]
+        if results:
+            cls = "pass" if all(_good(f, o) for o in results) else "fail"
+            mark = "/".join(o[0].upper() for o in results)
+        else:
+            cls, mark = "none", "-"
+        text = f"{rung}: " + (", ".join(found) if found else "nothing")
+        if ctx:
+            text += f"; context: {', '.join(ctx)}"
+            mark += "*"
+        cells.append(
+            f'<span class="rung {cls}" title="{_e(text)} ({_e(meaning)})">'
+            f"{_e(rung[0].upper())}:{mark}</span>"
+        )
+    return f'<span class="ladder">{"".join(cells)}</span>'
 
 
 def _max_rung(f: Finding) -> str:
@@ -201,6 +283,10 @@ border-radius:6px;padding:8px 12px;margin:8px 0}summary{cursor:pointer}
 .chips{display:flex;flex-wrap:wrap;gap:8px}.chip{border:1px solid var(--line);border-radius:999px;
 padding:2px 10px;font-size:.85rem}ol.steps li{margin:2px 0}.rule{font-family:var(--mono);
 color:var(--muted)}footer{margin-top:48px;color:var(--muted);font-size:.85rem}
+.ladder{display:inline-flex;gap:3px;font-family:var(--mono);font-size:.8rem}
+.rung{border:1px solid var(--line);border-radius:3px;padding:0 4px;min-width:2.2em;
+text-align:center}.rung.pass{border-color:var(--venom)}.rung.fail{border-color:var(--fail)}
+.rung.none{color:var(--muted)}
 """
 
 SCRIPT: Final = """(function(){
@@ -274,7 +360,7 @@ def _coverage(findings: tuple[Finding, ...], source: str) -> str:
         f"<tr><td>{_e(f.item_kind)}</td><td><code>{_e(f.target)}</code></td>"
         f"<td><code>{_e(f.operation)}</code></td>"
         f'<td class="{_cls(f.verdict)}">{_e(f.verdict)}</td><td>{_e(f.coverage)}</td>'
-        f"<td>{_e(_max_rung(f))}</td></tr>"
+        f"<td>{_e(_max_rung(f))}</td><td>{_ladder(f)}</td></tr>"
         for f in sorted(findings, key=lambda f: (f.item_kind, f.target, f.operation))
     )
     return (
@@ -282,7 +368,10 @@ def _coverage(findings: tuple[Finding, ...], source: str) -> str:
         "much was actually checked; read them before the verdicts.</p>"
         f'<div class="chips">{chips}</div><div class="wrap"><table><thead><tr><th>item</th>'
         "<th>target</th><th>operation</th><th>verdict</th><th>coverage</th><th>highest rung</th>"
-        f"</tr></thead><tbody>{rows}</tbody></table></div>"
+        f'<th>ladder</th></tr></thead><tbody>{rows}</tbody></table></div><p class="muted">'
+        "Ladder: one cell per rung (Modeled, Evaluated, Observed, Logged). A: allowed, D: "
+        "denied, -: no result. Green is what the contract wants, red is not. * marks "
+        "context, a result kept with the finding that settles nothing.</p>"
     )
 
 
@@ -298,17 +387,13 @@ def _findings(report: ContainReport, proved: dict[str, Finding]) -> str:
     ]
     for f in sorted(report.findings, key=lambda f: (f.item_kind, f.target, f.operation)):
         reasons = "".join(f"<li>{_e(r)}</li>" for r in f.reasons)
-        evidence = "".join(
-            f"<tr><td>{_e(e.rung)}</td><td>{_e(e.outcome)}</td><td><code>{_e(e.source)}</code>"
-            f"</td><td>{_e(e.notes or '')}</td></tr>"
-            for e in f.evidence
-        )
+        shown = proved.get(f.id, f)
         body = [f"<ul>{reasons}</ul>"]
-        if evidence:
-            body.append(
-                '<div class="wrap"><table><thead><tr><th>rung</th><th>outcome</th><th>source</th>'
-                f"<th>notes</th></tr></thead><tbody>{evidence}</tbody></table></div>"
-            )
+        if f.id in proved and proved[f.id].reasons != f.reasons:
+            after = "".join(f"<li>{_e(r)}</li>" for r in proved[f.id].reasons)
+            body.append(f'<p class="muted">After prove:</p><ul>{after}</ul>')
+        if shown.evidence:
+            body.append(_evidence_table(shown.evidence, after_prove=f.id in proved))
         for p in paths.get(f.id, []):
             title = "shortest path" if p.rank == 0 else f"alternative {p.rank}"
             flags = " (partial)" if p.partial else ""
@@ -340,6 +425,105 @@ def _findings(report: ContainReport, proved: dict[str, Finding]) -> str:
     return "".join(parts)
 
 
+def _evidence_table(evidence: tuple[Evidence, ...], *, after_prove: bool) -> str:
+    rows = "".join(
+        f"<tr><td>{_e(e.rung)}</td><td>{_e(e.outcome)}</td>"
+        f"<td>{'context' if e.role == 'context' else 'supports'}</td>"
+        f"<td><code>{_e(e.source)}</code></td><td>{_e(e.notes or '')}</td></tr>"
+        for e in evidence
+    )
+    caption = "Evidence after prove" if after_prove else "Evidence from the model"
+    return (
+        f'<p class="muted">{caption}:</p><div class="wrap"><table><thead><tr><th>rung</th>'
+        "<th>outcome</th><th>role</th><th>source</th><th>notes</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div>"
+    )
+
+
+def _strike_outcome(w: StrikeWriteRecord) -> tuple[str, str]:
+    if w.outcome == "denied" and w.expect == "denied":
+        return "denied, as required", "pass"
+    if w.outcome == "succeeded":
+        return "succeeded: the capability is real", "inconclusive"
+    if w.outcome == "unexpected-success":
+        return "succeeded: the contract fails", "fail"
+    return w.outcome, "fail" if w.outcome in {"gate-denied", "unknown"} else "muted"
+
+
+def _strike_run(v: StrikeView) -> str:
+    r = v.cleanup or v.run
+    rows = "".join(
+        f"<tr><td><code>{_e(w.key)}</code></td><td>{_e(w.expect)}</td>"
+        f'<td class="{_strike_outcome(w)[1]}">{_e(_strike_outcome(w)[0])}</td>'
+        f"<td>{_e('' if w.status is None else w.status)}</td>"
+        f"<td>{_e(', '.join(w.undo) or '-')}</td>"
+        f"<td>{'<br>'.join(f'<code>{_e(o)}</code>' for o in w.observes) or '-'}</td></tr>"
+        for w in v.run.writes
+    )
+    checks = "".join(
+        f'<li><span class="{"pass" if c.ok else "fail"}">{"ok" if c.ok else "FAIL"}</span> '
+        f"{_e(c.what)}: {_e(c.detail)}</li>"
+        for c in r.verification
+    )
+    when = "after harden" if all(w.expect == "denied" for w in v.run.writes) else "before harden"
+    cls = "pass" if r.exit_code == 0 else "fail"
+    return (
+        f"<h3>Run <code>{_e(v.run.run_id)}</code>, {_e(', '.join(v.run.strikes))} ({when})</h3>"
+        f'<p class="muted">Plan <code>{_e(v.run.plan_hash)}</code>, approved by the operator; '
+        f"as <code>{_e(v.plan.agent_object_id)}</code>.</p>"
+        '<div class="wrap"><table><thead><tr><th>write</th><th>expected</th><th>outcome</th>'
+        "<th>status</th><th>undo</th><th>observes</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div>"
+        + (f'<p class="fail">Stopped early: {_e(v.run.aborted)}</p>' if v.run.aborted else "")
+        + (
+            f'<p class="muted">{"Cleanup" if v.cleanup else "Verification"} by the read-only '
+            f"scout:</p><ul>{checks}</ul>"
+            if checks
+            else ""
+        )
+        + f'<p class="{cls}">Exit {r.exit_code}: {_e(STRIKE_EXIT.get(r.exit_code, ""))}</p>'
+    )
+
+
+def _strikes(views: tuple[StrikeView, ...]) -> str:
+    return (
+        '<h2 id="strikes">Strikes</h2><p class="muted">Writes <code>fns strike run</code> made '
+        "as the assumed-compromised identity, through the scope gate, to lab objects only. "
+        "Each write was undone, and a separate read-only identity checked the state was back. "
+        "Before harden, a success shows the capability is real; after harden, every attempt "
+        "must be denied. Keys and passwords a strike received are never shown or stored.</p>"
+        + "".join(_strike_run(v) for v in sorted(views, key=lambda v: v.run.run_id))
+    )
+
+
+def _latency(r: DetectionResult) -> str:
+    if r.latency is None:
+        return "-"
+    minutes, seconds = divmod(int(r.latency.total_seconds()), 60)
+    return f"{minutes} min {seconds:02d} s"
+
+
+def _detections(d: DetectionResults) -> str:
+    rows = "".join(
+        f"<tr><td>{_e(r.strike)}</td><td><code>{_e(r.rule)}</code></td><td>{r.rows}</td>"
+        f'<td class="{DETECTION_TEXT[r.state][1]}">{_e(DETECTION_TEXT[r.state][0])}</td>'
+        f"<td>{_e(_latency(r))}</td><td>{_e(r.note or '')}</td></tr>"
+        for r in sorted(d.results, key=lambda r: (r.strike, r.rule))
+    )
+    fired = sum(r.state == "fired" for r in d.results)
+    return (
+        f'<h2 id="detections">Detections: {fired} of {len(d.results)} fired</h2>'
+        f'<p class="muted">For strike run <code>{_e(d.strike_run_id)}</code>. '
+        f"Reported by the operator ({_e(d.source)}); the tool did not query the workspace, so "
+        "these results are shown here and are not evidence for any finding. A strike whose "
+        "rows arrived with no alert is a detection gap. Latency is the first alert minus the "
+        "strike time.</p>"
+        '<div class="wrap"><table><thead><tr><th>strike</th><th>rule</th><th>source rows</th>'
+        "<th>result</th><th>latency</th><th>note</th></tr></thead>"
+        f"<tbody>{rows}</tbody></table></div>"
+    )
+
+
 def _proof(bundle: EvidenceBundle, signing: dict[str, str] | None) -> str:
     signer = (signing or {}).get("signer", "unknown")
     warning = (signing or {}).get("warning")
@@ -351,7 +535,13 @@ def _proof(bundle: EvidenceBundle, signing: dict[str, str] | None) -> str:
         + (f'<p class="inconclusive">{_e(warning)}</p>' if warning else "")
         + f"<p>{s.passed} pass, {s.critical} critical, {s.still_do_failed} legitimate use failed, "
         f"{s.inconclusive} inconclusive: {_e(EXIT_MEANING.get(s.exit_code, s.exit_code))}. "
-        f"{len(bundle.artifacts)} probe artifact(s). This page does not check the signature; "
+        f"{len(bundle.artifacts)} probe artifact(s)"
+        + (
+            f", {len(bundle.strike_artifacts)} strike observation(s)"
+            if bundle.strike_artifacts
+            else ""
+        )
+        + ". This page does not check the signature; "
         "run <code>fns verify &lt;run dir&gt;</code>.</p>"
     )
 
@@ -439,6 +629,21 @@ def render_html(inputs: Inputs) -> str:
         cards.append(
             (m.score, "mutation score", "pass" if m.killed == m.total and m.total else "fail")
         )
+    if inputs.strikes:
+        clean = sum((v.cleanup or v.run).exit_code == 0 for v in inputs.strikes)
+        cards.append(
+            (
+                f"{clean} / {len(inputs.strikes)}",
+                "strike runs clean",
+                "pass" if clean == len(inputs.strikes) else "fail",
+            )
+        )
+    if inputs.detections:
+        res = inputs.detections.results
+        fired = sum(r.state == "fired" for r in res)
+        cards.append(
+            (f"{fired} / {len(res)}", "detections fired", "pass" if fired == len(res) else "fail")
+        )
     if inputs.bundle:
         signing = inputs.signing or {}
         signer = signing.get("signer", "unknown")
@@ -469,6 +674,8 @@ def render_html(inputs: Inputs) -> str:
         '<div id="graph"></div><div id="graph-detail" class="muted"></div>',
         _findings(c, {f.id: f for f in inputs.bundle.findings} if inputs.bundle else {}),
         _proof(inputs.bundle, inputs.signing) if inputs.bundle else "",
+        _strikes(inputs.strikes) if inputs.strikes else "",
+        _detections(inputs.detections) if inputs.detections else "",
         _mutation(inputs.mutation) if inputs.mutation else "",
         f"<footer><h3>Evidence ladder</h3><ol>{ladder}</ol><p>Contract digest "
         f"<code>{_e(c.contract_digest)}</code><br>Snapshot digest <code>{_e(c.snapshot_digest)}"
