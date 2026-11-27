@@ -81,27 +81,22 @@ or P2 license". Community threads also report that on Entra ID Free only
 `AuditLogs` arrived. The documentation and the reports disagree, which is why
 this step is a live check and not an assumption.
 
-The check uses no strike code and no trial, and it needs no extra writes. The
-events come from things M4 does anyway:
+The check uses no strike code and no trial, and the tool makes no write. It is
+its own session, with its own lab build and teardown. The runbook is
+`docs/runbooks/m4-log-path-check.md`, and you run every command in it:
 
-1. **You, before session A's `lab-up`:** create a throwaway workspace
-   `law-fns-logcheck` in its own resource group `rg-fns-logcheck`, and a
-   tenant-level Entra diagnostic setting `fns-logcheck` that sends `AuditLogs`
-   and `ServicePrincipalSignInLogs` to it. The runbook gives the exact
-   `az monitor log-analytics workspace create` and
-   `az rest --method put .../providers/microsoft.aadiam/diagnosticSettings/fns-logcheck`
-   commands. **Stop rule:** if the portal or the API refuses either category, or
-   greys it out with a licence message, stop here and record the exact
-   response.
-2. **You:** session A as planned. `lab-up` creates four applications and their
-   service principals, which writes `AuditLogs` events. The scout's
-   certificate sign-in writes a service principal sign-in.
-3. **You, 2 hours later:** run two queries in the workspace and paste the
-   results:
-   - `AuditLogs | where TimeGenerated > ago(4h) | summarize count() by OperationName`
-   - `AADServicePrincipalSignInLogs | where TimeGenerated > ago(4h) | summarize count() by ServicePrincipalName`
-4. **You:** delete the diagnostic setting and `rg-fns-logcheck`. Session B's
-   Terraform creates the real ones.
+1. Rebuild the lab, with a new suffix.
+2. Create a throwaway workspace `law-fns-logcheck` in `rg-fns-logcheck`, and a
+   tenant-level Entra diagnostic setting `fns-logcheck` that sends `AuditLogs` and
+   `ServicePrincipalSignInLogs` to it. **Stop rule:** if the API refuses, record
+   the exact response, retry with `AuditLogs` alone, then clean up and report.
+3. Cause **one** harmless audit event: a certificate valid for at most a day on
+   the read-only `sp-fns-scout`.
+4. Cause **one** service principal sign-in: the scout signs in with that
+   certificate, in a temporary CLI profile.
+5. Delete the certificate. Run the KQL, polling for up to 2 hours, and paste the
+   results. The queries return no IDs or user names.
+6. Delete the setting and the workspace, then `lab-down`.
 
 **Results:**
 
@@ -137,8 +132,8 @@ most.
 
 | Session | Needs | Strikes? | Time (rough) |
 | --- | --- | --- | --- |
-| 1. Log path check | a throwaway workspace | no | 15 min, plus 2 h of waiting (overlaps A) |
-| A. Rebuild, baseline scout, the `Directory.Read.All` and custom-role tests | step 1's setting created | no | 1.5 h |
+| 1. Log path check (`docs/runbooks/m4-log-path-check.md`) | a lab build and a throwaway workspace, both removed at the end | no | 45 min, plus up to 2 h of waiting |
+| A. Rebuild, baseline scout, the `Directory.Read.All` and custom-role tests | step 1 reported; a fresh build | no | 1.5 h |
 | B. Logging on, legitimate use, record | A; the workspace and the Sentinel trial | no | 1 h, plus up to a day for logs to settle |
 | C. Strikes and detection results | B; step 1 passed or you chose an option; `fns strike` built from the approved strike plan | **yes**: S1 to S4 | 2 h, mostly waiting for alerts |
 | D. Harden, apply, prove the fix, and the required denials (D6) | C | **attempts that must be denied**: D-1 to D-5 | 1.5 h |
