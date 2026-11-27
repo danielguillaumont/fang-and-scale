@@ -31,7 +31,9 @@ from rich.table import Table
 
 from fns.console import FixtureConsole
 from fns.exitcodes import ExitCode
+from fns.inputcap import MAX_RECORD_BYTES, read_capped, read_capped_text
 from fns.models.base import sha256_hex
+from fns.yamlio import MAX_BYTES as YAML_MAX_BYTES
 from fns.yamlio import YamlError
 
 Out = Console | FixtureConsole
@@ -61,7 +63,7 @@ class _Session:
 
 
 def _scope_digest(path: Path) -> str:
-    return sha256_hex(path.read_bytes().decode("utf-8"))
+    return sha256_hex(read_capped_text(path, YAML_MAX_BYTES))
 
 
 def _fixture_session(
@@ -283,7 +285,7 @@ def _print_plan(o: Out, p: Any) -> None:
 def _load_plan(path: Path) -> Any:
     from fns.strike.plan import StrikePlan
 
-    return StrikePlan.model_validate_json(path.read_bytes())
+    return StrikePlan.model_validate_json(read_capped(path, MAX_RECORD_BYTES))
 
 
 def _gate_factory(s: _Session, journal: Any) -> Callable[..., Any]:

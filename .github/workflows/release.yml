@@ -1,7 +1,8 @@
 name: release
 
 # Runs only when a maintainer pushes a v* tag. It builds the wheel and sdist, writes a
-# CycloneDX SBOM and SHA-256 sums, and creates a *draft* GitHub release with them.
+# CycloneDX SBOM and SHA-256 sums, attests their build provenance (Sigstore, signed
+# with this workflow's OIDC identity), and creates a *draft* GitHub release with them.
 # A person reviews and publishes the draft. Nothing is uploaded to PyPI.
 on:
   push:
@@ -20,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # the draft release only
+      id-token: write # the provenance attestation's Sigstore certificate only
+      attestations: write # store that attestation on this repository
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,6 +46,10 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: sha256sum -- * > SHA256SUMS
+      - name: Build provenance attestation (every release file)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}

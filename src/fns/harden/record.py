@@ -17,6 +17,7 @@ from typing import Any, Final
 
 from pydantic import ValidationError
 
+from fns.inputcap import MAX_JSON_BYTES, read_capped
 from fns.models.contract import Contract
 
 BLOB_OPS: Final[dict[str, str]] = {
@@ -175,7 +176,7 @@ def load_rows(paths: list[Path]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in paths:
         try:
-            data = json.loads(path.read_bytes())
+            data = json.loads(read_capped(path, MAX_JSON_BYTES))
         except (OSError, json.JSONDecodeError) as exc:
             raise RecordError(f"{path.name}: {exc}") from exc
         if not isinstance(data, list):

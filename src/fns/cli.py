@@ -9,6 +9,7 @@ import typer
 
 from fns.console import make_console, print_banner
 from fns.exitcodes import ExitCode
+from fns.inputcap import MAX_RECORD_BYTES, read_capped
 
 app = typer.Typer(
     name="fns",
@@ -388,7 +389,11 @@ def comment(
     err = make_console(stderr=True)
     try:
         inputs = report_cli.load_inputs(contain, mutation, prove_dir)
-        base = ContainReport.model_validate_json(baseline.read_bytes()) if baseline else None
+        base = (
+            ContainReport.model_validate_json(read_capped(baseline, MAX_RECORD_BYTES))
+            if baseline
+            else None
+        )
         text = render_comment(inputs, base)
     except ReportInputError as exc:
         err.print(f"refusing to mix runs: {exc}", style="fns.fail", markup=False)
@@ -1020,7 +1025,7 @@ def demo_report(
         c = demo_contract(fixture)
         root = fixture
         results = MockResults.model_validate_json(
-            root.joinpath(RESULTS_FILE).read_text(encoding="utf-8")
+            read_capped(root.joinpath(RESULTS_FILE), MAX_RECORD_BYTES)
         )
         proved = run_prove(
             c,
@@ -1093,7 +1098,7 @@ def demo_prove(
         c = demo_contract(fixture)
         root = fixture
         results = MockResults.model_validate_json(
-            root.joinpath(RESULTS_FILE).read_text(encoding="utf-8")
+            read_capped(root.joinpath(RESULTS_FILE), MAX_RECORD_BYTES)
         )
     except (
         FixtureError,

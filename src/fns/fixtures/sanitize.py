@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from fns.fixtures.wellknown import WELL_KNOWN_GUIDS
+from fns.inputcap import MAX_RECORD_BYTES, read_capped
 
 GUID_RE: Final = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
@@ -79,7 +80,7 @@ class IdMap:
     def load(cls, path: Path) -> IdMap:
         if not path.is_file():
             return cls()
-        return cls(json.loads(path.read_text(encoding="utf-8")))
+        return cls(json.loads(read_capped(path, MAX_RECORD_BYTES)))
 
     def save(self, path: Path) -> None:
         data = {

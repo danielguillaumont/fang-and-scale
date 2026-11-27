@@ -27,6 +27,7 @@ import re
 from pathlib import Path
 from typing import Final
 
+from fns.inputcap import MAX_RECORD_BYTES, read_capped
 from fns.journal.sqlite import SqliteJournal
 from fns.models.assertions import AssertionSet, StrikeObservation
 from fns.models.strike_record import StrikeRunRecord
@@ -46,8 +47,10 @@ class AfterStrikeError(ValueError):
 
 def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObservation]:
     try:
-        plan = StrikePlan.model_validate_json((directory / PLAN_FILE).read_bytes())
-        run = StrikeRunRecord.model_validate_json((directory / RUN_FILE).read_bytes())
+        plan = StrikePlan.model_validate_json(read_capped(directory / PLAN_FILE, MAX_RECORD_BYTES))
+        run = StrikeRunRecord.model_validate_json(
+            read_capped(directory / RUN_FILE, MAX_RECORD_BYTES)
+        )
     except (OSError, ValueError) as exc:
         raise AfterStrikeError(f"not a strike run directory: {exc}") from exc
     if run.run_id != plan.run_id:

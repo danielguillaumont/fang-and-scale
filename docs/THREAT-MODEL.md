@@ -42,9 +42,14 @@ so hostile code can simply not call it.
   are read-only by default.
 - **This repository.** `main` has branch protection (no force pushes, no
   deletion), and CODEOWNERS names the owner as the reviewer of every file.
-  Reviews are not *required*: there is one maintainer (Open gaps).
+  The three CI checks are required: a PR can't merge while CI is red
+  (2026-11-27). Reviews are not *required*: there is one maintainer (Open gaps).
 - **Releases.** A release is a draft that a person publishes. It ships with a
   CycloneDX SBOM and `SHA256SUMS`, and is built from a tag after the full check.
+  Every release file has a build provenance attestation (Sigstore, signed with
+  the release workflow's OIDC identity, by `actions/attest-build-provenance`
+  pinned by SHA): `gh attestation verify <file> --repo <owner>/fang-and-scale`
+  shows it was built by `release.yml` from this repository at that tag.
 - **The executor.** Its identities hold lab RBAC only, so even unchecked code
   acting as them reaches only the lab.
 
@@ -52,9 +57,10 @@ so hostile code can simply not call it.
 - **The gate is not a sandbox.** It stops *this* code from leaving the scope. It
   cannot stop other code in the same process. Do not run `fns` with a login that
   can reach production.
-- **`SHA256SUMS` sits in the same release as the files it covers**, so it shows
-  a download was not corrupted, not who built it. A Sigstore attestation of the
-  release files would show who built them; it is not done yet (Open gaps).
+- **The attestation says which workflow built a file, not that its code was
+  reviewed.** Reviews are not required (Open gaps), so one account can change
+  `release.yml` or the code and tag the result. `SHA256SUMS` alone, in the same
+  release as the files it covers, shows only that a download was not corrupted.
 - **The verifier runs on the same machine as the prover.** It has no credentials
   and imports no prover code, but a fully compromised machine controls both.
 
@@ -81,13 +87,19 @@ so hostile code can simply not call it.
 - **No real identifiers.** `tests/fixtures/test_no_real_ids.py` fails on
   non-placeholder tenant IDs and real email addresses in committed fixtures. The
   sanitizer's ID map is never committed.
+- **Size caps.** Every JSON and YAML file is read through `fns.inputcap`, which
+  refuses a file over its cap from its size, before reading it: 64 MiB for
+  snapshots, fixture exchanges and strike recordings, 16 MiB for everything the
+  tool writes and reads back, 1 MiB for YAML. `tests/test_input_caps.py` fails if
+  a module reads a JSON or YAML file any other way.
 
 **What does not:**
 - **A fixture can claim anything about its fake tenant.** "FIXTURE" means "not
   observed": a fixture's verdicts are evidence about the fixture, never about a
   tenant. `fns demo` says so on every line.
-- **JSON fixture files have no size limit** (YAML files do: 1 MiB). A huge
-  `exchanges.json` can exhaust memory on the machine replaying it (Open gaps).
+- **A file under its cap can still be slow.** 64 MiB of JSON parses into
+  several times that in memory. The cap bounds the damage; it does not make a
+  large fixture cheap.
 
 ## 3. A malicious scope file
 
@@ -208,6 +220,8 @@ run directory by hand, to get a `pass`.*
   plus the signature and every subject digest.
 - **Strike evidence only tightens.** It cannot move a finding toward `pass`
   (`GuardrailError`), and a test re-runs every prove golden to check that.
+- **Size caps.** The verifier reads every run-directory file through
+  `fns.inputcap` (16 MiB each); an oversized file is an integrity failure.
 
 **What does not:**
 - **Consistency is not truth.** A careful forger who writes a consistent run
@@ -239,16 +253,23 @@ run directory by hand, to get a `pass`.*
   `pull_request` event, the PR's own version of the workflow, the action and the
   tool run. A hostile PR can make that check pass or its comment say anything.
   Review the diff, not the comment.
-- **Nothing forces CI to pass before a merge** (Open gaps).
+- **CI is required, reviews are not.** `main` requires the three CI checks, so
+  a red PR can't merge, but one account can still merge its own green PR (Open
+  gaps).
 
 ## Open gaps
 
-The protections these gaps need are not built yet. Each needs a decision before
-it is.
+The protection this gap needs is not in place yet. It needs a decision before it
+is.
 
 | Gap | Effect | Possible fix |
 | --- | --- | --- |
-| JSON inputs (fixtures, run directories, reports) have no size limit | A huge file can exhaust memory on the machine reading it | A size cap like the YAML loader's 1 MiB, sized per file type |
-| Release files are not attested | `SHA256SUMS` shows integrity, not who built them | A Sigstore build attestation in `release.yml`, which needs `id-token: write` |
-| No required status checks on `main` | A PR can merge with CI red | The one command in `docs/PUBLIC-READINESS.md`, "Require CI to pass" |
-| No required reviews on `main` | One account can change the gate, the verifier or a contract alone | Required code-owner review, once there is a second maintainer |
+| No required reviews on `main` | One account can change the gate, the verifier, a contract or `release.yml` alone | Required code-owner review, once there is a second maintainer |
+
+Closed on 2026-11-27 (approved that day):
+
+| Gap | Closed by |
+| --- | --- |
+| JSON inputs had no size limit | `fns.inputcap`, used for every JSON and YAML file; `tests/test_input_caps.py` |
+| Release files were not attested | the build provenance attestation step in `release.yml`; `tests/test_release.py` |
+| No required status checks on `main` | the three CI checks are required on `main` (set by the owner) |

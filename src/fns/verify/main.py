@@ -22,7 +22,14 @@ from fns import __version__
 from fns.exitcodes import ExitCode
 from fns.models.bundle import ArtifactRef, EvidenceBundle, StrikeArtifactRef
 from fns.models.evidence import Finding
-from fns.verify.inputs import ARTIFACTS_DIR, ASSERTIONS_FILE, Inputs, IntegrityError, load_inputs
+from fns.verify.inputs import (
+    ARTIFACTS_DIR,
+    ASSERTIONS_FILE,
+    Inputs,
+    IntegrityError,
+    load_inputs,
+    read_file,
+)
 from fns.verify.signing import (
     SignatureError,
     SignerName,
@@ -178,8 +185,8 @@ def check(
     """Re-verify a finished run. Returns 0 if everything checks out, else 5."""
     try:
         inputs = load_inputs(run_dir)
-        envelope = json.loads((run_dir / ENVELOPE_FILE).read_bytes())
-        signing = json.loads((run_dir / SIGNING_FILE).read_bytes())
+        envelope = json.loads(read_file(run_dir / ENVELOPE_FILE))
+        signing = json.loads(read_file(run_dir / SIGNING_FILE))
         payload = verify_envelope(
             envelope,
             signing,
@@ -188,19 +195,19 @@ def check(
             instance=sigstore_instance,
         )
         standalone = run_dir / SIGSTORE_BUNDLE_FILE
-        if standalone.exists() and json.loads(standalone.read_bytes()) != signing.get(
+        if standalone.exists() and json.loads(read_file(standalone)) != signing.get(
             "sigstore_bundle"
         ):
             raise SignatureError(f"{SIGSTORE_BUNDLE_FILE} differs from {SIGNING_FILE}")
-        if payload != (run_dir / STATEMENT_FILE).read_bytes():
+        if payload != read_file(run_dir / STATEMENT_FILE):
             raise SignatureError("statement file differs from the signed payload")
         stmt = json.loads(payload)
         bundle = EvidenceBundle.model_validate(stmt["predicate"])
-        on_disk = EvidenceBundle.model_validate_json((run_dir / BUNDLE_FILE).read_bytes())
+        on_disk = EvidenceBundle.model_validate_json(read_file(run_dir / BUNDLE_FILE))
         if bundle.canonical_json() != on_disk.canonical_json():
             raise SignatureError("bundle.json differs from the signed predicate")
         for subject in stmt["subject"]:
-            data = (run_dir / subject["name"]).read_bytes()
+            data = read_file(run_dir / subject["name"])
             if hashlib.sha256(data).hexdigest() != subject["digest"]["sha256"]:
                 raise SignatureError(f"subject {subject['name']} does not match its digest")
         rebuilt, _ = build(inputs, identity="check", now=bundle.generated_at)

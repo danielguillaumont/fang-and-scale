@@ -19,12 +19,14 @@ from pathlib import Path
 from fns.adapters.azure.http import Transport
 from fns.adapters.azure.live import HttpTransport
 from fns.fixtures.recorder import Recorder
+from fns.inputcap import read_capped_text
 from fns.inventory.collector import Collector
 from fns.journal.sqlite import SqliteJournal
 from fns.models.scope import load_scope
 from fns.scope.credentials import PinnedTokens, TokenProvider
 from fns.scope.gate import Clock, Gate, SystemClock
 from fns.summary import ScoutResult, write_snapshot
+from fns.yamlio import MAX_BYTES as YAML_MAX_BYTES
 
 
 def run_live_scout(
@@ -70,5 +72,5 @@ def run_live_scout(
     digest, path = write_snapshot(snapshot, out_dir / "snapshots")
     fixture_path = None
     if recorder is not None:
-        fixture_path = recorder.finalize(scope_path.read_text(encoding="utf-8"))
+        fixture_path = recorder.finalize(read_capped_text(scope_path, YAML_MAX_BYTES))
     return ScoutResult(snapshot, digest, path, journal_path, run_id, gate.calls_used, fixture_path)

@@ -19,7 +19,9 @@ from typing import Any, Final, Literal
 from pydantic import Field, ValidationError
 
 from fns.harden import kql
+from fns.inputcap import read_capped_text
 from fns.models.base import FnsModel
+from fns.yamlio import MAX_BYTES as YAML_MAX_BYTES
 from fns.yamlio import YamlError, loads_yaml
 
 Severity = Literal["Informational", "Low", "Medium", "High"]
@@ -84,7 +86,9 @@ def load_rules(directory: Path) -> tuple[list[DetectionRule], list[str]]:
         if path.name == "EXEMPT.yaml":
             continue
         try:
-            rules.append(DetectionRule.model_validate(loads_yaml(path.read_text(encoding="utf-8"))))
+            rules.append(
+                DetectionRule.model_validate(loads_yaml(read_capped_text(path, YAML_MAX_BYTES)))
+            )
         except (ValidationError, YamlError) as exc:
             errors.append(f"{path.name}: invalid: {exc}")
             continue
@@ -97,7 +101,7 @@ def load_exempt(directory: Path) -> dict[str, str]:
     path = directory / "EXEMPT.yaml"
     if not path.exists():
         return {}
-    data = loads_yaml(path.read_text(encoding="utf-8"))
+    data = loads_yaml(read_capped_text(path, YAML_MAX_BYTES))
     if not isinstance(data, dict) or not all(
         isinstance(k, str) and isinstance(v, str) and v.strip() for k, v in data.items()
     ):
@@ -243,7 +247,7 @@ def load_samples(directory: Path) -> tuple[dict[str, RuleSamples], list[str]]:
     for path in sorted((directory / "samples").glob("*.yaml")):
         try:
             found[path.stem] = RuleSamples.model_validate(
-                loads_yaml(path.read_text(encoding="utf-8"))
+                loads_yaml(read_capped_text(path, YAML_MAX_BYTES))
             )
         except (ValidationError, YamlError) as exc:
             errors.append(f"samples/{path.name}: invalid: {exc}")

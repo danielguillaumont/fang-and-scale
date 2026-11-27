@@ -25,8 +25,10 @@ from importlib.resources.abc import Traversable
 from typing import Any, Final
 
 from fns.adapters.azure.http import ApiRequest, ApiResponse, canonical_url
+from fns.inputcap import MAX_JSON_BYTES, MAX_RECORD_BYTES, read_capped, read_capped_text
 from fns.models.base import FnsModel
 from fns.models.ids import TzDatetime
+from fns.yamlio import MAX_BYTES as YAML_MAX_BYTES
 
 FIXTURE_LABEL: Final = "FIXTURE"
 FORMAT: Final = 1
@@ -68,11 +70,13 @@ class FixtureSet:
     @classmethod
     def load(cls, root: Traversable) -> FixtureSet:
         manifest = FixtureManifest.model_validate_json(
-            root.joinpath("manifest.json").read_text("utf-8")
+            read_capped(root.joinpath("manifest.json"), MAX_RECORD_BYTES)
         )
         if manifest.format != FORMAT or manifest.label != FIXTURE_LABEL:
             raise FixtureError("unsupported fixture format or missing FIXTURE label")
-        raw: list[dict[str, Any]] = json.loads(root.joinpath("exchanges.json").read_text("utf-8"))
+        raw: list[dict[str, Any]] = json.loads(
+            read_capped(root.joinpath("exchanges.json"), MAX_JSON_BYTES)
+        )
         exchanges = []
         for ex in raw:
             method, _, url = str(ex["request"]).partition(" ")
@@ -88,7 +92,11 @@ class FixtureSet:
                     ),
                 )
             )
-        return cls(manifest, tuple(exchanges), root.joinpath("scope.yaml").read_text("utf-8"))
+        return cls(
+            manifest,
+            tuple(exchanges),
+            read_capped_text(root.joinpath("scope.yaml"), YAML_MAX_BYTES),
+        )
 
 
 def bundled(name: str) -> Traversable:

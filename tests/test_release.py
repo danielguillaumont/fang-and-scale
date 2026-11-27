@@ -2,8 +2,9 @@
 
 Nothing here tags or publishes. The checks keep the workflow to what was asked:
 it runs only on a ``v*`` tag, refuses a tag that disagrees with the package
-version and changelog, builds and writes an SBOM, and makes a *draft* release
-that a person publishes. It never uploads to PyPI.
+version and changelog, builds and writes an SBOM, attests the build provenance of
+every release file (approved 2026-11-27), and makes a *draft* release that a
+person publishes. It never uploads to PyPI.
 """
 
 from __future__ import annotations
@@ -63,12 +64,25 @@ def test_it_runs_only_on_a_version_tag() -> None:
     assert on == {"push": {"tags": ["v*"]}}
 
 
-def test_permissions_are_read_only_except_the_draft() -> None:
+ATTEST = "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8"
+NEW_PINS = {ATTEST: "v4.2.2"}
+"""Pins used only here, each with its version comment (the provenance attestation)."""
+
+
+def test_permissions_are_read_only_except_the_draft_and_the_attestation() -> None:
     wf = _workflow()
     assert wf["permissions"] == {"contents": "read"}
     (job,) = wf["jobs"].values()
-    assert job["permissions"] == {"contents": "write"}
-    assert "id-token" not in RELEASE.read_text(encoding="utf-8")
+    assert job["permissions"] == {
+        "contents": "write",
+        "id-token": "write",
+        "attestations": "write",
+    }
+    # the OIDC token is for the attestation: no step but that one is an action
+    actions = [s["uses"] for s in _steps() if "uses" in s]
+    assert actions == [
+        u for u in actions if u.startswith(("actions/checkout@", "astral-sh/setup-uv@"))
+    ] + [ATTEST]
 
 
 def test_every_action_is_pinned_like_the_other_workflows() -> None:
@@ -77,8 +91,12 @@ def test_every_action_is_pinned_like_the_other_workflows() -> None:
     others = "\n".join(
         p.read_text(encoding="utf-8") for p in WORKFLOWS.glob("*.yml") if p != RELEASE
     )
+    text = RELEASE.read_text(encoding="utf-8")
     for u in uses:
         assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u), u
+        if u in NEW_PINS:
+            assert f"{u} # {NEW_PINS[u]}" in text, u
+            continue
         assert u in others, f"{u} is pinned nowhere else; reuse an existing pin"
     for s in _steps():
         if s.get("uses", "").startswith("actions/checkout@"):
@@ -98,6 +116,10 @@ def test_it_checks_builds_writes_an_sbom_and_drafts_only() -> None:
     ]
     positions = [text.index(needle) for needle in order]
     assert positions == sorted(positions)
+    names = [s.get("name", "") for s in _steps()]
+    attest = next(s for s in _steps() if s.get("uses") == ATTEST)
+    assert attest["with"] == {"subject-path": "dist/*"}  # wheel, sdist, SBOM and SHA256SUMS
+    assert names.index("Checksums") < names.index(attest["name"]) < names.index("Draft release")
     assert "--draft" in text and "--verify-tag" in text
     for publish in ("uv publish", "twine", "pypa/gh-action-pypi-publish", "--latest"):
         assert publish not in RELEASE.read_text(encoding="utf-8"), publish

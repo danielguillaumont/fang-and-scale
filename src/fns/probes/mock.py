@@ -25,6 +25,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from fns.inputcap import MAX_RECORD_BYTES, read_capped
 from fns.models.assertions import ProbeKind, ProbeObservation, ProbeSpec
 from fns.models.base import FnsModel
 from fns.probes.base import ProbeUnavailableError, observation
@@ -67,7 +68,7 @@ class MockResults(FnsModel):
 
 
 def load_results(path: Path) -> MockResults:
-    return MockResults.model_validate_json(path.read_bytes())
+    return MockResults.model_validate_json(read_capped(path, MAX_RECORD_BYTES))
 
 
 class MockProbe:
