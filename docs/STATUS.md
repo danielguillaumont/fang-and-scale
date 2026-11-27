@@ -19,6 +19,7 @@ Terraform run. To resume, read this section first.
 | #65 | 4 (part 2) | **`fns strike plan | run | cleanup`.** Live mode signs in two identities from two Azure CLI config dirs (agent writes, scout reads), checked before any call. `--fixture fixtures/strike-demo` replays a strict recording, generated from the fake tenant and labelled FIXTURE. ARM targets must carry the lab tags. Proposal for S4's gate rules recorded (pending review) | 1621 |
 | #66 | 4 (part 3) | **`lab/scope.tf` renders the `strike:` block**, only with `enable_strikes = true` (off by default; 1 more resource when on). The seven write forms the built strikes use, the five lab targets by Terraform reference, a 4-hour strike expiry. `lab-check` passes; tests render the template both ways and load it through the engine | 1625 |
 | #67 | 4 (part 4) | **D-1 to D-5 as verdict evidence (D6), with the guardrail.** `fns prove --after-strike <strike run dir>` (and `fns demo prove`) records each after-harden attempt as a frozen, journaled strike observation. The verifier adds a denial as context only. A success against a `must_not_reach` item fails it, and code refuses any verdict that would loosen. A new test re-runs every prove golden with every item struck, all denied and all succeeded: no finding moves toward pass, and denials change no decision. A strike run from another plan, tenant or mode is refused before anything is written. A tampered strike artifact fails `check`. The real `fixtures/strike-demo` after-harden run maps onto exactly the five application and directory items | 1649 |
+| #68 | 5 | **M4 live runbook** (`docs/runbooks/m4-live-run.md`), sessions A to D. It covers: rebuild; monitoring on (workspace, Sentinel, diagnostic settings, the 11 rules); legitimate use and `fns record`; strikes on; S1 to S3 with two CLI profiles; one KQL query per strike plus an alert query (D5); harden and apply; D-1 to D-5; `prove --live --after-strike`; teardown; and an emergency cleanup for every write a strike can make. Exact PowerShell, prompting commands alone, no real values. `tests/test_runbook_m4_live.py` checks every `fns` option, Terraform output, plan count, certificate lifetime and query column against the code. README and M4 plan point to it | 1675 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -28,8 +29,8 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 2. ~~Detection rules~~: sample-row tests (#61), `lab/monitoring.tf` (#62)
 3. ~~Lab group (D3)~~ (#63)
 4. ~~Strike engine~~: core (#64), command and replay (#65), `lab/scope.tf` strike block (#66), D-1 to D-5 as verdict evidence (#67). S4 waits for a decision (Needs Daniel)
-5. **Next:** M4 live runbook
-6. Report and UX
+5. ~~M4 live runbook~~ (#68)
+6. **Next:** Report and UX
 7. v0.1 release prep (no tag, no publish)
 8. ARCHITECTURE and THREAT-MODEL
 9. M6 groundwork (read-only MCP server)
