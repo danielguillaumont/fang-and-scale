@@ -38,6 +38,51 @@ Since then:
 - **A Sigstore verification failure now exits 5** instead of printing a
   traceback (#51).
 
+## Require CI to pass (optional; not applied)
+
+Branch protection on `main` has no required status checks yet. These are the
+checks that run on every pull request, with the names GitHub uses for them
+(read from the check runs of #51):
+
+| Check name | Workflow | Reported by | Require? |
+| --- | --- | --- | --- |
+| `check (ubuntu-latest)` | `ci` | GitHub Actions (app 15368) | **yes**: ruff, mypy, import boundaries, schema drift, pytest |
+| `check (windows-latest)` | `ci` | GitHub Actions | **yes**: the same on Windows (about 5 minutes) |
+| `lab (terraform fmt + validate)` | `ci` | GitHub Actions | **yes**: the lab Terraform, no credentials |
+| `codeql (python)`, `codeql (actions)` | `codeql` | GitHub Actions | optional: they pass even when they raise an alert. Use a code scanning merge rule to gate on alerts instead |
+| `CodeQL` | code scanning results | GitHub Advanced Security (app 57789) | no: it is the alert summary, not a job |
+| `blast radius (fixture)` | `blast-radius` | GitHub Actions | no: it reports and is meant not to gate. Its comment step fails on fork PRs (read-only token) |
+| `prove and sign (Sigstore)` | `prove-sign` | GitHub Actions | no: on PRs it signs on Sigstore staging, an external test service, and it skips fork and Dependabot PRs |
+
+Not PR checks: `prove-sign` on a push to `main` (the production signature) and
+the weekly CodeQL schedule.
+
+To require the three `ci` checks, run this **one** command. It works in
+PowerShell and in bash:
+
+```
+'{"required_status_checks":{"strict":true,"checks":[{"context":"check (ubuntu-latest)","app_id":15368},{"context":"check (windows-latest)","app_id":15368},{"context":"lab (terraform fmt + validate)","app_id":15368}]},"enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null,"allow_force_pushes":false,"allow_deletions":false}' | gh api -X PUT repos/danielguillaumont/fang-and-scale/branches/main/protection --input -
+```
+
+What it does:
+
+- `PUT .../protection` replaces the whole classic rule, so the command restates
+  what is on now: force pushes and deletion stay blocked, there are no required
+  reviews, and every other option stays off.
+- `app_id` 15368 is GitHub Actions. Only a check reported by Actions under that
+  name counts, so another app can't satisfy it.
+- `strict: true` means a PR must be up to date with `main` before it merges.
+  Run `gh pr update-branch <n>` when `main` has moved. Use `false` if that gets
+  in the way.
+- `enforce_admins: false` leaves you, as admin, a deliberate bypass
+  (`gh pr merge --admin`). Set it to `true` if the rule should bind you too.
+- Skipped jobs count as passed, and none of the three is ever skipped.
+
+Read it back with
+`gh api repos/danielguillaumont/fang-and-scale/branches/main/protection/required_status_checks`.
+`tests/test_public_readiness.py` checks that the command's JSON parses and that
+its three names are exactly the jobs `ci.yml` runs on pull requests.
+
 The audit as written before the change of visibility follows, unchanged except
 where marked *(updated)*.
 
