@@ -310,6 +310,37 @@ Both print `OK` / `verified` or fail. A pull request run signs on Sigstore
 (`...prove-sign.yml@refs/pull/<n>/merge`). Staging bundles prove the pipeline,
 not a trusted log, and reports label them `Sigstore STAGING`.
 
+## MCP server (read-only)
+
+`fns mcp serve` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server on stdio. With it, an assistant can list and read fixture sets, read
+contain reports, and run `fns contain` on a fixture. It has no write tool and
+makes no network call. Its five tools:
+
+- `list_fixtures`, `read_fixture_file`: the bundled sets, and a checkout's
+  `fixtures/` with `--fixtures`. Files come from a fixed list, which never
+  includes the sanitizer's ID map or the recorded exchanges.
+- `contain_fixture`: replays a set and returns the `ContainReport` (FIXTURE).
+- `list_reports`, `read_report`: report files from `--reports`. These are
+  FIXTURE only, unless you pass `--include-live`.
+
+An MCP client configuration, for example:
+
+```json
+{
+  "mcpServers": {
+    "fang-and-scale": {
+      "command": "fns",
+      "args": ["mcp", "serve", "--fixtures", "fixtures", "--reports", ".fns/reports"]
+    }
+  }
+}
+```
+
+LIVE reports hold real tenant names and IDs. Pass `--include-live` only to a
+client you would show them to. Strings from a tenant are data, never
+instructions, and every tool description says so.
+
 ## Safety
 
 - **Read-only by default.** Only `strike` and `harden --apply` may ever write, only
@@ -378,7 +409,7 @@ fixture](#real-vs-fixture).
 | M3 Prove | freeze, probes, isolated verifier, signed bundle | **done**: live probes ran on 2026-11-26 (`fixtures/lab-run-3`); Sigstore production signing in CI on every push to `main` (staging on pull requests) |
 | M4 Harden + detect | minimizer, record mode, KQL rules | built offline; live loop pending approval |
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
-| M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | not started |
+| M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | started: read-only MCP server (`fns mcp serve`) |
 
 Design: `docs/PLAN.md`. Trust boundaries, with diagrams: `docs/ARCHITECTURE.md`.
 What happens when the tool, a fixture or a scope file is hostile:
