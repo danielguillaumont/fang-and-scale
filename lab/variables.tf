@@ -79,3 +79,20 @@ variable "budget_amount" {
     error_message = "budget_amount must be between 1 and 100."
   }
 }
+
+variable "enable_monitoring" {
+  description = "M4 sessions B to D: a Log Analytics workspace with Sentinel, diagnostic settings for the Activity Log, Key Vault, blobs and Entra, and the rules from detections/ (lab/monitoring.tf). Starting Sentinel starts its 31-day trial."
+  type        = bool
+  default     = false
+}
+
+variable "monitoring_daily_quota_gb" {
+  description = "Daily ingestion cap of the lab workspace in GB (M4). The lab logs megabytes a day; the cap only limits a runaway."
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.monitoring_daily_quota_gb >= 0.1 && var.monitoring_daily_quota_gb <= 10
+    error_message = "monitoring_daily_quota_gb must be between 0.1 and 10."
+  }
+}

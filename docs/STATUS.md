@@ -13,15 +13,15 @@ Terraform run. To resume, read this section first.
 | --- | --- | --- | --- |
 | #60 | 1 | **M4 step 1 passed; D1 stands.** FINDINGS rows and section "M4 log path check" (both categories export on Entra ID Free; `clientAssertion`; a key's add and delete share one operation name). Runbook corrections (`az group show -n rg-fns-lab`, the expected values, an audit query that tells add from delete, prompting commands pasted alone). M4-plan step 1 marked passed | 1404 |
 | #61 | 2 (part 1) | **Detection rules tested against sample rows.** `fns.harden.kql`, a small KQL evaluator that refuses anything it doesn't model; `detections/samples/<id>.yaml` for every rule, each with rows that must alert and rows that must not; `fns detections check` runs them. `app-credential-added-by-workload` no longer fires on a key delete. New rule `workload-sign-in-with-secret` for S4. Mutation tests show the samples catch the delete, a certificate sign-in, and an ignored failure | 1471 |
+| #62 | 2 (part 2) | **`lab/monitoring.tf` (D2)**, off by default (`enable_monitoring`). Workspace with Sentinel, Activity Log, Key Vault, blob and Entra diagnostic settings, and one scheduled rule per `detections/` file from the generated `lab/detections.json` (`fns detections export --terraform`, with `--check`). 18 more resources when on. `lab-check` passes; tests check every rule's table is fed, the rules are exactly `detections/`, and nothing deploys by default | 1482 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
 ### Queue position
 
 1. ~~Log path check results~~ (#60)
-2. Detection rules: ~~sample-row tests~~ (#61); **next:** the rules and log
-   plumbing as Terraform, `lab/monitoring.tf` (D2)
-3. Lab group (D3)
+2. ~~Detection rules~~: sample-row tests (#61), `lab/monitoring.tf` (#62)
+3. **Next:** lab group (D3)
 4. Strike engine
 5. M4 live runbook
 6. Report and UX
@@ -43,7 +43,10 @@ Choices made where the plans are silent, marked "pending review" in
 - `app-credential-added-by-workload` alerts when it can't tell an add from a
   delete (#61);
 - `workload-sign-in-with-secret` alerts on any credential type other than the
-  three key-based ones, rather than only on `clientSecret` (#61).
+  three key-based ones, rather than only on `clientSecret` (#61);
+- a 1 GB daily ingestion cap on the lab workspace (#62);
+- the monitored identities list both object and client IDs, until session B
+  shows what `AzureActivity.Caller` holds (#62).
 
 # Status after the M3 live run (2026-11-26)
 

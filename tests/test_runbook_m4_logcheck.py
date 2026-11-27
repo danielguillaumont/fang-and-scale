@@ -71,6 +71,14 @@ def test_the_expected_plan_count_matches_the_lab() -> None:
         "time_static.budget_start",
         "azurerm_consumption_budget_subscription.lab",
         "azuread_application_federated_identity_credential.scout_github",
+        # lab/monitoring.tf (enable_monitoring = false by default)
+        "azurerm_log_analytics_workspace.lab",
+        "azurerm_sentinel_log_analytics_workspace_onboarding.lab",
+        "azurerm_monitor_diagnostic_setting.activity_log",
+        "azurerm_monitor_diagnostic_setting.key_vault",
+        "azurerm_monitor_diagnostic_setting.blobs",
+        "azurerm_monitor_aad_diagnostic_setting.entra",
+        "azurerm_sentinel_alert_rule_scheduled.rules",
     }
     copies = {
         "azuread_app_role_assignment.scout_graph": 4,

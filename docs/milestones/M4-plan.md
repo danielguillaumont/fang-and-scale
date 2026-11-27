@@ -243,7 +243,9 @@ role *for the agent*, stays on the roadmap after v0.1.
 ### Session B: logging on, legitimate use, record
 
 **Me (offline, before the session):** `lab/monitoring.tf`, behind
-`enable_monitoring` (default `false`, so the M1 to M3 lab is unchanged):
+`enable_monitoring` (default `false`, so the M1 to M3 lab is unchanged).
+**Built 2026-11-27** (`lab/README.md`, "Monitoring"): 18 more resources when on,
+validated with `lab-check` only:
 
 | Resource | Feeds | Detection rules that read it |
 | --- | --- | --- |
