@@ -169,7 +169,35 @@ def test_prove_after_harden_carries_the_strike_evidence() -> None:
     (line,) = [c for c in _fns_lines() if " prove " in c]
     assert "--live" in line and "--after-strike $dRun" in line
     assert "--record fixtures/lab-run-5" in line
-    assert "exit 3" in _section("### D7.")  # the guardrail keeps the app items inconclusive
+    d7 = _section("### D7.")
+    assert "exit 3" in d7  # listKeys x2, blob/write, the tenant-wide item, SD3
+    assert "five inconclusive" in d7
+    for item in ("credentials/update", "owners/update"):
+        assert item in d7
+    assert "**`pass`**, `verified`, the D-step's 403" in d7
+
+
+def test_session_d_checks_the_pim_precondition_before_the_strikes() -> None:
+    from fns.inventory.collector import PIM_COLLECTOR, PIM_ELIGIBILITY
+    from fns.models.snapshot import CollectorRun, NotApplicable, NotCollected, SnapshotCoverage
+
+    d4 = _section("### D4.")
+    assert "Precondition for D6 and D7" in d4
+    assert f'Where-Object name -eq "{PIM_COLLECTOR}"' in d4
+    assert f'Where-Object surface -eq "{PIM_ELIGIBILITY}"' in d4
+    for field, model in (
+        ("collectors", SnapshotCoverage),
+        ("not_collected", SnapshotCoverage),
+        ("not_applicable", SnapshotCoverage),
+        ("name", CollectorRun),
+        ("status", CollectorRun),
+        ("surface", NotCollected),
+        ("evidence", NotApplicable),
+    ):
+        assert field in model.model_fields, field
+        assert field in d4, field
+    for stop in ("partial", "failed", "skipped", "did not run"):
+        assert stop in d4, stop
 
 
 # --- identities and certificates ------------------------------------------------------

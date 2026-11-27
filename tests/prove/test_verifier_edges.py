@@ -3,9 +3,11 @@
 Coverage, queue item 10. Two groups:
 - integrity refusals in ``fns.verify.inputs``: unfinished probes, artifacts that
   name another probe, rung or mode, and strike artifacts;
-- the D6 guardrail in ``fns.verify.verdict.with_strikes``, as a property over
-  real findings and any strike observations: evidence only grows, a denial
-  changes nothing, and no finding ever moves toward ``pass``.
+- the D6 guardrail in ``fns.verify.verdict.with_strikes``, which takes every
+  strike observation that is not a counting denial: as a property over real
+  findings and any such observations, evidence only grows, a denial changes
+  nothing, and no finding moves toward ``pass``. Counting denials (option B) and
+  the guardrail around them are in ``test_option_b.py``.
 """
 
 from __future__ import annotations

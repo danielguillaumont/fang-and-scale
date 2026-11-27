@@ -17,8 +17,10 @@ about the boundary and is dropped. Each one becomes a
 :class:`~fns.models.assertions.StrikeObservation` per contract item it observes,
 journaled after the freeze as a read step.
 
-The verifier decides what they mean, under the guardrail that a strike can never
-move a finding toward ``pass``.
+The verifier decides what they mean (``fns.verify.verdict``): a LIVE 403 on the
+item's exact operation and object counts like an observed probe denial (option B,
+approved 2026-11-27); every other result is context or fails the finding. Each
+observation carries the planned write's operation and object ID for that check.
 """
 
 from __future__ import annotations
@@ -39,6 +41,11 @@ RUN_FILE: Final = "strike-run.json"
 COUNTED: Final[dict[str, str]] = {"denied": "denied", "unexpected-success": "allowed"}
 CONTRACT_ITEM: Final = re.compile(r"^((?:resource|directory|application):[^\s:]+) (\S+)$")
 """``<kind>:<name> <operation>``, as a contract item's target and operation read."""
+_OBJECT_IN_URL: Final = re.compile(
+    r"/(?:applications|servicePrincipals)/([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})/"
+)
+"""The directory object a Graph write names. The verifier compares it with the
+frozen target's object ID (option B); prove only copies it."""
 
 
 class AfterStrikeError(ValueError):
@@ -72,6 +79,7 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
         if p.strike not in AFTER_HARDEN or p.expect != "denied" or outcome is None:
             continue
         status = w.status
+        object_id = _OBJECT_IN_URL.search(p.request.url)
         for item in p.observes:
             m = CONTRACT_ITEM.match(item)
             if m is None:
@@ -90,6 +98,8 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
                     outcome=outcome,  # type: ignore[arg-type]
                     http_status=status,
                     observed_at=at,
+                    request_operation=p.request.operation,
+                    request_object_id=object_id[1].lower() if object_id else None,
                 )
             )
     return sorted(out, key=lambda o: o.step_key)

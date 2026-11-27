@@ -65,6 +65,8 @@ class PathAssertion(FnsModel):
 
 
 class Assertion(FnsModel):
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"target_object_id"})
+
     finding_id: Hex64 = Field(pattern=r"^[0-9a-f]{64}$")
     item_kind: ItemKind
     target: str = Field(min_length=1)
@@ -76,6 +78,10 @@ class Assertion(FnsModel):
     probes: tuple[ProbeSpec, ...] = ()
     open_surfaces: tuple[str, ...] = ()
     """Uncollected surfaces that could add reach for this operation (blocks a pass, E1)."""
+    target_object_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
+    """The directory object ID of an ``application:`` or ``service_principal:`` target,
+    from the snapshot at freeze. An after-harden strike counts toward a verdict only
+    on this exact object (option B, approved 2026-11-27)."""
 
     @field_validator("paths")
     @classmethod
@@ -190,11 +196,13 @@ class StrikeObservation(FnsModel):
     Written by ``fns prove --after-strike`` from a ``fns strike run`` and stored
     content-addressed under ``artifacts/`` like a probe observation. The verifier
     may only add it to a finding as context (a denial), or make the finding
-    stricter (a success fails it). It never moves a finding toward ``pass``
-    (decision of 2026-11-27).
+    stricter (a success fails it). A LIVE 403 on the item's exact operation and
+    object counts like an observed probe denial (option B, approved 2026-11-27):
+    the verifier decides that, from ``request_operation`` and ``request_object_id``.
     """
 
     __volatile__: ClassVar[frozenset[str]] = frozenset({"observed_at", "request_id"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"request_operation", "request_object_id"})
 
     version: Literal[1]
     mode: Literal["LIVE", "FIXTURE"]
@@ -209,6 +217,10 @@ class StrikeObservation(FnsModel):
     http_status: int | None = None
     request_id: str | None = None
     observed_at: TzDatetime
+    request_operation: str | None = None
+    """The planned write's operation, e.g. ``graph:POST /applications/{id}/addPassword``."""
+    request_object_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
+    """The directory object ID in the planned write's URL (lower case)."""
 
     @property
     def step_key(self) -> str:

@@ -38,7 +38,7 @@ from fns.verify.signing import (
     statement,
     verify_envelope,
 )
-from fns.verify.verdict import judge, summarize, with_strikes
+from fns.verify.verdict import judge_with_strikes, summarize
 
 BUNDLE_FILE: Final = "bundle.json"
 STATEMENT_FILE: Final = "statement.intoto.json"
@@ -63,13 +63,13 @@ def build(inputs: Inputs, *, identity: str, now: datetime) -> tuple[EvidenceBund
         obs = {
             pid: o for pid, o in inputs.observations.items() if any(p.id == pid for p in a.probes)
         }
-        f = judge(a, obs, aset.contract)
         mine = [
             (o, sha)
             for o, sha in inputs.strikes
-            if (o.target, o.operation) == (f.target, f.operation)
+            if (o.target, o.operation) == (a.target, a.operation)
         ]
-        findings.append(with_strikes(f, mine))
+        live = aset.mode == "LIVE"
+        findings.append(judge_with_strikes(a, obs, aset.contract, mine, live=live))
     by_item = {(f.target, f.operation): f.id for f in findings}
     strike_refs = tuple(
         StrikeArtifactRef(

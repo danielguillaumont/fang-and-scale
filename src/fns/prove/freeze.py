@@ -20,7 +20,7 @@ from typing import Final
 from fns.contain import semantics as sem
 from fns.contain.closure import Closure, SnapshotIndex
 from fns.contain.evaluate import DONE
-from fns.contain.resolve import resolve_resource
+from fns.contain.resolve import resolve_object, resolve_resource
 from fns.models.assertions import (
     PROBE_RUNG,
     Assertion,
@@ -141,6 +141,16 @@ def _resource(snapshot: Snapshot, finding: Finding) -> Entity | None:
     return resolve_resource(snapshot, ref).entity
 
 
+def _object_id(snapshot: Snapshot, finding: Finding) -> str | None:
+    """The object ID of an application or service principal target, if it resolves."""
+    kind, _, ref = finding.target.partition(":")
+    entity_kind = {"application": "application", "service_principal": "servicePrincipal"}.get(kind)
+    if entity_kind is None:
+        return None
+    entity = resolve_object(snapshot, entity_kind, ref).entity
+    return None if entity is None else entity.id.lower()
+
+
 def _closure_surfaces(snapshot: Snapshot, compromised: str | None) -> tuple[str, ...]:
     """Open surfaces from what the attacker controls: PIM eligibility (activation is
     not modeled) and Agent ID objects (inheritance is not modeled)."""
@@ -222,6 +232,7 @@ def _assertion(
             *_open_surfaces(snapshot, semantics, target),
             *surfaces,
         ),
+        target_object_id=_object_id(snapshot, finding),
     )
 
 
