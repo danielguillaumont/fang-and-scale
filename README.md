@@ -35,11 +35,27 @@ budget:
   max_critical_reachable: 0
 ```
 
-> **Status.** A personal research project: one maintainer, one lab tenant, no
-> release yet. M1, M2 and M3 are done and ran live. In M3 the probes ran as the
+> **Status.** A personal research project: one maintainer, one lab tenant.
+> Version 0.1.0 is prepared ([CHANGELOG](CHANGELOG.md)) but not tagged or
+> published yet. M1, M2 and M3 are done and ran live. In M3 the probes ran as the
 > assumed-compromised identity itself (`docs/runbooks/m3-live-run.md`). M4 and M5
 > are built and tested offline, against the recorded lab runs and hand-written
 > fixtures. See [Real vs. fixture](#real-vs-fixture) before you trust any result.
+
+## Install
+
+Python 3.12. From a Git tag, with [pipx](https://pipx.pypa.io/) or `uv tool`:
+
+```
+pipx install --python 3.12 "git+https://github.com/danielguillaumont/fang-and-scale@v0.1.0"
+fns demo contain --bundled   # replays the hand-written demo set in the package; no tenant
+```
+
+Until the `v0.1.0` tag exists, use `@main`. Not on PyPI. The
+[quickstart](docs/QUICKSTART.md) walks through `fns demo` in under 5 minutes,
+installed or from a checkout. For keyless Sigstore signing
+(`fns prove --sign sigstore`), install the extra:
+`"fang-and-scale[sigstore] @ git+https://github.com/danielguillaumont/fang-and-scale@v0.1.0"`.
 
 ## 90-second demo (no tenant)
 

@@ -1,6 +1,6 @@
 [project]
 name = "fang-and-scale"
-version = "0.0.1"
+version = "0.1.0"
 description = "Unit tests for breach blast radius in Microsoft Entra and Azure."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
@@ -107,7 +107,12 @@ scout.cmd = "fns scout --scope scope.lab.yaml"
 scout.help = "Live read-only scout of the lab (needs az login, see README)"
 
 demo.cmd = "fns demo scout"
-demo.help = "Replay the recorded lab run fixtures/lab-run-2 through scout (no tenant needed)"
+demo.help = "Replay the recorded lab run fixtures/lab-run-3 through scout (no tenant needed)"
+
+release-check.cmd = "python scripts/release_check.py"
+release-check.help = "Version, changelog and lock agree (the release workflow adds the tag)"
+sbom.cmd = "uv export --frozen --format cyclonedx1.5 --no-dev --all-extras --output-file dist/sbom.cdx.json"
+sbom.help = "Write the CycloneDX SBOM of the runtime dependencies to dist/ (as the release does)"
 
 # ---------------------------------------------------------------------------
 [tool.ruff]

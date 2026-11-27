@@ -781,15 +781,40 @@ replay it by default, so they need a repository checkout; the hand-written demo-
 set is for tests."""
 
 
-def _need_fixture(fixture: Path, err: Any) -> None:
+_BUNDLED_OPT = typer.Option(
+    "--bundled",
+    help="Replay the hand-written demo set shipped in the package (works without a checkout).",
+)
+
+
+def _need_fixture(fixture: Path, err: Any, *, bundled: bool = False) -> Path:
+    """The fixture set to replay: ``--fixture``, or with ``--bundled`` the packaged one.
+
+    ``pipx install`` users have no ``fixtures/`` directory; ``--bundled`` gives them the
+    hand-written ``demo-scout`` set that ships in the package, and the line printed
+    says so. Without it, a missing set is an error, as before.
+    """
+    if bundled:
+        if fixture != LAB_RUN:
+            err.print("choose --fixture or --bundled, not both", style="fns.fail", markup=False)
+            raise typer.Exit(ExitCode.USAGE)
+        from fns.fixtures.replay import bundled as bundled_set
+
+        err.print(
+            "replaying the bundled hand-written demo set (not a recorded lab run)",
+            style="fns.muted",
+            markup=False,
+        )
+        return Path(str(bundled_set("demo-scout")))
     if not fixture.joinpath("manifest.json").is_file():
         err.print(
             f"no fixture set at {fixture.as_posix()}: run from a repository checkout, "
-            "or pass --fixture <recorded set>",
+            "or pass --fixture <recorded set>, or --bundled",
             style="fns.fail",
             markup=False,
         )
         raise typer.Exit(ExitCode.INVALID_INPUT)
+    return fixture
 
 
 @demo_app.command("scout")
@@ -798,6 +823,7 @@ def demo_scout(
         ".fns"
     ),
     fixture: Annotated[Path, typer.Option(help="Recorded fixture set to replay.")] = LAB_RUN,
+    bundled: Annotated[bool, _BUNDLED_OPT] = False,
 ) -> None:
     """Replay a recorded lab run through the scope gate and collector (labelled FIXTURE)."""
     from pydantic import ValidationError
@@ -811,7 +837,7 @@ def demo_scout(
 
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
-    _need_fixture(fixture, err)
+    fixture = _need_fixture(fixture, err, bundled=bundled)
     try:
         result = run_demo_scout(out, fixture)
     except (
@@ -845,6 +871,7 @@ def demo_contain(
     alternatives: Annotated[
         int, typer.Option(min=0, max=3, help="Alternative paths to print per failure.")
     ] = 0,
+    bundled: Annotated[bool, _BUNDLED_OPT] = False,
 ) -> None:
     """Replay a fixture through scout, then run `fns contain` on it (labelled FIXTURE).
 
@@ -863,7 +890,7 @@ def demo_contain(
 
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
-    _need_fixture(fixture, err)
+    fixture = _need_fixture(fixture, err, bundled=bundled)
     try:
         c = load_contract(contract) if contract is not None else None
         _scout, report = run_demo_contain(out, fixture, c)
@@ -964,6 +991,7 @@ def demo_report(
     lab: Annotated[
         Path, typer.Option(help="Lab Terraform, for the mutation section (skipped if missing).")
     ] = Path("lab"),
+    bundled: Annotated[bool, _BUNDLED_OPT] = False,
 ) -> None:
     """Run contain and prove (and mutate, for a lab fixture) on a fixture; write the HTML report.
 
@@ -985,7 +1013,7 @@ def demo_report(
 
     con = FixtureConsole(make_console())
     err = FixtureConsole(make_console(stderr=True))
-    _need_fixture(fixture, err)
+    fixture = _need_fixture(fixture, err, bundled=bundled)
     try:
         scout, contain_report = run_demo_contain(out, fixture)
         snap = scout.snapshot
@@ -1037,6 +1065,7 @@ def demo_prove(
     ] = LAB_RUN,
     sign: Annotated[str, typer.Option(help="offline-test or none.")] = "offline-test",
     after_strike: Annotated[Path | None, _AFTER_STRIKE_OPT] = None,
+    bundled: Annotated[bool, _BUNDLED_OPT] = False,
 ) -> None:
     """Replay a fixture, freeze assertions, replay probe results, verify (FIXTURE).
 
@@ -1058,7 +1087,7 @@ def demo_prove(
     if sign not in {"offline-test", "none"}:
         err.print("the demo signs offline only (offline-test or none)", style="fns.fail")
         raise typer.Exit(ExitCode.USAGE)
-    _need_fixture(fixture, err)
+    fixture = _need_fixture(fixture, err, bundled=bundled)
     try:
         scout_result = run_demo_scout(out, fixture)
         c = demo_contract(fixture)
