@@ -23,6 +23,9 @@ version may change file formats; each change is listed here.
   record the planned write's operation and object ID. All three fields are
   omitted when empty. The lab-run prove bundle digests change for that reason
   only; no verdict changes.
+- The release workflow attests the build provenance in its own job, which runs
+  only two pinned actions, so no other step can mint the signing token. The
+  check, build and draft run in jobs without `id-token: write`.
 - The M4 runbook checks the PIM precondition before session D's strikes, and its
   expected results now include `listKeys` and `blob/write`. With them, session D
   still exits 3.

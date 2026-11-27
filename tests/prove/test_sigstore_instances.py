@@ -523,8 +523,10 @@ def test_id_token_is_granted_on_one_job_only() -> None:
 
 RELEASE_WORKFLOW = WORKFLOWS / "release.yml"
 """The one other workflow that may mint an OIDC token: the release's build provenance
-attestation (approved 2026-11-27). Its certificate names ``release.yml`` on a tag, so
-it can never pass as the prove identity, which names ``prove-sign.yml`` on ``main``."""
+attestation (scope approved 2026-11-27). Its certificate names ``release.yml`` on a
+tag, so it can never pass as the prove identity, which names ``prove-sign.yml`` on
+``main``. Only its ``attest`` job has ``id-token: write``, and that job runs two
+pinned actions and no shell step, so no other step can mint a token."""
 
 
 @pytest.mark.parametrize("path", sorted(WORKFLOWS.glob("*.yml")), ids=lambda p: p.name)
@@ -535,10 +537,19 @@ def test_no_other_workflow_can_mint_an_oidc_token(path: Path) -> None:
     grants = [p for p in perms if isinstance(p, dict) and p.get("id-token") == "write"]
     if path == RELEASE_WORKFLOW:
         assert _triggers(doc) == {"push": {"tags": ["v*"]}}  # a maintainer's tag only
-        (job,) = doc["jobs"].values()
+        minting = [
+            n for n, j in doc["jobs"].items() if (j.get("permissions") or {}).get("id-token")
+        ]
+        assert minting == ["attest"]
+        job = doc["jobs"]["attest"]
         assert grants == [job["permissions"]]
-        actions = [s["uses"] for s in job["steps"] if "uses" in s]
-        assert actions[-1].startswith("actions/attest-build-provenance@")
+        uses = [s.get("uses", "") for s in job["steps"]]
+        assert [u.split("@")[0] for u in uses] == [
+            "actions/download-artifact",
+            "actions/attest-build-provenance",
+        ]
+        assert all("run" not in s for s in job["steps"])  # no shell step can reach the token
+        assert not {"container", "services", "env", "strategy"} & set(job)
         assert "release.yml" not in PRODUCTION_WORKFLOW_REF
     elif path != WORKFLOW:
         assert grants == [], path.name

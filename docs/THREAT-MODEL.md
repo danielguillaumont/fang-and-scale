@@ -49,7 +49,12 @@ so hostile code can simply not call it.
   Every release file has a build provenance attestation (Sigstore, signed with
   the release workflow's OIDC identity, by `actions/attest-build-provenance`
   pinned by SHA): `gh attestation verify <file> --repo <owner>/fang-and-scale`
-  shows it was built by `release.yml` from this repository at that tag.
+  shows it was built by `release.yml` from this repository at that tag. Only the
+  workflow's `attest` job can mint the signing token, and it runs two pinned
+  actions (download the files, attest them) and no shell step. The full check,
+  the build and the draft run in jobs that cannot mint one, so a hostile test
+  dependency can't attest a file of its own (`tests/test_release.py`,
+  `tests/prove/test_sigstore_instances.py`).
 - **The executor.** Its identities hold lab RBAC only, so even unchecked code
   acting as them reaches only the lab.
 

@@ -14,7 +14,7 @@ Second batch (Daniel's decisions after the option-B plan; marked in DECISIONS):
 | # | Item | State | PR |
 | --- | --- | --- | --- |
 | 7 | Build option B, with the PIM precondition and the runbook's session-D results | done | #82 |
-| 8 | The attestation token reachable from its step only | next | #83 |
+| 8 | The attestation token reachable from its step only | done | #83 |
 
 First batch:
 
@@ -34,26 +34,42 @@ First batch:
   in a later release).
 - Agent ID `not-assessed`: approved and built (#77). Its build choices are pending review in DECISIONS (base types plus `agentIdType`, "controls" like PIM, a modeled reach still fails).
 - S4: approved with conditions, and built (#78): right after S3 in the same run, the token never written anywhere (only `oid` and `roles` journaled), S3's password removed as soon as the token is held, the marker role defined by Terraform, and an emergency cleanup step in the M4 runbook. Tested against the fake tenant only; it has not run live. Its nine build choices are approved (2026-11-27), the unverified-signature claims check on the condition that it is a safety stop only, never verdict evidence (pinned by `tests/prove/test_s4_not_evidence.py`).
-- M4 exit gate: option B, **plan only** (item 6).
+- M4 exit gate: option B, approved as written and **built (#82)**, with: D-2 not
+  counting for the tenant-wide item; the PIM precondition (complete, or not
+  applicable with evidence), pinned by tests and checked in the runbook at D4.
+  Its build choices are pending review in DECISIONS.
+- The release attestation's token scope: approved. #83 narrows it to one job
+  that runs two pinned actions, so no other step can mint the token.
+- Folding "Unreleased" into 0.1.0: approved.
 - **M6 Agent ID licensing and the LLM bake-off: deferred.**
 - Threat model open gaps: size caps and build provenance approved, and built (#79): `fns.inputcap` for every JSON and YAML read, bounded MCP stdin, and a pinned build provenance attestation in `release.yml`. THREAT-MODEL "Open gaps" now lists only required reviews (CI is required on `main`). The build choices are pending review in DECISIONS.
 
 ### Needs Daniel
 
-- **Approve the option-B plan** (`docs/milestones/M4-exit-gate-plan.md`, #81).
-  Nothing is built for it. The plan:
-  - a LIVE D-2 to D-5 denial (403 only, as you decided) on the exact operation
-    and object counts like an observed probe denial, so `pass` still needs
-    every path refuted and no open surface;
-  - FIXTURE, D-1, S4, before-harden strikes and `roleAssignments/write` never
-    count;
-  - no committed golden moves. Two tests change, and a LIVE matrix and one
-    negative row per condition are added.
+- **Session D still exits 3, even with option B** (found while building #82;
+  `tests/prove/test_option_b.py`, `test_the_rest_of_the_contract_after_harden`).
+  The four application items now `pass`. Five items stay `inconclusive`, against
+  `max_inconclusive: 2`:
+  - payroll `listKeys` and invoices `listKeys`: only the permissions API
+    evaluates them after harden, and nothing observes a denial (SD4's note
+    said the probes did; they don't);
+  - invoices `blob/write` (must still do): an observed success needs a write;
+  - `directory:tenant applications/credentials/update`: one app is not every
+    app (your decision);
+  - `roleAssignments/write`: SD3.
 
-  Two open points: (1) D-2 does not count for the tenant-wide
-  `directory:tenant applications/credentials/update` (one app is not every
-  app); (2) whether collecting `pim-eligibility` becomes a precondition of
-  session D, since an open surface keeps the gate at exit 3.
+  The plan counted two, because it missed the first three. Nothing was
+  loosened. Possible next steps, each its own decision:
+  - **a.** A D-step `listKeys` attempt on both storage accounts after harden,
+    expecting 403. S1's write form already exists. It would count under option
+    B only if `listKeys` rows are added to the exact-operation table.
+  - **b.** Accept `blob/write` on `fns record`'s logged evidence (rung 4) from
+    session B. Today `prove` doesn't use it.
+  - **c.** Raise the lab contract's `max_inconclusive`, with a reason per item.
+- **The v0.1.0 tag commit.** See the commands below and the last note there:
+  tagging #81's commit keeps 0.1.0 as dated, with the job-level token you
+  approved. Tagging `main` after #83 would need option B and #83 folded into
+  0.1.0 first.
 - **Tag and publish v0.1.0** (prepared in #80; nothing is tagged or published).
   `CHANGELOG.md` is dated 2026-11-27, with the earlier "Unreleased" entries folded
   into 0.1.0 because the tag ships them, and `uv run poe release-check` prints
@@ -79,6 +95,12 @@ First batch:
     DECISIONS). #82 changed the verdict rules after 0.1.0 was dated, so `main`
     holds more than the 0.1.0 section lists. `git switch --detach` checks out
     that commit; `git switch main` goes back after tagging it.
+  - A tag runs the `release.yml` of the commit it names. So v0.1.0 attests from
+    one job holding `id-token: write` for every step, which is the scope you
+    approved. #83's split (only the attest job can mint the token) applies from
+    the next tag. To have it in v0.1.0 instead, tag `main` after #83. The
+    "Unreleased" entries (option B and the split) would then need folding into
+    0.1.0 first. That is your choice; tell me and it is one docs PR.
   - `release-check` must print `release check: ok` before you tag.
   - The workflow runs the full check, builds, writes the SBOM and
     `SHA256SUMS`, attests every file and creates a **draft**. `gh run watch`
