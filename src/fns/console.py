@@ -8,9 +8,13 @@ default text/background so output stays readable on light and dark terminals.
 from __future__ import annotations
 
 import io
-from typing import IO, Final
+import re
+from collections.abc import Iterable
+from typing import IO, Any, Final
 
-from rich.console import Console
+from rich.console import Console, ConsoleOptions, RenderableType
+from rich.segment import Segment
+from rich.text import Text
 from rich.theme import Theme
 
 from fns import __version__
@@ -47,6 +51,47 @@ BANNER: Final = r"""
 TAGLINE: Final = "Challenge the defence. Reduce the damage. Prove the improvement."
 
 
+UNSAFE_CHARS: Final = re.compile(
+    r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]"
+)
+"""C0 and C1 controls (but tab and newline), DEL, and the bidi controls that reorder text."""
+
+
+def _escape(m: re.Match[str]) -> str:
+    code = ord(m[0])
+    return f"\\x{code:02x}" if code < 0x100 else f"\\u{code:04x}"
+
+
+def visible_controls(text: str) -> str:
+    """Show control characters as escapes (``\\x1b``) instead of sending them to the terminal."""
+    return UNSAFE_CHARS.sub(_escape, text)
+
+
+class SafeConsole(Console):
+    """A Rich console that never passes control characters from data to the terminal.
+
+    Tenant strings (display names, descriptions) are untrusted: an ESC in one could
+    recolour, hide or overwrite lines. Rich adds its own escape codes from styles
+    only when it writes the buffer, so a control character found in a segment's
+    text came from the data, and is shown as an escape instead
+    (``docs/THREAT-MODEL.md``, section 5).
+    """
+
+    def render_str(self, text: str, **kwargs: Any) -> Text:
+        # Before layout, so tables size their columns for the escaped text.
+        return super().render_str(visible_controls(text), **kwargs)
+
+    def render(
+        self, renderable: RenderableType, options: ConsoleOptions | None = None
+    ) -> Iterable[Segment]:
+        # After layout: a backstop for Text objects built from data elsewhere.
+        for seg in super().render(renderable, options):
+            if seg.control is None and seg.text and UNSAFE_CHARS.search(seg.text):
+                yield Segment(visible_controls(seg.text), seg.style)
+            else:
+                yield seg
+
+
 def make_console(
     *,
     file: IO[str] | None = None,
@@ -54,7 +99,7 @@ def make_console(
     force_terminal: bool | None = None,
 ) -> Console:
     """Build a themed console. Rich honours NO_COLOR and non-TTY output itself."""
-    return Console(
+    return SafeConsole(
         theme=THEME,
         file=file,
         stderr=stderr,
@@ -100,7 +145,7 @@ class FixtureConsole:
         from rich.text import Text
 
         buf = _EncodedBuffer(self.console.encoding)
-        inner = Console(
+        inner = SafeConsole(
             theme=THEME,
             file=buf,
             width=max(40, self.console.width - len(self.LABEL) - 1),

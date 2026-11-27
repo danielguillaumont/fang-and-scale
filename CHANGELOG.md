@@ -24,6 +24,13 @@ version may change file formats; each change is listed here.
   scope file, a contract, tenant data, a run directory or a pull request is
   hostile, including what does not hold.
 
+### Fixed
+
+- Terminal output shows control characters from tenant strings (ESC, other C0
+  and C1 controls, DEL, bidi controls) as visible escapes instead of passing
+  them to the terminal, where a crafted display name could hide or rewrite
+  lines. The HTML report, JSON files and PR comment were not affected.
+
 ## [0.1.0] - not tagged yet
 
 The first release: contracts, the reach model, read-only probes with signed
