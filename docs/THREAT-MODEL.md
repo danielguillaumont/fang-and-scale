@@ -174,9 +174,11 @@ edit an object in the tenant.*
   newlines in one pass.
 - **Paging.** A `nextLink` is checked by the gate like any URL. If it is denied,
   the collector fails and discards the earlier pages.
-- **No LLM.** No language model reads tenant data in 0.1.0. When one does (M6
-  bake-off), it sits on the proposer side, with no write credentials and no
-  route to the verifier.
+- **The model as a reader only.** No language model reads tenant data in
+  0.1.0, except through the MCP server, if an operator connects one. That server
+  is read-only and every tool description marks tenant strings as data. When the
+  M6 bake-off adds a proposer, it gets no write credentials and no route to the
+  verifier.
 
 Tests: `tests/test_report_html.py`, `tests/test_report_strikes.py`,
 `tests/test_action.py`, `tests/scope/test_gate_fuzz.py`.
