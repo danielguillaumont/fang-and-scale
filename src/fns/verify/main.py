@@ -23,13 +23,23 @@ from fns.exitcodes import ExitCode
 from fns.models.bundle import ArtifactRef, EvidenceBundle
 from fns.models.evidence import Finding
 from fns.verify.inputs import ARTIFACTS_DIR, ASSERTIONS_FILE, Inputs, IntegrityError, load_inputs
-from fns.verify.signing import SignatureError, SignerName, sign, statement, verify_envelope
+from fns.verify.signing import (
+    SignatureError,
+    SignerName,
+    SigstoreInstance,
+    sign,
+    statement,
+    verify_envelope,
+)
 from fns.verify.verdict import judge, summarize
 
 BUNDLE_FILE: Final = "bundle.json"
 STATEMENT_FILE: Final = "statement.intoto.json"
 ENVELOPE_FILE: Final = "bundle.dsse.json"
 SIGNING_FILE: Final = "signing.json"
+SIGSTORE_BUNDLE_FILE: Final = "bundle.sigstore.json"
+"""The Sigstore bundle on its own, for ``sigstore verify`` and other clients.
+A copy of ``signing.json``'s ``sigstore_bundle``; ``check`` refuses a mismatch."""
 
 Print = Callable[[str], None]
 
@@ -107,6 +117,8 @@ def run(
     _write(run_dir / STATEMENT_FILE, payload)
     _write(run_dir / ENVELOPE_FILE, _json_bytes(signed.envelope))
     _write(run_dir / SIGNING_FILE, _json_bytes(signed.signing))
+    if "sigstore_bundle" in signed.signing:
+        _write(run_dir / SIGSTORE_BUNDLE_FILE, _json_bytes(signed.signing["sigstore_bundle"]))
     render(bundle, signed.signing, out)
     return bundle.summary.exit_code
 
@@ -146,6 +158,7 @@ def check(
     echo: Print = print,
     sigstore_identity: str | None = None,
     sigstore_issuer: str | None = None,
+    sigstore_instance: SigstoreInstance | None = None,
 ) -> int:
     """Re-verify a finished run. Returns 0 if everything checks out, else 5."""
     try:
@@ -157,7 +170,13 @@ def check(
             signing,
             sigstore_identity=sigstore_identity,
             sigstore_issuer=sigstore_issuer,
+            instance=sigstore_instance,
         )
+        standalone = run_dir / SIGSTORE_BUNDLE_FILE
+        if standalone.exists() and json.loads(standalone.read_bytes()) != signing.get(
+            "sigstore_bundle"
+        ):
+            raise SignatureError(f"{SIGSTORE_BUNDLE_FILE} differs from {SIGNING_FILE}")
         if payload != (run_dir / STATEMENT_FILE).read_bytes():
             raise SignatureError("statement file differs from the signed payload")
         stmt = json.loads(payload)

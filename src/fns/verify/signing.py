@@ -4,8 +4,9 @@
   only; anyone can make another. Always labelled ``TEST SIGNATURE``.
 - ``sigstore``: keyless signing with sigstore-python 4.x and the ambient OIDC
   token (GitHub Actions). Optional extra; Sigstore itself is only reached from
-  CI (M3 E5). **Staging only** (decision V3): ``FNS_SIGSTORE_INSTANCE`` selects
-  the instance, and production is refused until the owner approves it.
+  CI (M3 E5). ``FNS_SIGSTORE_INSTANCE`` selects the instance (decision V3):
+  ``staging`` by default; ``production`` signs only from ``prove-sign.yml`` on a
+  push to ``main`` of this repository. Verification works on either, anywhere.
 - ``none``: the statement is written unsigned, and says so.
 """
 
@@ -37,10 +38,15 @@ STAGING_WARNING: Final = (
     "SIGSTORE STAGING: signed on Sigstore's test instance; proves the pipeline, "
     "not a trusted public log"
 )
-PRODUCTION_APPROVED: Final = False
-"""V3: production Fulcio and Rekor only after the owner's explicit approval
-(docs/DECISIONS.md). Until then a production request is refused before any
-network contact, for signing and for verification alike."""
+PRODUCTION_REPOSITORY: Final = "danielguillaumont/fang-and-scale"
+PRODUCTION_WORKFLOW_REF: Final = (
+    f"{PRODUCTION_REPOSITORY}/.github/workflows/prove-sign.yml@refs/heads/main"
+)
+"""V3 (approved once the repository went public): production Fulcio and Rekor
+sign only from this workflow on ``main``. The check reads the GitHub Actions
+environment, so it stops mistakes (a local run, a fork, a pull request), not an
+attacker who sets the variables: the certificate's identity is the real proof,
+and verifiers pin it to :data:`PRODUCTION_WORKFLOW_REF`."""
 
 
 class SignatureError(RuntimeError):
@@ -125,27 +131,45 @@ def _sigstore(module: str) -> Any:
 
 
 def sigstore_instance(env: Mapping[str, str] | None = None) -> SigstoreInstance:
-    """The Sigstore instance to use: ``staging`` unless set, production refused (V3)."""
+    """The Sigstore instance to use: ``staging`` unless set otherwise."""
     value = (os.environ if env is None else env).get(INSTANCE_ENV, "staging")
-    if value == "staging":
-        return "staging"
-    if value == "production":
-        if PRODUCTION_APPROVED:  # pragma: no cover - not yet approved
-            return "production"
-        raise SignatureError(
-            "Sigstore production is not enabled: it needs the owner's explicit approval "
-            f"(decision V3, docs/DECISIONS.md). Use {INSTANCE_ENV}=staging"
-        )
+    if value in ("staging", "production"):
+        return value  # type: ignore[return-value]
     raise SignatureError(f"unknown {INSTANCE_ENV} {value!r} (staging or production)")
 
 
-def sign_sigstore(payload: bytes, instance: SigstoreInstance | None = None) -> Signed:
+def check_production_origin(env: Mapping[str, str] | None = None) -> None:
+    """Refuse production signing outside a push to ``main`` in prove-sign.yml."""
+    env = os.environ if env is None else env
+    expected = {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_REPOSITORY": PRODUCTION_REPOSITORY,
+        "GITHUB_REF": "refs/heads/main",
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_WORKFLOW_REF": PRODUCTION_WORKFLOW_REF,
+    }
+    wrong = sorted(k for k, v in expected.items() if env.get(k) != v)
+    if wrong:
+        raise SignatureError(
+            "Sigstore production signs only from prove-sign.yml on a push to main of "
+            f"{PRODUCTION_REPOSITORY} (decision V3); not here: {', '.join(wrong)}. "
+            f"Use {INSTANCE_ENV}=staging"
+        )
+
+
+def sign_sigstore(
+    payload: bytes,
+    instance: SigstoreInstance | None = None,
+    env: Mapping[str, str] | None = None,
+) -> Signed:
     """Keyless signing (sigstore-python 4.x) with the ambient OIDC token.
 
-    The instance is checked before sigstore is imported, so a refused instance
-    never reaches the network.
+    The instance and, for production, the origin are checked before sigstore is
+    imported, so a refused request never reaches the network.
     """
-    instance = sigstore_instance({INSTANCE_ENV: instance} if instance else None)
+    instance = sigstore_instance({INSTANCE_ENV: instance} if instance else env)
+    if instance == "production":
+        check_production_origin(env)
     sign, models, oidc, dsse = (
         _sigstore(m) for m in ("sigstore.sign", "sigstore.models", "sigstore.oidc", "sigstore.dsse")
     )
@@ -184,8 +208,13 @@ def verify_envelope(
     *,
     sigstore_identity: str | None = None,
     sigstore_issuer: str | None = None,
+    instance: SigstoreInstance | None = None,
 ) -> bytes:
-    """Return the verified payload, or raise :class:`SignatureError`."""
+    """Return the verified payload, or raise :class:`SignatureError`.
+
+    A Sigstore bundle is checked against the instance given (else
+    ``FNS_SIGSTORE_INSTANCE``, else staging), never the one it claims.
+    """
     if envelope.get("payloadType") != DSSE_PAYLOAD_TYPE:
         raise SignatureError("unexpected DSSE payload type")
     payload = _unb64(envelope.get("payload"))
@@ -207,7 +236,7 @@ def verify_envelope(
     if signer == "sigstore":
         if not (sigstore_identity and sigstore_issuer):
             raise SignatureError("sigstore verification needs --identity and --issuer")
-        instance = sigstore_instance()
+        instance = sigstore_instance({INSTANCE_ENV: instance} if instance else None)
         recorded = signing.get("sigstore_instance")
         if recorded != instance:
             raise SignatureError(

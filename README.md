@@ -224,7 +224,7 @@ Coverage states: `verified`, `evaluated-only`, `modeled-only`, `not-assessed`,
 | PIM eligibility collector | **Live** in the M2 run, as `not-applicable` with evidence: the lab tenant is Entra ID Free (0 SKUs), and Graph and ARM both answered `400 AadPremiumLicenseRequired`. The `collected` path, in a tenant with P2, is mocked tests only. |
 | Reach engine and contracts (`fns contain`) | **Live** on the M2 snapshot, signed in as the read-only scout: 11 critical reachable, 2 inconclusive, exit 1, the same as the fixture replay. Results are rung 1 (modeled). The replay of `fixtures/lab-run-2` with its contract is a committed regression test. |
 | Prove: probe results | **Live** on the lab, 2026-11-26, signed in as `sp-billing-agent`. There were 14 `GET` and `HEAD` requests through the scope gate, all allowed by it. Result: passed 1 (invoices `blob/read`, observed), critical reachable 11, inconclusive 1, exit 1. The Key Vault and payroll reads were denied when probed, but escalation paths remain, so they still fail. The results are recorded and sanitized as `fixtures/lab-run-3/probes.json`, and its replay is the M3 regression test, with the same verdicts. The `probes.json` in lab-run-1 and lab-run-2 stays hand-written. |
-| Signing | The live run is signed with the offline test key, labelled `TEST`. In CI, `prove-sign` signs the lab-run-3 replay with Sigstore keyless signing on **staging** only, and verifies it against the workflow's identity. Production Sigstore (the public Rekor log) stays off until the repository is public. |
+| Signing | The live run is signed with the offline test key, labelled `TEST`. In CI, `prove-sign` signs the lab-run-3 replay with Sigstore keyless signing: **production** (public Rekor log) on every push to `main`, staging on pull requests. It signs a FIXTURE replay, not a live run. See [Verify a signed result](#verify-a-signed-result). |
 | Harden, mutate | Model only, on the recorded snapshot and `lab/*.tf`. Nothing applied. `fns mutate --harden` on the live M2 snapshot scored 6/8, with the two accepted app-owner survivors. |
 | Record mode | Hand-written sample logs. |
 | Detections | Structural lint only; never deployed. |
@@ -232,6 +232,59 @@ Coverage states: `verified`, `evaluated-only`, `modeled-only`, `not-assessed`,
 
 Anything replayed from a fixture prints `FIXTURE`, and reports built from one say
 so in the title.
+
+## Verify a signed result
+
+Every push to `main` runs `prove-sign`: the isolated verifier judges the recorded
+lab-run-3 replay and signs its evidence bundle with Sigstore keyless signing,
+using the workflow's own GitHub OIDC identity. The entry goes into the public
+Rekor log. The signed run directory is uploaded as the workflow artifact
+`prove-sign-production-<commit sha>` (kept 30 days).
+
+What a valid signature proves: this exact bundle was produced by
+`.github/workflows/prove-sign.yml` on `main` of this repository, at the commit
+in the certificate. It does not make the result live: the statement says
+`mode: FIXTURE`, and its inputs are the sanitized lab recording.
+
+Download the latest one (any GitHub account can download artifacts of a public
+repository):
+
+```
+sha=$(gh run list -R danielguillaumont/fang-and-scale --workflow prove-sign \
+  --branch main --event push --status success -L 1 --json headSha -q '.[0].headSha')
+gh run download -R danielguillaumont/fang-and-scale -n "prove-sign-production-$sha" -D run
+```
+
+Check the signature with the Sigstore client alone (sigstore-python, the same
+library the workflow signs with). It verifies the certificate chain, the Rekor
+inclusion proof, the signing identity, and that `assertions.json` is a subject of
+the signed in-toto statement:
+
+```
+uvx sigstore@4.6.0 verify github \
+  --bundle run/bundle.sigstore.json \
+  --cert-identity https://github.com/danielguillaumont/fang-and-scale/.github/workflows/prove-sign.yml@refs/heads/main \
+  --repository danielguillaumont/fang-and-scale \
+  --trigger push \
+  run/assertions.json
+```
+
+Then, from a checkout of this repository, re-check everything else: every
+subject digest, and that each verdict follows from the frozen inputs:
+
+```
+uv sync --extra sigstore
+uv run python -m fns.verify check --run run \
+  --sigstore-instance production \
+  --sigstore-identity https://github.com/danielguillaumont/fang-and-scale/.github/workflows/prove-sign.yml@refs/heads/main \
+  --sigstore-issuer https://token.actions.githubusercontent.com
+```
+
+Both print `OK` / `verified` or fail. A pull request run signs on Sigstore
+**staging** instead: add `--staging` before `verify` and use
+`--sigstore-instance staging`, with the pull request's identity
+(`...prove-sign.yml@refs/pull/<n>/merge`). Staging bundles prove the pipeline,
+not a trusted log, and reports label them `Sigstore STAGING`.
 
 ## Safety
 
@@ -267,7 +320,7 @@ so does an internal error, so a crash never looks like a verdict.
 | --- | --- | --- |
 | M1 Lab + contracts | Terraform lab, scope gate, scout, schemas | done, live |
 | M2 Contain | reach engine, escalation rules, settings and PIM collectors | done, live (tag `m2`) |
-| M3 Prove | freeze, probes, isolated verifier, signed bundle | **done**: live probes ran on 2026-11-26 (`fixtures/lab-run-3`); Sigstore signing in CI on **staging** only; production stays off until the repository is public |
+| M3 Prove | freeze, probes, isolated verifier, signed bundle | **done**: live probes ran on 2026-11-26 (`fixtures/lab-run-3`); Sigstore production signing in CI on every push to `main` (staging on pull requests) |
 | M4 Harden + detect | minimizer, record mode, KQL rules | built offline; live loop pending approval |
 | M5 Mutation + CI | mutation score, HTML report, GitHub Action, README | built; v0.1 tag pending |
 | M6 Strike + agents | non-destructive strikes, Agent ID, MCP server | not started |
