@@ -1,3 +1,42 @@
+# Status
+
+## Build session of 2026-11-27
+
+A long offline session working through the owner's queue, one focused PR per
+item. No Azure, Graph or Log Analytics call, no `az` command and no Terraform
+apply or destroy is made; `uv run poe lab-check` (fmt and validate) is the only
+Terraform run. To resume, read this section first.
+
+### Latest changes
+
+| PR | Queue item | Change | Tests after |
+| --- | --- | --- | --- |
+| #60 | 1 | **M4 step 1 passed; D1 stands.** FINDINGS rows and section "M4 log path check" (both categories export on Entra ID Free; `clientAssertion`; a key's add and delete share one operation name). Runbook corrections (`az group show -n rg-fns-lab`, the expected values, an audit query that tells add from delete, prompting commands pasted alone). M4-plan step 1 marked passed | 1404 |
+
+Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
+
+### Queue position
+
+1. ~~Log path check results~~ (#60)
+2. **Next:** detection rules as Terraform (D2)
+3. Lab group (D3)
+4. Strike engine
+5. M4 live runbook
+6. Report and UX
+7. v0.1 release prep (no tag, no publish)
+8. ARCHITECTURE and THREAT-MODEL
+9. M6 groundwork (read-only MCP server)
+10. Hardening and quality
+
+### Needs Daniel
+
+Nothing yet.
+
+### Pending review
+
+Choices made where the plans are silent, marked "pending review" in
+`docs/DECISIONS.md`: none yet.
+
 # Status after the M3 live run (2026-11-26)
 
 ## Milestone results
@@ -92,11 +131,9 @@ limit, explained in the README. Build step 1, the write gate, is built and teste
 offline, with nothing calling it. The places where the build differs from the
 plan are in the strike plan's "Build status".
 
-**Next live step: the log path check**, `docs/runbooks/m4-log-path-check.md`. You
-rebuild the lab, create a workspace and the Entra diagnostic setting, and cause
-one audit event and one sign-in, both by the read-only scout. Then you run the
-KQL and paste the results, and clean up with `lab-down`. The rest of M4 waits on
-its result.
+**The log path check passed on 2026-11-27** (`docs/runbooks/m4-log-path-check.md`):
+both Entra log categories reach Log Analytics on Entra ID Free, so D1 stands and
+no trial is needed. See FINDINGS, "M4 log path check".
 
 ## The morning review (before the M2 and M3 runs)
 

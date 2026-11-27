@@ -302,7 +302,7 @@ The monitored identities are `sp-billing-agent` and `app-escalation-target`.
 | S1 | `MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION` | `storage-listkeys-by-workload` | `AzureActivity` |
 | S2 | `MICROSOFT.KEYVAULT/VAULTS/WRITE` | `keyvault-control-plane-write-by-workload` | `AzureActivity` |
 | S3 | "Update application – Certificates and secrets management" | `app-credential-added-by-workload` | `AuditLogs` |
-| S4 | the target's sign-in | none yet: a rule over `AADServicePrincipalSignInLogs`, if the log path check (M4-plan step 1) shows the table fills | `AADServicePrincipalSignInLogs` |
+| S4 | the target's sign-in | none yet: a rule over `AADServicePrincipalSignInLogs`. The log path check (M4-plan step 1) showed the table fills on Entra ID Free (2026-11-27); a certificate sign-in logs `ClientCredentialType` = `clientAssertion` | `AADServicePrincipalSignInLogs` |
 | S4 | "Add app role assignment to service principal" | `app-role-assignment-by-workload` | `AuditLogs` |
 
 You run one KQL query per strike and paste the result (D5). The runbook gives the

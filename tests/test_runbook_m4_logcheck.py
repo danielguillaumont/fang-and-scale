@@ -160,3 +160,25 @@ def test_the_tool_only_reads() -> None:
 def test_the_m4_plan_and_readme_point_here() -> None:
     for doc in ("docs/milestones/M4-plan.md", "README.md"):
         assert "docs/runbooks/m4-log-path-check.md" in (ROOT / doc).read_text(encoding="utf-8"), doc
+
+
+def test_commands_that_prompt_are_pasted_alone() -> None:
+    # Pasting more lines after lab-up or lab-down answers Terraform's yes prompt (FINDINGS).
+    prompting = [b for b in BLOCKS if re.search(r"poe lab-(up|down)\b", b)]
+    assert len(prompting) >= 3  # step 2, step 10 and the emergency cleanup
+    for block in prompting:
+        lines = [ln.split("#", 1)[0].strip() for ln in block.splitlines()]
+        assert [ln for ln in lines if ln] in (["uv run poe lab-up"], ["uv run poe lab-down"]), block
+
+
+def test_the_2026_11_27_corrections() -> None:
+    assert "az group show --ids" not in TEXT
+    assert "az group show -n rg-fns-lab" in TEXT
+    step8 = _section("## 8. Check that both arrived")
+    assert "`ClientCredentialType` = **`clientAssertion`**" in step8
+    assert "`ClientCredentialType` = `Certificate`" not in TEXT
+    audit = next(c for c in COMMANDS if c.startswith("$qAudit = "))
+    assert "modifiedProperties" in audit
+    assert "Change = case(After > Before, 'add', After < Before, 'delete'" in audit
+    assert "**two** rows" in step8
+    assert "Run on 2026-11-27: passed." in TEXT
