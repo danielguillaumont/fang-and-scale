@@ -14,6 +14,7 @@ over-privileged on purpose.
 | `stinvoices<suffix>` | Storage the agent legitimately uses |
 | `id-verifier` | Reader on the RG; used only by `fns prove` (M3) |
 | `sp-fns-scout` | Read-only scout: Reader on the subscription + Graph read permissions (see the root README) |
+| `grp-<prefix>-billing` | Security group with `sp-billing-agent` as its only member and **no roles** (M4 D3), so the scout's `memberOf` read returns something |
 
 Not in the lab: a deny assignment. Deny assignments cannot be created directly;
 the bundled demo fixture covers them. Logging and the detection rules are in the

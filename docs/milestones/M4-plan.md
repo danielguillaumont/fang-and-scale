@@ -201,7 +201,9 @@ whatever else happens. The comparison has to be on the **same lab state**:
 The lab makes this a weak test: its owners are one user and three service
 principals, and no service principal is in a group, so `memberOf` returns
 nothing either way. D3 adds a lab group with `sp-billing-agent` as a member, so
-`/servicePrincipals/{id}/memberOf` has something to lose.
+`/servicePrincipals/{id}/memberOf` has something to lose. **Built 2026-11-27:**
+`lab/groups.tf`, `grp-fns-billing` with no roles. The default plan is now 37 to
+add.
 
 ### Session A, continued: narrow the scout from Reader to a custom role
 

@@ -84,8 +84,9 @@ uv run poe lab-up
 
 **Review the plan before typing `yes`:**
 
-- **36 to add, 0 to change, 0 to destroy** with the defaults;
-- **38 to add** if you set `budget_alert_email`;
+- **37 to add, 0 to change, 0 to destroy** with the defaults (36 on 2026-11-27;
+  the lab group `grp-fns-billing`, decision D3, added one since);
+- **39 to add** if you set `budget_alert_email`;
 - **one more** if `github_repository` is set, and **one fewer** if
   `scout_directory_read_all = false`.
 
