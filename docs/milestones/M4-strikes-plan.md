@@ -1,7 +1,7 @@
 # M4 strikes plan (K5): `fns strike`
 
-**Status: plan only (decision D4, 2026-11-26). There is no strike code, and none
-is written until you approve this plan and the decisions at its end.** It covers
+**Status: approved 2026-11-26, with SD1 to SD5 (end of this file). Build step 1,
+the write gate, is done (see "Build status"). There is still no strike code.** It covers
 the four lab strikes from `docs/milestones/M4.md` K5, and their re-runs after
 harden (D6). The live order and the log path check are in
 `docs/milestones/M4-plan.md`.
@@ -362,7 +362,62 @@ field names.
 Each is its own PR with CI green. Nothing runs live until the runbook is merged
 and you start the session.
 
+## Build status
+
+**Step 1, the write gate: built** (`src/fns/scope/writes.py`, `Gate.check_write`
+and `Gate.call_write`). Nothing calls it except tests.
+
+- **Tests:** a negative test per rule (`tests/scope/test_gate_writes.py`), and
+  Hypothesis properties (`tests/scope/test_gate_writes_fuzz.py`):
+  - a write is allowed exactly when every part of it is good, checked against an
+    independent oracle;
+  - a first-party object is always a hard deny;
+  - no scope lifts the denylist: valid, forged past validation, or any committed
+    scope file with a strike block added.
+- **Mutation check:** switching off the denylist, the body check or the SD2
+  marker rule each fails tests.
+
+Where the build differs from the text above, and why:
+
+| Plan said | Built | Why |
+| --- | --- | --- |
+| a `strike.operations` list | the write forms are listed under `allowed_operations.strike`, and validation refuses any write there that is not one of the ten forms | one place for operations, as for every other verb |
+| no query string on a write | Graph writes: none. ARM writes: exactly `api-version=<pinned>` (Storage `2023-05-01`, Key Vault `2023-07-01`) | ARM requires `api-version`; pinning it is the Key Vault data-plane rule again |
+| denylist: role, grant and authorization endpoints | also `$batch`, all of `appRoleAssignments`, `federatedIdentityCredentials`, and writes to `Microsoft.Insights`, `Microsoft.AadIam`, `Microsoft.OperationalInsights` and `Microsoft.SecurityInsights` | a batch can carry any request, and a strike must never switch off the logs it is measured by |
+| `graph-group` target kind | left out | no write form names a group |
+| a `token:` form for S4 step 1, acting as `app-escalation-target` | not yet: every write must be made signed in as a test identity | it lands with S4, under its own decision |
+| `lab/scope.tf` renders `strike.targets` | not yet | the live scope gets write forms only when strike code exists to use them |
+| `removePassword` and the assignment `DELETE` bound to IDs the run created | bound to lab objects only; the plan binding (step 3) will bind them to IDs from the journal | the gate cannot learn a `keyId` before the strike runner exists |
+
+**SD2's condition** (the marker role is defined only on a lab-created app,
+never on Microsoft Graph or a first-party app) is enforced in three places:
+
+- a scope cannot name a first-party ID as a target;
+- the live check refuses a service principal owned by another tenant, or with a
+  first-party `appId`;
+- an `appRoleAssignedTo` write is allowed only for a marker role that this run's
+  gate let through, on the service principal's own lab application.
+
+Each place has a negative test.
+
+The denylist also reads text in request bodies. So an app role whose description
+contained a denied word, such as "directory", could not be written back by the S4
+undo. The gate refuses the write rather than allowing it, and the lab apps define
+no app roles (`lab/identities.tf`), so this can't happen today.
+
 ## Decisions for you
+
+Approved 2026-11-26:
+
+- **SD1: a.** Regenerate both keys after `listKeys`, verified.
+- **SD2: b**, with the condition above, enforced by the gate.
+- **SD3: a.** `directory:tenant roleAssignments/write` stays `inconclusive` after
+  harden. This is a deliberate limit, explained in the README's "Evidence
+  ladder".
+- **SD4: b.** No re-run of S1 and S2. D6 still applies to the Graph strikes.
+- **SD5: yes.**
+
+The options as they were offered:
 
 - **SD1. S1's undo: regenerate both payroll keys.**
   - **a.** Yes. **(Recommended:** the keys were in the tool's memory, and

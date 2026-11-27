@@ -46,6 +46,89 @@
       "title": "ScopeBudget",
       "type": "object"
     },
+    "StrikeScope": {
+      "additionalProperties": false,
+      "description": "The ``strike:`` block: which lab objects strikes may write, and until when.",
+      "properties": {
+        "expires_at": {
+          "description": "Strike writes stop at this instant, even if the manifest is still valid.",
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/StrikeTarget"
+          },
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "expires_at",
+        "targets"
+      ],
+      "title": "StrikeScope",
+      "type": "object"
+    },
+    "StrikeTarget": {
+      "additionalProperties": false,
+      "description": "One object ``strike`` may write to (M4 strike plan, \"Lab objects only\").\n\nRendered by Terraform from the lab's own resources, never hand-written. A Graph\ntarget also has to pass a live check (its lab tags and display name) before the\ngate allows the first write to it.",
+      "properties": {
+        "application": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Service principals: the object ID of its application, also a target.",
+          "title": "Application"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Graph targets: the display name Terraform gave the object; the live check\ncompares it.",
+          "title": "Display Name"
+        },
+        "id": {
+          "description": "A full ARM ID (``arm``: a vault or a storage account) or an Entra object ID.",
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "arm",
+            "graph-application",
+            "graph-service-principal"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "StrikeTarget",
+      "type": "object"
+    },
     "TestIdentity": {
       "additionalProperties": false,
       "description": "An identity the executor may act as (``strike``).",
@@ -148,6 +231,18 @@
       "format": "date-time",
       "title": "Expires At",
       "type": "string"
+    },
+    "strike": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StrikeScope"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Lab objects ``strike`` may write to (M4). Absent means no write at all."
     },
     "subscription_ids": {
       "default": [],

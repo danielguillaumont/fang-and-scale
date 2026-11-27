@@ -86,6 +86,12 @@ every request in order with its undo, the stop line (no directory role is ever
 assigned), the write gate limited to lab objects, with fuzz tests, the journal,
 cleanup and emergency steps, and decisions SD1 to SD5. No strike code exists.
 
+SD1 to SD5 were approved on 2026-11-26. SD2 came with a condition: the marker role
+lives only on a lab-created app, and the gate enforces it. SD3 is a deliberate
+limit, explained in the README. Build step 1, the write gate, is built and tested
+offline, with nothing calling it. The places where the build differs from the
+plan are in the strike plan's "Build status".
+
 ## The morning review (before the M2 and M3 runs)
 
 Every item from the morning review of `docs/OVERNIGHT.md` is done. Each one got

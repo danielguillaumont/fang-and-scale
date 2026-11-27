@@ -37,6 +37,7 @@ from tests.scope.gatekit import (
     manifest,
 )
 from tests.scope.test_gate_data_plane import DATA_REASONS
+from tests.scope.test_gate_writes import WRITE_REASONS
 
 D = DirectoryTarget()
 KV_ROLE_DEF = f"/subscriptions/{SUB}/providers/Microsoft.Authorization/roleDefinitions/x"
@@ -65,7 +66,7 @@ def test_allowed(verb: str, op: str, target: Any, tenant: str, kw: dict[str, Any
     assert isinstance(decision, Allowed), decision
 
 
-STRIKE = manifest(allowed_operations={"strike": [ARM_READ, ARM_WRITE], "scout": [ARM_READ]})
+STRIKE = manifest(allowed_operations={"strike": [ARM_READ, LIST_KEYS], "scout": [ARM_READ]})
 
 DENY_ROWS: list[tuple[str, DenyReason, dict[str, Any]]] = [
     ("no manifest", DenyReason.NO_MANIFEST, {"manifest": None}),
@@ -89,8 +90,8 @@ DENY_ROWS: list[tuple[str, DenyReason, dict[str, Any]]] = [
     ("graph write not listed", DenyReason.OPERATION_NOT_ALLOWED, {"op": GRAPH_WRITE, "target": D}),
     (
         "strike write",
-        DenyReason.WRITE_NOT_AVAILABLE_IN_M1,
-        {"manifest": STRIKE, "verb": "strike", "op": ARM_WRITE, "principal": SP_AGENT},
+        DenyReason.WRITE_ON_READ_PATH,
+        {"manifest": STRIKE, "verb": "strike", "op": LIST_KEYS, "principal": SP_AGENT},
     ),
     ("malformed target", DenyReason.MALFORMED_TARGET, {"target": "rg-fns-lab"}),
     (
@@ -190,6 +191,7 @@ def test_every_deny_reason_has_a_test() -> None:
     covered = (
         {r[1] for r in DENY_ROWS}
         | DATA_REASONS
+        | WRITE_REASONS
         | {
             DenyReason.JOURNAL_FAILED,
             DenyReason.INTERNAL_ERROR,

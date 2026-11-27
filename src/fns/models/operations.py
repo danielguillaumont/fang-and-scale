@@ -4,7 +4,7 @@ Grammar (exact match only; no wildcards in M1):
 
     arm:<Namespace>/<type>[/<type>...]/<read|write|delete|action>
         e.g. arm:Microsoft.Authorization/roleAssignments/read
-    graph:<METHOD> <path template>
+    graph:<METHOD> <path template>[/$ref]
         e.g. graph:GET /servicePrincipals/{id}/owners
     kv:GET /secrets | kv:GET /secrets/<name>
         Key Vault data plane (M3 P5.1): list secret names, or get one secret
@@ -39,7 +39,7 @@ _ARM_RE = re.compile(
 )
 _GRAPH_RE = re.compile(
     r"^graph:(?P<method>GET|POST|PUT|PATCH|DELETE) "
-    r"(?P<path>(?:/(?:\{id\}|[A-Za-z][A-Za-z0-9.]*))+)$"
+    r"(?P<path>(?:/(?:\{id\}|[A-Za-z][A-Za-z0-9.]*))+(?:/\$ref)?)$"
 )
 # Key Vault secret names: 1-127 of [0-9A-Za-z-] (Key Vault rules).
 _KV_RE = re.compile(r"^kv:GET (?P<path>/secrets(?:/[0-9A-Za-z-]{1,127})?)$")
@@ -52,6 +52,23 @@ _BLOB_RE = re.compile(
 
 # Graph POSTs that only read. Empty in M1; additions need a DECISIONS row.
 SAFE_POST_READS: Final[frozenset[str]] = frozenset()
+
+
+# The only write operations that exist (M4, docs/milestones/M4-strikes-plan.md). A scope
+# may list a write under ``strike`` only if it is one of these; ``fns.scope.writes``
+# holds the rule for each (method, path, body). Additions need a DECISIONS row.
+WRITE_FORM_OPERATIONS: Final[tuple[str, ...]] = (
+    "arm:Microsoft.Storage/storageAccounts/listKeys/action",
+    "arm:Microsoft.Storage/storageAccounts/regenerateKey/action",
+    "arm:Microsoft.KeyVault/vaults/write",
+    "graph:POST /applications/{id}/addPassword",
+    "graph:POST /applications/{id}/removePassword",
+    "graph:PATCH /applications/{id}",
+    "graph:POST /servicePrincipals/{id}/appRoleAssignedTo",
+    "graph:DELETE /servicePrincipals/{id}/appRoleAssignedTo/{id}",
+    "graph:POST /applications/{id}/owners/$ref",
+    "graph:DELETE /applications/{id}/owners/{id}/$ref",
+)
 
 
 class OperationError(ValueError):
@@ -95,3 +112,8 @@ def parse_operation(value: object) -> Operation:
         "'arm:<Namespace>/<type>/<read|write|delete|action>', 'graph:<METHOD> /<path>', "
         "'kv:GET /secrets[/<name>]' or 'blob:HEAD /<container>/<blob>'"
     )
+
+
+WRITE_FORM_KEYS: Final[frozenset[str]] = frozenset(
+    parse_operation(op).key for op in WRITE_FORM_OPERATIONS
+)

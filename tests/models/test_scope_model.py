@@ -95,14 +95,20 @@ def test_required_fields(field: str) -> None:
         ScopeManifest.model_validate(data)
 
 
-def test_write_ops_allowed_in_model_for_write_verbs() -> None:
-    # The model accepts writes for strike/harden; the M1 gate still denies them.
+def test_strike_may_list_only_the_write_forms() -> None:
+    # M4: a strike write must be one of the forms the write gate knows.
     m = ScopeManifest.model_validate(
         scope_dict(
-            allowed_operations={"strike": ["arm:Microsoft.Authorization/roleAssignments/write"]}
+            allowed_operations={"strike": ["arm:Microsoft.Storage/storageAccounts/listKeys/action"]}
         )
     )
     assert m.allowed_operations["strike"]
+    with pytest.raises(ValidationError, match="only the M4 write forms"):
+        ScopeManifest.model_validate(
+            scope_dict(
+                allowed_operations={"strike": ["arm:Microsoft.Authorization/roleAssignments/write"]}
+            )
+        )
 
 
 def test_manifest_is_frozen() -> None:
