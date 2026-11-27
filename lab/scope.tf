@@ -84,6 +84,7 @@ locals {
   ]
   strike_arm_targets = [
     azurerm_storage_account.payroll.id,
+    azurerm_storage_account.invoices.id, # D-7: listKeys after harden, must be denied
     azurerm_key_vault.crown_jewels.id,
   ]
   strike_app_targets = [

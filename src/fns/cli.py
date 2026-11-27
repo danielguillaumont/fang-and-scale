@@ -453,7 +453,7 @@ def detections_export(
 
 
 _AFTER_STRIKE_OPT = typer.Option(
-    help="A `fns strike run` directory after harden: its D-1 to D-5 results become evidence "
+    help="A `fns strike run` directory after harden: its D-1 to D-7 results become evidence "
     "(they can only add context or fail a finding, never pass one)."
 )
 

@@ -40,15 +40,27 @@ STRIKE_SOURCE = "fns.strike/after-harden"
 COUNTING_STATUS: Final = 403
 """The probes' rule (V5): only a 403 is a denial. A 401 can be an expired or wrong
 token, so it says nothing about the request (approved 2026-11-27)."""
-COUNTING: Final[dict[str, tuple[str, frozenset[str]]]] = {
-    "graph:POST /applications/{id}/addPassword": ("credentials/update", frozenset({"D-2", "D-3"})),
-    "graph:POST /applications/{id}/owners/$ref": ("owners/update", frozenset({"D-4", "D-5"})),
+COUNTING: Final[dict[str, tuple[str, frozenset[str], str]]] = {
+    "graph:POST /applications/{id}/addPassword": (
+        "credentials/update",
+        frozenset({"D-2", "D-3"}),
+        "application",
+    ),
+    "graph:POST /applications/{id}/owners/$ref": (
+        "owners/update",
+        frozenset({"D-4", "D-5"}),
+        "application",
+    ),
+    "arm:Microsoft.Storage/storageAccounts/listKeys/action": (
+        "listKeys",
+        frozenset({"D-6", "D-7"}),
+        "resource",
+    ),
 }
 """Option B's exact-operation table: a planned write's operation, the one contract
-operation of an ``application:`` item it observes, and the strikes that may make it.
-Held here and not imported from ``fns.strike``: the verifier's rule stays put when
-the strike engine changes."""
-COUNTING_TARGET_KIND: Final = "application"
+operation it observes, the strikes that may make it, and the kind of item it is
+for. ``listKeys`` (D-6, D-7) was added on 2026-11-27. Held here and not imported
+from ``fns.strike``: the verifier's rule stays put when the strike engine changes."""
 NEVER_COUNTS: Final = frozenset({("directory:tenant", "roleAssignments/write")})
 """SD3: no direct attempt is possible, so nothing may stand in for one."""
 
@@ -66,7 +78,10 @@ def not_counting(o: StrikeObservation, a: Assertion, *, live: bool) -> str | Non
         (row is not None, "not a write in the exact-operation table"),
         (row is not None and row[0] == a.operation, "not the item's exact operation"),
         (row is not None and o.strike in row[1], f"{o.strike} does not make that request"),
-        (a.target.partition(":")[0] == COUNTING_TARGET_KIND, "not an application item"),
+        (
+            row is not None and a.target.partition(":")[0] == row[2],
+            f"not an item of the kind {row[2] if row else '?'} requests",
+        ),
         (
             a.target_object_id is not None and o.request_object_id == a.target_object_id,
             "not the item's exact object",

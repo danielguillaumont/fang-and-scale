@@ -28,9 +28,9 @@ from fns.models.ids import TzDatetime
 from fns.scope.gate import WriteRequest
 from fns.scope.writes import canonical_body
 
-StrikeId = Literal["S1", "S2", "S3", "S4", "D-1", "D-2", "D-3", "D-4", "D-5"]
+StrikeId = Literal["S1", "S2", "S3", "S4", "D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7"]
 BEFORE_HARDEN: Final[tuple[StrikeId, ...]] = ("S1", "S2", "S3", "S4")
-AFTER_HARDEN: Final[tuple[StrikeId, ...]] = ("D-1", "D-2", "D-3", "D-4", "D-5")
+AFTER_HARDEN: Final[tuple[StrikeId, ...]] = ("D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7")
 PLAN_LIFETIME: Final = timedelta(hours=1)
 _LEARNED = re.compile(r"\{\{learned:([A-Za-z0-9/._-]+):([A-Za-z0-9_]+)\}\}")
 

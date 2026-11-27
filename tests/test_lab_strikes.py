@@ -104,6 +104,7 @@ def test_targets_are_the_lab_objects_by_terraform_reference() -> None:
     arm = _local_list("strike_arm_targets")
     assert re.findall(r"(azurerm_\w+\.\w+)\.id", arm) == [
         "azurerm_storage_account.payroll",
+        "azurerm_storage_account.invoices",  # D-7 (approved 2026-11-27)
         "azurerm_key_vault.crown_jewels",
     ]
     apps = _local_list("strike_app_targets")

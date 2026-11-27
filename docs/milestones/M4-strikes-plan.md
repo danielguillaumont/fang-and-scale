@@ -138,6 +138,13 @@ contract fails (exit 1).
 | D-3 | `POST /applications/{scout-app}/addPassword` (1 h) | 403 | `removePassword` | `application:sp-fns-scout credentials/update` |
 | D-4 | `POST /applications/{id-verifier-app}/owners/$ref` `{"@odata.id":".../directoryObjects/{agent-sp}"}` | 403 | `DELETE /applications/{id-verifier-app}/owners/{agent-sp}/$ref` | `application:id-verifier owners/update` |
 | D-5 | `POST /applications/{scout-app}/owners/$ref` (the same) | 403 | the same, on the scout app | `application:sp-fns-scout owners/update` |
+| D-6 | `POST {payroll account}/listKeys` | 403 | regenerate key1 and key2 at once (as SD1) | `resource:<payroll account> listKeys` |
+| D-7 | `POST {invoices account}/listKeys` | 403 | the same, on the invoices account | `resource:<invoices account> listKeys` |
+
+D-6 and D-7 were added on 2026-11-27 (approved): without them, both `listKeys`
+items stay `inconclusive` after harden, because only the permissions API
+evaluates the action. The invoices account is a strike target for D-7 only (the
+lab's `strike_arm_targets`).
 
 `directory:tenant roleAssignments/write` gets **no direct attempt**. The only
 direct attempt is a directory role assignment, and if it succeeded it would
@@ -147,17 +154,17 @@ stays `inconclusive`. SD3 is the decision.
 
 **How the denials count (option B, approved 2026-11-27,
 `docs/milestones/M4-exit-gate-plan.md`).** A LIVE D-2 to D-5 denial with HTTP 403
-on the item's exact operation and object counts like an observed probe denial.
-So the four application items can `pass`, if no surface is open (the PIM
-precondition in the M4 runbook, D4). D-2 does not count for the tenant-wide
+on the item's exact operation and object counts like an observed probe denial,
+and so does a LIVE D-6 or D-7 403 on the account's exact ARM ID (approved
+2026-11-27). So the four application items and the two `listKeys` items can
+`pass`, if no surface is open (the PIM precondition in the M4 runbook, D4). D-2 does not count for the tenant-wide
 `directory:tenant applications/credentials/update` (one app is not every app),
 and D-1 observes a first hop, so it counts for no item.
 
-S1 and S2 after harden (`listKeys` and the vault tag, both 403 without
-Contributor) are optional (SD4). The M3 read probes observe the vault reads and
-`blob/read`. They do **not** observe a `listKeys` denial: only the permissions
-API evaluates it. So both `listKeys` items stay `inconclusive` after harden
-(`tests/prove/test_option_b.py`).
+S2 after harden (the vault tag, 403 without Contributor) is optional (SD4). The
+M3 read probes observe the vault reads and `blob/read`. They do **not** observe a
+`listKeys` denial: only the permissions API evaluates it. That is why D-6 and
+D-7 exist (`tests/prove/test_option_b.py`).
 
 ## The stop line
 
@@ -350,6 +357,7 @@ steps, all as **yourself** (not the agent):
    - **D-1 to D-5:** if any of them succeeded, delete the credential or the
      owner reference it created (the same commands as S3, plus
      `az ad app owner remove`).
+   - **D-6, D-7:** if either succeeded, renew both keys of that account, as S1.
 3. If the journal is lost, look for objects by name instead: any credential
    named `fns-strike-*`, any app role whose `value` is `fns.strike.marker`, any
    assignment to the agent on a lab SP, and any vault tag `fns-strike`.
@@ -371,7 +379,7 @@ field names.
 3. **`fns strike plan`, `run` and `cleanup`:** the plan hash, the journal, undo
    in `finally`, and the verification. They are tested against the fake tenant,
    including a failure at every step.
-4. **The strikes S1 to S4 and the post-harden attempts D-1 to D-5**, each with
+4. **The strikes S1 to S4 and the post-harden attempts D-1 to D-7**, each with
    its undo and verification tests.
 5. **`docs/runbooks/m4-live-run.md`**, sessions C and D: the commands, the
    expected output, the KQL per strike, the stop rules and the emergency
@@ -458,6 +466,8 @@ Approved 2026-11-26:
   harden. This is a deliberate limit, explained in the README's "Evidence
   ladder".
 - **SD4: b.** No re-run of S1 and S2. D6 still applies to the Graph strikes.
+  (2026-11-27: `listKeys` after harden is now D-6 and D-7, on both accounts;
+  the vault tag is still not re-run.)
 - **SD5: yes.**
 
 The options as they were offered:

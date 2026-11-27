@@ -392,7 +392,7 @@ so does an internal error, so a crash never looks like a verdict.
   fix, and run the detections in a Log Analytics workspace. Spec:
   `docs/milestones/M4.md`; live plan (decisions approved):
   `docs/milestones/M4-plan.md`; strike plan (approved; `fns strike` S1 to S4 and
-  D-1 to D-5 are built and tested against a fake tenant):
+  D-1 to D-7 are built and tested against a fake tenant):
   `docs/milestones/M4-strikes-plan.md`. The log path check passed on
   2026-11-27 (`docs/runbooks/m4-log-path-check.md`). Next live step, sessions A
   to D: `docs/runbooks/m4-live-run.md`.

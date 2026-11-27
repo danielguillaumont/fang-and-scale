@@ -131,7 +131,7 @@ def test_strikes_are_s1_to_s4_then_d1_to_d5() -> None:
     plans = [c for c in _fns_lines() if "strike plan" in c]
     assert [re.search(r"--strikes (\S+)", c)[1] for c in plans] == [  # type: ignore[index]
         "S1,S2,S3,S4",  # S4 only right after S3, in the same run
-        "D-1,D-2,D-3,D-4,D-5",
+        "D-1,D-2,D-3,D-4,D-5,D-6,D-7",  # D-6, D-7: listKeys (approved 2026-11-27)
     ]
     runs = [c for c in _fns_lines() if re.search(r"strike (run|cleanup)", c)]
     assert len(runs) == 3
@@ -170,8 +170,9 @@ def test_prove_after_harden_carries_the_strike_evidence() -> None:
     assert "--live" in line and "--after-strike $dRun" in line
     assert "--record fixtures/lab-run-5" in line
     d7 = _section("### D7.")
-    assert "exit 3" in d7  # listKeys x2, blob/write, the tenant-wide item, SD3
-    assert "five inconclusive" in d7
+    assert "exit 3" in d7  # blob/write, the tenant-wide item, SD3 over a budget of 2
+    assert "three inconclusive" in d7
+    assert "| payroll `listKeys`, invoices `listKeys` | **`pass`**, `verified`" in d7
     for item in ("credentials/update", "owners/update"):
         assert item in d7
     assert "**`pass`**, `verified`, the D-step's 403" in d7
@@ -383,6 +384,8 @@ def test_every_strike_write_has_a_manual_undo() -> None:
         '--operation Delete --tags "fns-strike=$v"',  # S2
         "--key primary",  # S1
         "--key secondary",
+        "-n $invoiceAcct --key primary",  # D-7
+        "-n $invoiceAcct --key secondary",
         "uv run poe lab-down",
         "from strike_events",
         "appRoles[?value=='fns.strike.marker'].id",  # S4

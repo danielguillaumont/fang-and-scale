@@ -73,7 +73,7 @@
         "target_object_id": {
           "anyOf": [
             {
-              "pattern": "^[0-9a-f-]{36}$",
+              "pattern": "^(?:[0-9a-f-]{36}|/subscriptions/[^\\s?#]+)$",
               "type": "string"
             },
             {
@@ -81,7 +81,7 @@
             }
           ],
           "default": null,
-          "description": "The directory object ID of an ``application:`` or ``service_principal:`` target,\nfrom the snapshot at freeze. An after-harden strike counts toward a verdict only\non this exact object (option B, approved 2026-11-27).",
+          "description": "The target's object at freeze, from the snapshot: the directory object ID of an\n``application:`` or ``service_principal:`` target, or the normalized ARM ID of a\n``resource:`` target. An after-harden strike counts toward a verdict only on this\nexact object (option B, approved 2026-11-27).",
           "title": "Target Object Id"
         }
       },

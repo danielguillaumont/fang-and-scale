@@ -21,6 +21,9 @@ VER_APPID = pid(301)
 SCOUT_APPID = pid(302)
 PAYROLL = f"{RG}/providers/Microsoft.Storage/storageAccounts/stpayrolltest"
 INVOICES = f"{RG}/providers/Microsoft.Storage/storageAccounts/stinvoicestest"
+"""A storage account that is *not* a strike target (gate negative tests)."""
+INVOICES_D7 = f"{RG}/providers/Microsoft.Storage/storageAccounts/stinvoicesd7"
+"""D-7's invoices account: a strike target only in ``TARGETS_D7``."""
 VAULT = KV
 GRAPH_APP_ID = "00000003-0000-0000-c000-000000000000"  # Microsoft Graph (public)
 MS_SERVICES_TENANT = "f8cdef31-a31e-4b4a-93e4-5f571e91255a"  # public
@@ -86,6 +89,11 @@ APPS = {
     APP_VER: ("id-verifier", VER_APPID),
     APP_SCOUT: ("sp-fns-scout", SCOUT_APPID),
 }
+
+
+TARGETS_D7: list[dict[str, Any]] = [*TARGETS, {"kind": "arm", "id": INVOICES_D7}]
+"""The lab's targets once D-7 exists (approved 2026-11-27). ``TARGETS`` stays as
+recorded in ``fixtures/strike-demo``."""
 
 
 def strike_dict(**overrides: Any) -> dict[str, Any]:

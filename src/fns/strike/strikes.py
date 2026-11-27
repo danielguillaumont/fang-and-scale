@@ -9,8 +9,10 @@ identity, the marker role Terraform defined on its own app assigned to the agent
 (undo: delete the assignment). S3's password is removed as soon as S4 holds the
 token, and the token is used for nothing but the assignment and its undo.
 
-After harden (session D, D6): D-1 to D-5 must be denied. Each has the undo that
-runs if it is not.
+After harden (session D, D6): D-1 to D-7 must be denied. Each has the undo that
+runs if it is not. D-6 and D-7 (approved 2026-11-27) are ``listKeys`` on the
+payroll and invoices accounts; if one ever succeeds, both of that account's keys
+are regenerated at once (as SD1), the scout verifies it, and the run exits 1.
 
 Everything a strike writes carries the run ID: the credential name
 ``fns-strike-<run>`` and the tag ``fns-strike: <run>``.
@@ -73,7 +75,7 @@ USED_FORMS: Final[tuple[str, ...]] = (
     ASSIGN,
     UNASSIGN,
 )
-"""The write forms S1 to S4 and D-1 to D-5 use. ``PATCH`` app roles is not one:
+"""The write forms S1 to S4 and D-1 to D-7 use. ``PATCH`` app roles is not one:
 the marker role is defined by Terraform, never by a strike."""
 TOKEN_KEY: Final = "S4/token"  # noqa: S105 - a journal step key
 ASSIGN_KEY: Final = "S4/assign"
@@ -87,6 +89,8 @@ class LabTargets:
 
     agent: str
     payroll: str | None = None
+    invoices: str | None = None
+    """D-7 only: the invoices storage account."""
     vault: str | None = None
     escalation_app: str | None = None
     verifier_app: str | None = None
@@ -103,6 +107,7 @@ class LabTargets:
     def as_dict(self) -> dict[str, str]:
         roles = (
             "payroll",
+            "invoices",
             "vault",
             "escalation_app",
             "verifier_app",
@@ -136,6 +141,7 @@ def lab_targets(manifest: ScopeManifest, *, s4: bool = False) -> LabTargets:
         if t.kind == "arm":
             name = t.key.rsplit("/", 1)[-1]
             role = "payroll" if name.startswith("stpayroll") else None
+            role = "invoices" if name.startswith("stinvoices") else role
             role = "vault" if name.startswith("kv-crown") else role
         elif t.kind == "graph-application":
             role = {
@@ -255,14 +261,17 @@ def read_pre_state(strikes: Sequence[StrikeId], t: LabTargets, reader: LabReader
     """What the verification compares against, read as the scout."""
     state: dict[str, Any] = {}
     for s in strikes:
-        if s == "S1":
-            p = _need(t.payroll, "payroll storage account")
+        if s in ("S1", "D-6", "D-7"):
+            p, what = _storage(s, t)
             body = reader.storage_account(p)
-            _lab_tagged(body, "payroll storage account")
+            _lab_tagged(body, what)
             props = body.get("properties", {})
             times = props.get("keyCreationTime") if isinstance(props, dict) else None
             if not isinstance(times, dict) or not {"key1", "key2"} <= set(times):
-                raise PlanError("the payroll account read has no keyCreationTime")
+                raise PlanError(
+                    f"the {what.removesuffix(' storage account')} account read "
+                    "has no keyCreationTime"
+                )
             state[f"arm:{p}"] = {
                 "keyCreationTime": {"key1": str(times["key1"]), "key2": str(times["key2"])}
             }
@@ -277,6 +286,37 @@ def read_pre_state(strikes: Sequence[StrikeId], t: LabTargets, reader: LabReader
     for app in sorted(set(_owner_apps(strikes, t))):
         state[f"owners:{app}"] = {"owners": reader.app_owners(app)}
     return state
+
+
+def _storage(s: StrikeId, t: LabTargets) -> tuple[str, str]:
+    """The storage account a ``listKeys`` strike targets: S1 and D-6 the payroll
+    account, D-7 the invoices account."""
+    if s == "D-7":
+        return _need(t.invoices, "invoices storage account"), "invoices storage account"
+    return _need(t.payroll, "payroll storage account"), "payroll storage account"
+
+
+def _list_keys(key: str, s: StrikeId, account: str, expect: str) -> PlannedWrite:
+    """``listKeys``, undone by regenerating both keys (SD1)."""
+    observes = () if s == "S1" else (f"resource:{account.rsplit('/', 1)[-1]} listKeys",)
+    return PlannedWrite(
+        key=key,
+        strike=s,
+        request=PlannedRequest(
+            operation=LIST_KEYS, method="POST", url=_arm(account, "/listKeys", "blob")
+        ),
+        expect=expect,  # type: ignore[arg-type]
+        undo=tuple(
+            PlannedRequest(
+                operation=REGEN_KEY,
+                method="POST",
+                url=_arm(account, "/regenerateKey", "blob"),
+                body={"keyName": k},
+            )
+            for k in ("key1", "key2")
+        ),
+        observes=observes,
+    )
 
 
 def _apps(strikes: Sequence[StrikeId], t: LabTargets) -> list[str]:
@@ -309,7 +349,8 @@ OBSERVES: Final[dict[str, tuple[str, ...]]] = {
     "D-4": ("application:id-verifier owners/update",),
     "D-5": ("application:sp-fns-scout owners/update",),
 }
-"""The strike plan's D6 table, column "Contract item it observes"."""
+"""The strike plan's D6 table, column "Contract item it observes". D-6 and D-7
+observe ``resource:<account name> listKeys``, named from the lab (``_list_keys``)."""
 
 
 def planned_writes(
@@ -323,26 +364,9 @@ def planned_writes(
     writes: list[PlannedWrite] = []
     for s in strikes:
         if s == "S1":
-            p = _need(t.payroll, "payroll storage account")
-            writes.append(
-                PlannedWrite(
-                    key="S1/list-keys",
-                    strike="S1",
-                    request=PlannedRequest(
-                        operation=LIST_KEYS, method="POST", url=_arm(p, "/listKeys", "blob")
-                    ),
-                    expect="allowed",
-                    undo=tuple(
-                        PlannedRequest(
-                            operation=REGEN_KEY,
-                            method="POST",
-                            url=_arm(p, "/regenerateKey", "blob"),
-                            body={"keyName": k},
-                        )
-                        for k in ("key1", "key2")
-                    ),
-                )
-            )
+            writes.append(_list_keys("S1/list-keys", "S1", _storage(s, t)[0], "allowed"))
+        elif s in ("D-6", "D-7"):
+            writes.append(_list_keys(f"{s}/list-keys", s, _storage(s, t)[0], "denied"))
         elif s == "S2":
             v = _need(t.vault, "Key Vault")
             before = dict(pre_state[f"arm:{v}"]["tags"])
