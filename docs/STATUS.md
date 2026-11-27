@@ -15,8 +15,8 @@ is now required on `main`.
 | 2 | Agent ID findings `not-assessed` | done | #77 |
 | 3 | S4, with the runbook update | done | #78 |
 | 4 | Threat model open gaps (size caps, provenance attestation) | done | #79 |
-| 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | next | |
-| 6 | M4 exit gate, option B: plan only, then stop | | |
+| 5 | v0.1.0 release prep (date, `release-check`, the tag commands for Daniel) | done | #80 |
+| 6 | M4 exit gate, option B: plan only, then stop | next | |
 
 ### Decisions of 2026-11-27 (marked in `docs/DECISIONS.md`)
 
@@ -31,7 +31,36 @@ is now required on `main`.
 
 ### Needs Daniel
 
-Nothing yet in this session.
+- **Tag and publish v0.1.0** (prepared in #80; nothing is tagged or published).
+  `CHANGELOG.md` is dated 2026-11-27, with the earlier "Unreleased" entries folded
+  into 0.1.0 because the tag ships them, and `uv run poe release-check` prints
+  `release check: ok`. These commands work in PowerShell and in bash:
+
+  ```
+  git switch main
+  git pull --ff-only
+  uv run poe release-check
+  git tag v0.1.0
+  git push origin v0.1.0
+  gh run list --workflow release.yml --limit 1
+  gh run watch <run id from the line above> --exit-status
+  gh release view v0.1.0
+  gh release download v0.1.0 --dir v0.1.0-files
+  gh attestation verify v0.1.0-files/fang_and_scale-0.1.0-py3-none-any.whl --repo danielguillaumont/fang-and-scale
+  gh release edit v0.1.0 --draft=false
+  ```
+
+  - `release-check` must print `release check: ok` before you tag.
+  - The workflow runs the full check, builds, writes the SBOM and
+    `SHA256SUMS`, attests every file and creates a **draft**. `gh run watch`
+    exits non-zero if any step fails. If it does, delete nothing: tell me, and
+    the fix goes in a new PR and a new patch version.
+  - `gh release view` lists the draft's files: the wheel, the sdist,
+    `sbom.cdx.json` and `SHA256SUMS`.
+  - `gh attestation verify` must show the file was built by `release.yml` at
+    `refs/tags/v0.1.0`. Run it for any other file the same way.
+  - The last line publishes the draft. You can do the same in the GitHub UI
+    instead.
 
 
 ## Summary of the build session: the queue is done (2026-11-27)
@@ -178,10 +207,11 @@ The queue is done. See the summary at the top.
 
   Nothing is built for b.
 
-- **Releasing v0.1.0** (when you want it; nothing is tagged or published):
-  1. In `CHANGELOG.md`, replace `not tagged yet` with the date (`YYYY-MM-DD`), and
-     merge that.
-  2. `uv run poe release-check` must print `ok`.
+- **Releasing v0.1.0** (when you want it; nothing is tagged or published).
+  Steps 1 and 2 are done (#80); the exact commands are in the owner-decision
+  session's "Needs Daniel" above:
+  1. Done: `CHANGELOG.md` is dated 2026-11-27.
+  2. Done: `uv run poe release-check` prints `ok`.
   3. `git tag v0.1.0` on `main`, then `git push origin v0.1.0`.
   4. The release workflow builds, checks and creates a **draft** release with the
      wheel, sdist, `sbom.cdx.json` and `SHA256SUMS`. Review it on GitHub, then

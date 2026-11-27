@@ -7,60 +7,7 @@ version may change file formats; each change is listed here.
 
 ## [Unreleased]
 
-### Added
-
-- Size caps on every JSON and YAML file the tool reads (`fns.inputcap`): 64 MiB
-  for snapshots, fixture exchanges and strike recordings, 16 MiB for files the
-  tool writes and reads back, 1 MiB for YAML as before. A file over its cap is
-  refused before it is read. The MCP server reads stdin a bounded line at a time.
-- The release workflow attests the build provenance of every release file
-  (Sigstore, `actions/attest-build-provenance` pinned by SHA). Check a download
-  with `gh attestation verify <file> --repo danielguillaumont/fang-and-scale`.
-
-- `fns strike` S4 (approved 2026-11-27), right after S3 in the same run: a
-  token as `app-escalation-target` with S3's password, whose claims must show
-  `AppRoleAssignment.ReadWrite.All`, then, as that identity, the marker role
-  assigned to the agent and removed. S3's password is removed as soon as the
-  token is held. The token is never written anywhere; the journal gets its `oid`
-  and `roles` claims only. The claims check is a safety stop, never verdict evidence:
-  `fns prove --after-strike` counts only D-1 to D-5. The marker role is defined by Terraform
-  (`enable_strikes`), and the scope's new `strike.escalation` block authorises
-  the token request and the escalated identity. `fns strike cleanup` can't undo
-  the assignment (no token): it exits 5 and the M4 runbook's emergency cleanup
-  removes it. Fixture mode refuses S4: the recording has S1 to S3.
-
-- M6 design notes: `docs/milestones/M6-agent-id.md` (what Agent ID changes about
-  blast radius, the gap in today's collector, and six lab checks) and
-  `docs/milestones/M6-bakeoff.md` (how an LLM proposer would be compared with
-  `fns harden`, and kept a proposer). Nothing is built yet.
-- `fns mcp serve`: a read-only MCP server on stdio. Its five tools list and read
-  fixture sets, list and read contain reports, and run `fns contain` on a
-  fixture. It has no write tool and makes no network call. Fixture files come
-  from a fixed list that never includes the ID map. LIVE reports are offered
-  only with `--include-live`. It is standard library only, with no new
-  dependency.
-- `docs/ARCHITECTURE.md`: the trust boundaries with diagrams, each with what
-  enforces it. `docs/THREAT-MODEL.md`: what happens when the tool, a fixture, a
-  scope file, a contract, tenant data, a run directory or a pull request is
-  hostile, including what does not hold.
-
-### Changed
-
-- Entra Agent ID objects are recognised by their `@odata.type` (agent identity,
-  blueprint, blueprint principal) and marked `agentIdType`. When the attacker
-  controls one, findings the model cannot settle are `not-assessed` with the
-  reason "Agent ID inheritance not modeled", and `fns prove` can't pass them,
-  because what an agent identity inherits from its blueprint is not modeled. A
-  modeled reach still fails.
-
-### Fixed
-
-- Terminal output shows control characters from tenant strings (ESC, other C0
-  and C1 controls, DEL, bidi controls) as visible escapes instead of passing
-  them to the terminal, where a crafted display name could hide or rewrite
-  lines. The HTML report, JSON files and PR comment were not affected.
-
-## [0.1.0] - not tagged yet
+## [0.1.0] - 2026-11-27
 
 The first release: contracts, the reach model, read-only probes with signed
 evidence, harden and mutation testing in the model, the strike engine, and the
@@ -91,6 +38,12 @@ built and tested offline only (see "Not in 0.1.0").
   primitives, vault access policies, eligibility, and application credential
   and owner paths. Each finding gets labelled paths and an evidence rung, and
   anything not modeled is `inconclusive`, never a pass.
+- Entra Agent ID objects are recognised by their `@odata.type` (agent identity,
+  blueprint, blueprint principal) and marked `agentIdType`. When the attacker
+  controls one, findings the model cannot settle are `not-assessed` with the
+  reason "Agent ID inheritance not modeled", and `fns prove` can't pass them,
+  because what an agent identity inherits from its blueprint is not modeled. A
+  modeled reach still fails.
 - Recorded lab runs `fixtures/lab-run-1` to `lab-run-3`, replayed as regression
   tests. `fns demo` replays them; it is labelled `FIXTURE` and makes no network
   call.
@@ -130,7 +83,7 @@ built and tested offline only (see "Not in 0.1.0").
 - A write gate for `fns strike`. It allows listed write forms only, to lab
   targets only, with body allowlists. Its hard denylist no scope can lift.
   There are negative and fuzz tests for every rule.
-- `fns strike plan | run | cleanup`, for S1 to S3 before harden and D-1 to D-5
+- `fns strike plan | run | cleanup`, for S1 to S4 before harden and D-1 to D-5
   after:
   - each plan has a sha256 hash, and the operator approves that hash
     (`--approve`);
@@ -141,6 +94,17 @@ built and tested offline only (see "Not in 0.1.0").
     the result;
   - cleanup is driven by the journal;
   - secrets are stripped inside the transport.
+- S4, right after S3 in the same run: a
+  token as `app-escalation-target` with S3's password, whose claims must show
+  `AppRoleAssignment.ReadWrite.All`, then, as that identity, the marker role
+  assigned to the agent and removed. S3's password is removed as soon as the
+  token is held. The token is never written anywhere; the journal gets its `oid`
+  and `roles` claims only. The claims check is a safety stop, never verdict evidence:
+  `fns prove --after-strike` counts only D-1 to D-5. The marker role is defined by Terraform
+  (`enable_strikes`), and the scope's new `strike.escalation` block authorises
+  the token request and the escalated identity. `fns strike cleanup` can't undo
+  the assignment (no token): it exits 5 and the M4 runbook's emergency cleanup
+  removes it. Fixture mode refuses S4: the recording has S1 to S3.
 - Two-identity live sign-in from two Azure CLI profiles, and a strict fixture
   replay (`fixtures/strike-demo`).
 
@@ -154,6 +118,40 @@ built and tested offline only (see "Not in 0.1.0").
   sticky pull-request comment.
 - CI on Ubuntu and Windows, CodeQL, and a Sigstore production signature of the
   recorded M3 replay on every push to `main`.
+
+### MCP server
+
+- `fns mcp serve`: a read-only MCP server on stdio. Its five tools list and read
+  fixture sets, list and read contain reports, and run `fns contain` on a
+  fixture. It has no write tool and makes no network call. Fixture files come
+  from a fixed list that never includes the ID map. LIVE reports are offered
+  only with `--include-live`. It is standard library only, with no new
+  dependency.
+
+### Hardening the tool itself
+
+- Size caps on every JSON and YAML file the tool reads (`fns.inputcap`): 64 MiB
+  for snapshots, fixture exchanges and strike recordings, 16 MiB for files the
+  tool writes and reads back, 1 MiB for YAML as before. A file over its cap is
+  refused before it is read. The MCP server reads stdin a bounded line at a time.
+- Terminal output shows control characters from tenant strings (ESC, other C0
+  and C1 controls, DEL, bidi controls) as visible escapes instead of passing
+  them to the terminal, where a crafted display name could hide or rewrite
+  lines. The HTML report, JSON files and PR comment were not affected.
+- The release workflow attests the build provenance of every release file
+  (Sigstore, `actions/attest-build-provenance` pinned by SHA). Check a download
+  with `gh attestation verify <file> --repo danielguillaumont/fang-and-scale`.
+
+### Docs
+
+- `docs/ARCHITECTURE.md`: the trust boundaries with diagrams, each with what
+  enforces it. `docs/THREAT-MODEL.md`: what happens when the tool, a fixture, a
+  scope file, a contract, tenant data, a run directory or a pull request is
+  hostile, including what does not hold.
+- M6 design notes: `docs/milestones/M6-agent-id.md` (what Agent ID changes about
+  blast radius, the gap in today's collector, and six lab checks) and
+  `docs/milestones/M6-bakeoff.md` (how an LLM proposer would be compared with
+  `fns harden`, and kept a proposer). Nothing is built yet.
 
 ### Lab
 
