@@ -176,6 +176,8 @@ def test_codeql_is_read_only_apart_from_its_results() -> None:
     }
     assert set(job["strategy"]["matrix"]["language"]) == {"python", "actions"}
     assert job["if"] == "${{ !github.event.repository.private }}"
+    on: dict[str, Any] = doc["on"] if "on" in doc else doc[True]  # type: ignore[index]
+    assert set(on) == {"push", "pull_request", "schedule", "workflow_dispatch"}
 
 
 def test_dependabot_watches_every_ecosystem_we_pin() -> None:
