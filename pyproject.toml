@@ -211,6 +211,14 @@ source_modules = ["fns.probes", "fns.prove"]
 forbidden_modules = ["fns.verify"]
 
 [[tool.importlinter.contracts]]
+name = "Strike engine never imports the verifier, the prover or the proposer"
+type = "forbidden"
+source_modules = ["fns.strike"]
+# M4: strikes write through the gate and verify with the scout reader; they do not
+# grade themselves (the verifier), model reach (contain) or plan fixes (harden).
+forbidden_modules = ["fns.verify", "fns.prove", "fns.probes", "fns.harden", "fns.contain"]
+
+[[tool.importlinter.contracts]]
 name = "Reach engine is pure: no API access, credentials, journal, executor or proposer"
 type = "forbidden"
 source_modules = ["fns.contain"]

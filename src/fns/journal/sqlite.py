@@ -18,6 +18,7 @@ process) records nothing, leaving the step ``started``, i.e. unknown.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -33,7 +34,17 @@ T = TypeVar("T")
 StepKind = Literal["read", "write"]
 StepStatus = Literal["started", "succeeded", "failed", "needs_reconcile"]
 
-_TABLES: Final = ("runs", "steps", "step_events", "gate_decisions", "gate_results")
+_TABLES: Final = (
+    "runs",
+    "steps",
+    "step_events",
+    "gate_decisions",
+    "gate_results",
+    "strike_events",
+)
+StrikePhase = Literal[
+    "intent", "result", "error", "undo-intent", "undo-result", "undo-error", "verify"
+]
 
 _SCHEMA: Final = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -75,6 +86,15 @@ CREATE TABLE IF NOT EXISTS gate_decisions (
     reason       TEXT,
     detail       TEXT NOT NULL,
     at           TEXT NOT NULL
+) STRICT;
+CREATE TABLE IF NOT EXISTS strike_events (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id    TEXT NOT NULL,
+    write_key TEXT NOT NULL,
+    phase     TEXT NOT NULL CHECK (phase IN ('intent', 'result', 'error', 'undo-intent',
+                                             'undo-result', 'undo-error', 'verify')),
+    detail    TEXT NOT NULL,
+    at        TEXT NOT NULL
 ) STRICT;
 CREATE TABLE IF NOT EXISTS gate_results (
     id      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -299,6 +319,26 @@ class SqliteJournal:
             "INSERT INTO gate_results (run_id, seq, status, detail, at) VALUES (?, ?, ?, ?, ?)",
             (run_id, seq, status, detail, self._ts(at)),
         )
+
+    # -- strikes (M4) ------------------------------------------------------------------
+
+    def strike_event(
+        self, run_id: str, write_key: str, phase: StrikePhase, detail: dict[str, object]
+    ) -> None:
+        """One strike journal row. ``detail`` holds IDs and digests, never a secret
+        (the transport strips them before any caller sees the response)."""
+        self._write(
+            "INSERT INTO strike_events (run_id, write_key, phase, detail, at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (run_id, write_key, phase, json.dumps(detail, sort_keys=True), self._ts()),
+        )
+
+    def strike_events(self, run_id: str) -> list[tuple[str, StrikePhase, dict[str, object]]]:
+        rows = self._conn.execute(
+            "SELECT write_key, phase, detail FROM strike_events WHERE run_id = ? ORDER BY id",
+            (run_id,),
+        ).fetchall()
+        return [(k, ph, json.loads(d)) for k, ph, d in rows]
 
     def decision_counts(self, run_id: str) -> dict[str, int]:
         rows = self._conn.execute(
