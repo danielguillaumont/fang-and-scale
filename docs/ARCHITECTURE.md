@@ -26,6 +26,7 @@ One Python package, `fns`, with one CLI (`fns`). Grouped by role:
 | **Evidence store** | `fns.journal` (append-only SQLite), content-addressed `artifacts/` | no | no |
 | **Shared** | `fns.models` (frozen Pydantic models), `fns.yamlio`, `fns.fixtures` | no | no |
 | **Output** | `fns.report` (HTML, Markdown, text), `fns.cli` | no | no |
+| **MCP server** | `fns.mcp` (`fns mcp serve`, stdio) | no | no: read-only tools only |
 
 ## Boundary 1: every call goes through the gate
 
@@ -199,6 +200,29 @@ anyone who can edit an object in it can choose them. So:
 
 Enforced by: `tests/test_report_html.py`, `tests/test_report_strikes.py`,
 `tests/test_action.py`.
+
+## Boundary 6: the MCP server only reads
+
+`fns mcp serve` gives an MCP client, usually an assistant, five read-only tools:
+fixture sets, contain reports, and `fns contain` on a fixture.
+
+- **No write and no network.** It has no write tool and makes no network call.
+  `contain_fixture` replays through `FixtureTransport` in a temporary directory
+  that is removed afterwards.
+- **Fixture files from a fixed list.** It opens only `contract.fns.yaml`,
+  `detections.yaml`, `manifest.json`, `probes.json` and `scope.yaml`. The
+  sanitizer's ID map and the recorded exchanges cannot be listed or read.
+- **Reports only when asked.** Reports come only from `--reports`, and only
+  FIXTURE ones unless the operator passes `--include-live`.
+- **Safe names.** Names must match a pattern and resolve directly inside their
+  root. Large files and long lines are refused.
+
+Enforced by:
+- the import contract "MCP server is read-only: no live transport, credentials,
+  executor, prover, proposer or verifier";
+- `fns.mcp.server`;
+- `tests/mcp/test_server.py`: a canary ID map, and a socket that raises if any
+  connection is opened.
 
 ## Run state and exit codes
 

@@ -1133,6 +1133,49 @@ def _human(seconds: float) -> str:
     return f"{minutes}m"
 
 
+mcp_app = typer.Typer(
+    help="A read-only MCP server over stdio: fixtures, contain reports, fns contain (M6).",
+    no_args_is_help=True,
+)
+app.add_typer(mcp_app, name="mcp")
+
+
+@mcp_app.command("serve")
+def mcp_serve(
+    fixtures: Annotated[
+        Path | None,
+        typer.Option(help="A fixtures/ directory to offer besides the bundled sets."),
+    ] = None,
+    reports: Annotated[
+        Path | None,
+        typer.Option(help="A directory of ContainReport files (<digest>.<mode>.json) to offer."),
+    ] = None,
+    include_live: Annotated[
+        bool,
+        typer.Option(
+            "--include-live",
+            help="Also offer LIVE reports from --reports. They hold real tenant names and IDs.",
+        ),
+    ] = False,
+) -> None:
+    """Serve read-only MCP tools on stdin and stdout until end of input.
+
+    No tool writes or calls a tenant. Only JSON-RPC is written to stdout; give this
+    command to an MCP client as its server command.
+    """
+    import sys
+
+    from fns.mcp.server import Server, serve
+
+    # UTF-8 both ways; stdout writes bare "\n" (no "\r\n" on Windows), stdin accepts either.
+    for stream, newline in ((sys.stdin, None), (sys.stdout, "\n")):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", newline=newline)
+    server = Server(fixtures=fixtures, reports=reports, include_live=include_live)
+    raise typer.Exit(serve(server, sys.stdin, sys.stdout))
+
+
 def main() -> None:
     """Entry point. An unexpected exception exits 2, never 1: a crash must not look
     like a failed contract to CI."""

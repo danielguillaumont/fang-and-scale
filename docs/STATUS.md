@@ -23,6 +23,7 @@ Terraform run. To resume, read this section first.
 | #69 | 6 | **The report shows strikes, detections and the evidence ladder.**<br>`fns report --strike <dir>` (repeatable) shows each strike run: writes, outcomes, undos, what each observes, the scout's verification and the exit code.<br>`--detections <file>` shows the D5 results per strike: fired with latency, `detection-gap`, or no source rows. The new format (`schemas/detection-results.schema.json`) is operator-reported and never evidence.<br>Every finding gets a ladder column (one cell per rung, context marked). With `--prove`, its evidence table shows the bundle's evidence and roles.<br>The report refuses a strike run from another tenant or mode, or one that does not match its plan, and refuses detections for a run not on the page.<br>`strike-run.json` is read through one model (`StrikeRunRecord`) by the report and by `prove --after-strike`.<br>Cytoscape was already vendored and pinned by its SRI hash, and the page is still self-contained.<br>Golden: `tests/golden/report-strike-demo.html`, built through the real commands from demo-scout and strike-demo | 1701 |
 | #70 | 7 | **v0.1.0 release prep (no tag, no publish).**<br>Version `0.1.0` in `pyproject.toml` and `uv.lock`. `CHANGELOG.md` covers everything to date, including what did not run live; it says "not tagged yet".<br>`.github/workflows/release.yml` runs only on a `v*` tag. It checks that the tag, version, changelog date and lock agree (`scripts/release_check.py`), runs `poe check`, builds, writes a CycloneDX SBOM (`uv export`, no new dependency) and SHA-256 sums, and creates a **draft** release. Nothing goes to PyPI.<br>`poe release-check` and `poe sbom` run the same steps locally.<br>`docs/QUICKSTART.md` covers `pipx` or `uv tool` install from the Git tag with `--python 3.12`, or a checkout.<br>`fns demo --bundled` replays the packaged hand-written set without a checkout. Without the flag nothing changes.<br>A built wheel installed into a clean venv ran `fns demo` outside the repo.<br>The README has an Install section and an honest status line | 1722 |
 | #71 | 8 | **`docs/ARCHITECTURE.md` and `docs/THREAT-MODEL.md`.**<br>ARCHITECTURE has the roles, which ones hold credentials or write, and five trust boundaries as Mermaid diagrams: the gate, the separate verifier, the approved-only executor, labelled fixtures, and untrusted tenant data. Each boundary names what enforces it.<br>THREAT-MODEL covers a hostile tool, fixture, scope file, contract, tenant data, run directory and pull request. Each section says what stops the attack and what does **not**.<br>Open gaps found while writing it: terminal output keeps ESC from tenant strings (fix planned in item 10), JSON inputs have no size cap, release files are not attested, and CI and reviews are not required on `main`.<br>`tests/test_architecture_docs.py` fails if a named file, module or import contract disappears, or if the exit-code table drifts | 1731 |
+| #72 | 9 | **`fns mcp serve`: a read-only MCP server on stdio.**<br>It is standard-library JSON-RPC 2.0, with no new dependency. Five tools, each annotated read-only and closed-world:<br>- `list_fixtures` and `read_fixture_file`: from a fixed file list that never includes `_idmap.json` or `exchanges.json`;<br>- `contain_fixture`: a FIXTURE replay in a temporary directory;<br>- `list_reports` and `read_report`: from `--reports` only, FIXTURE unless `--include-live`, and refused if the content does not hash to the file name.<br>Names are pattern-checked and must resolve inside their root (no `..`, no symlink out). Files over 8 MiB and lines over 1 MiB are refused.<br>A new import contract keeps it away from the live transport, credentials, scout, the executor, the prover, the verifier and the proposer.<br>Tests: a canary ID map, a socket that raises if opened, and a real stdio subprocess.<br>The README has a client config example; ARCHITECTURE gains boundary 6 | 1791 |
 
 Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash script, Linux only). Counts below are passed tests on Windows.
 
@@ -36,7 +37,7 @@ Tests at the start of the session: 1402 passed, 1 skipped (the Action's bash scr
 6. ~~Report and UX~~ (#69)
 7. ~~v0.1 release prep~~ (#70; tagging is yours, see Needs Daniel)
 8. ~~ARCHITECTURE and THREAT-MODEL~~ (#71)
-9. **Next:** M6 groundwork (read-only MCP server, then the Agent ID and bake-off notes)
+9. M6 groundwork: ~~read-only MCP server~~ (#72); **next:** the Agent ID and bake-off notes
 10. Hardening and quality
 
 ### Needs Daniel
@@ -99,6 +100,8 @@ Still pending (strike engine, #64; not in the approved list):
   evidence (#69).
 - the release is a draft from a `v*` tag, never PyPI; the install path is a Git tag
   with `--python 3.12` (#70).
+- the MCP server: standard library instead of the `mcp` SDK, and what it will open
+  (fixed fixture files, FIXTURE reports unless `--include-live`) (#72).
 - the threat model's "Open gaps" table: each fix waits for a decision, except the
   terminal control-character fix, which item 10 builds (#71).
 

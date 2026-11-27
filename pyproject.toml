@@ -224,6 +224,32 @@ source_modules = ["fns.strike"]
 forbidden_modules = ["fns.verify", "fns.prove", "fns.probes", "fns.harden", "fns.contain"]
 
 [[tool.importlinter.contracts]]
+name = "MCP server is read-only: no live transport, credentials, executor, prover, proposer or verifier"
+type = "forbidden"
+source_modules = ["fns.mcp"]
+# M6: it replays fixtures and reads report files. Nothing that can reach a tenant,
+# write to one, grade evidence or record a fixture.
+forbidden_modules = [
+    "fns.adapters.azure.live",
+    "fns.scope.credentials",
+    "fns.scout",
+    "fns.strike",
+    "fns.strike_cli",
+    "fns.prove",
+    "fns.probes",
+    "fns.verify",
+    "fns.harden",
+    "fns.harden_cli",
+    "fns.mutate",
+    "fns.mutate_cli",
+    "fns.fixtures.recorder",
+    "fns.cli",
+    "azure",
+    "msal",
+    "msgraph",
+]
+
+[[tool.importlinter.contracts]]
 name = "Reach engine is pure: no API access, credentials, journal, executor or proposer"
 type = "forbidden"
 source_modules = ["fns.contain"]

@@ -9,6 +9,12 @@ version may change file formats; each change is listed here.
 
 ### Added
 
+- `fns mcp serve`: a read-only MCP server on stdio. Its five tools list and read
+  fixture sets, list and read contain reports, and run `fns contain` on a
+  fixture. It has no write tool and makes no network call. Fixture files come
+  from a fixed list that never includes the ID map. LIVE reports are offered
+  only with `--include-live`. It is standard library only, with no new
+  dependency.
 - `docs/ARCHITECTURE.md`: the trust boundaries with diagrams, each with what
   enforces it. `docs/THREAT-MODEL.md`: what happens when the tool, a fixture, a
   scope file, a contract, tenant data, a run directory or a pull request is
