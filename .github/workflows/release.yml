@@ -1,0 +1,53 @@
+name: release
+
+# Runs only when a maintainer pushes a v* tag. It builds the wheel and sdist, writes a
+# CycloneDX SBOM and SHA-256 sums, and creates a *draft* GitHub release with them.
+# A person reviews and publishes the draft. Nothing is uploaded to PyPI.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build, check and draft the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the draft release only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          python-version: "3.12"
+          enable-cache: false # a release builds from a clean cache
+      - name: The tag matches the package version and the changelog
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project python scripts/release_check.py "$TAG"
+      - name: Install
+        run: uv sync --locked --all-groups --all-extras
+      - name: Check
+        run: uv run --frozen poe check
+      - name: Build
+        run: uv build --no-sources --out-dir dist
+      - name: SBOM (CycloneDX 1.5, runtime dependencies and extras)
+        run: uv export --frozen --format cyclonedx1.5 --no-dev --all-extras --output-file dist/sbom.cdx.json
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum -- * > SHA256SUMS
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: >-
+          gh release create "$TAG" dist/*
+          --draft --verify-tag --title "$TAG"
+          --notes "Draft built by the release workflow. See CHANGELOG.md. Review before publishing."
