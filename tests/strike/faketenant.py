@@ -40,6 +40,7 @@ from tests.scope.writekit import (
     APPS,
     ESC_APPID,
     ESC_ROLES,
+    INVOICES_D7,
     PAYROLL,
     SP_ESC,
     VAULT,
@@ -88,6 +89,10 @@ class FakeTenant:
     key_times: dict[str, str] = field(
         default_factory=lambda: {"key1": "2026-11-01T00:00:00Z", "key2": "2026-11-01T00:00:00Z"}
     )
+    invoice_key_times: dict[str, str] = field(
+        default_factory=lambda: {"key1": "2026-11-02T00:00:00Z", "key2": "2026-11-02T00:00:00Z"}
+    )
+    """D-7's account (``INVOICES_D7``)."""
     vault_tags: dict[str, str] = field(
         default_factory=lambda: {"project": "fang-and-scale", "purpose": "lab"}
     )
@@ -128,7 +133,8 @@ class FakeTenant:
     hardened: bool = False
     """After harden: every Graph write by the agent is 403 (D6)."""
     leaky: set[str] = field(default_factory=set)
-    """Graph apps where a D-write wrongly succeeds even when hardened."""
+    """Graph apps, or storage account names, where a D-write wrongly succeeds even
+    when hardened."""
     sent: list[StrikeRequest] = field(default_factory=list)
     secrets_issued: list[str] = field(default_factory=list)
     _tick: itertools.count[int] = field(default_factory=lambda: itertools.count(1))
@@ -138,6 +144,7 @@ class FakeTenant:
         return copy.deepcopy(
             {
                 "keys": self.key_times,
+                "invoice_keys": self.invoice_key_times,
                 "tags": self.vault_tags,
                 "creds": self.creds,
                 "owners": self.owners,
@@ -211,11 +218,15 @@ class FakeTenant:
         path = urlsplit(r.url).path
         body = r.body if isinstance(r.body, dict) else {}
         if r.api == "arm":
+            account = path.split("/storageAccounts/", 1)[-1].split("/", 1)[0].lower()
+            times = self.invoice_key_times if account == "stinvoicesd7" else self.key_times
             if path.endswith("/listKeys"):
+                if self.hardened and account not in self.leaky:
+                    return 403, {"error": {"code": "AuthorizationFailed"}}
                 return 200, {"keys": self._keys()}
             if path.endswith("/regenerateKey"):
                 at = NOW + timedelta(minutes=next(self._tick))
-                self.key_times[body["keyName"]] = at.strftime("%Y-%m-%dT%H:%M:%SZ")
+                times[body["keyName"]] = at.strftime("%Y-%m-%dT%H:%M:%SZ")
                 return 200, {"keys": self._keys()}
             self.vault_tags = dict(body["tags"])
             return 200, {"id": VAULT, "tags": self.vault_tags, "properties": {}}
@@ -255,11 +266,14 @@ class FakeTenant:
         path = parts.path
         if request.api == "arm":
             if "storageAccounts" in path:
+                d7 = "stinvoicesd7" in path.lower()
                 body = {
-                    "id": PAYROLL,
-                    "name": "stpayrolltest",
+                    "id": INVOICES_D7 if d7 else PAYROLL,
+                    "name": "stinvoicesd7" if d7 else "stpayrolltest",
                     "tags": dict(self.storage_tags),
-                    "properties": {"keyCreationTime": dict(self.key_times)},
+                    "properties": {
+                        "keyCreationTime": dict(self.invoice_key_times if d7 else self.key_times)
+                    },
                 }
             else:
                 body = {"id": VAULT, "name": "kv-crown-jewels", "tags": dict(self.vault_tags)}

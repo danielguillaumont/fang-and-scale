@@ -23,7 +23,7 @@ apart from the tenant and subscription you type in step A1.
 | A | Rebuild the lab, baseline scout recorded as `fixtures/lab-run-4` | everything in `lab/`, with a new random suffix; a 1-day scout certificate | A4 (certificate); Teardown (lab) |
 | B | Monitoring on (workspace, Sentinel, diagnostic settings, the 11 rules); legitimate use as the agent; `fns record` | 18 resources; a 1-day agent certificate | B2 (certificate); Teardown |
 | C | `fns strike` S1 to S4, then one KQL query per strike (D5) | 2 resources (the strike expiry, the marker role's ID) and the marker role on `app-escalation-target`; 1-day scout and agent certificates; each strike's writes, all undone by the tool | C5 (certificates); C4 (strike writes); Teardown (marker role) |
-| D | Harden, apply, prove the fix, D-1 to D-5 (D6), recorded as `fixtures/lab-run-5` | 1-day certificates; nothing else, unless a D-step succeeds (undone at once) | D8 |
+| D | Harden, apply, prove the fix, D-1 to D-7 (D6), recorded as `fixtures/lab-run-5` | 1-day certificates; nothing else, unless a D-step succeeds (undone at once) | D8 |
 | Teardown | `lab-down`, then the checks | | |
 
 - **Time:** A 1.5 h, B 1 h plus up to a day for logs, C 2 h (mostly waiting
@@ -538,7 +538,7 @@ a `detection-gap` (PLAN §4). That is a result, not a stop.
 
 ---
 
-## Session D: harden, apply, prove the fix, D-1 to D-5
+## Session D: harden, apply, prove the fix, D-1 to D-7
 
 ### D1. Scout and contain
 
@@ -639,7 +639,7 @@ terraform -chdir=lab apply "-replace=time_offset.strike_expiry[0]"
 The plan: `time_offset.strike_expiry[0]` and `local_file.scope` replaced, **2
 to add, 0 to change, 2 to destroy**.
 
-### D6. D-1 to D-5: every attempt must be denied
+### D6. D-1 to D-7: every attempt must be denied
 
 ```powershell
 az ad app credential list --id $agentId --cert -o tsv            # must print nothing
@@ -652,12 +652,12 @@ $env:AZURE_CONFIG_DIR = $agentDir
 az login --service-principal --username $agentId --certificate $agentCred.fileWithCertAndPrivateKey --tenant $tenant --allow-no-subscriptions -o none
 Remove-Item Env:AZURE_CONFIG_DIR
 
-uv run fns strike plan --strikes D-1,D-2,D-3,D-4,D-5 --scope scope.lab.yaml --scout-config $scoutDir
+uv run fns strike plan --strikes D-1,D-2,D-3,D-4,D-5,D-6,D-7 --scope scope.lab.yaml --scout-config $scoutDir
 $plan = (Get-ChildItem .fns\strike\*\plan.json | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 (Get-Content $plan | ConvertFrom-Json).writes | ForEach-Object { "{0}  {1} {2}" -f $_.key, $_.request.method, $_.request.url; ($_.request.body | ConvertTo-Json -Compress -Depth 6); "  undo: " + (($_.undo | ForEach-Object { "{0} {1}" -f $_.method, $_.url }) -join "; ") }
 ```
 
-**Review.** Expected: five writes, all `expect denied`:
+**Review.** Expected: seven writes, all `expect denied`:
 
 | Write | Request | Undo, only if it succeeds |
 | --- | --- | --- |
@@ -666,6 +666,8 @@ $plan = (Get-ChildItem .fns\strike\*\plan.json | Sort-Object LastWriteTime | Sel
 | `D-3/add-password` | `addPassword` on `sp-fns-scout` | `removePassword` |
 | `D-4/add-owner` | `owners/$ref` on `id-verifier`, the agent as owner | `DELETE .../owners/<agent>/$ref` |
 | `D-5/add-owner` | `owners/$ref` on `sp-fns-scout`, the agent as owner | the same, on the scout app |
+| `D-6/list-keys` | `POST .../storageAccounts/stpayroll<suffix>/listKeys` | `regenerateKey` key1, then key2 (as SD1) |
+| `D-7/list-keys` | `POST .../storageAccounts/stinvoices<suffix>/listKeys` | the same, on the invoices account |
 
 ```powershell
 $hash = "<the 64 hex characters after plan sha256:>"
@@ -674,15 +676,18 @@ $LASTEXITCODE                                    # expected: 0
 $dRun = Split-Path $plan
 ```
 
-**Expected:** every row `denied`, `403`, undo `-`; five `verify ok` lines; `exit
-0: clean: every write undone and verified`.
+**Expected:** every row `denied`, `403`, undo `-`; seven `verify ok` lines, two
+of them `keys <account>: unchanged (listKeys not sent)`; `exit 0: clean: every
+write undone and verified`.
 
 - **Exit 1:** an attempt succeeded. It was undone at once, and the contract
-  fails. This is a stop: finish D7 and D8 so the evidence is recorded, then
-  report. It is a FINDINGS entry.
+  fails. A `listKeys` that succeeds (D-6, D-7) has both of that account's keys
+  regenerated at once, and its `verify` line reads `both regenerated`. This is a
+  stop: finish D7 and D8 so the evidence is recorded, then report. It is a
+  FINDINGS entry.
 - **Exit 4 or 5:** as in C4.
 
-### D7. Prove the fix as the agent, with the D-1 to D-5 evidence
+### D7. Prove the fix as the agent, with the D-1 to D-7 evidence
 
 ```powershell
 $env:AZURE_CONFIG_DIR = $agentDir
@@ -709,12 +714,13 @@ or another mode before anything is recorded.
 | `application:id-verifier`, `application:sp-fns-scout` (`credentials/update`, `owners/update`) | **`pass`**, `verified`, the D-step's 403 as supporting evidence; reason "denied by an after-harden strike (D-2) (observed), and every modeled path is refuted" (D-3, D-4, D-5 likewise) | option B: a LIVE 403 on the exact operation and object, no path, and no open surface (D4's PIM check) |
 | `directory:tenant applications/credentials/update` | **`inconclusive`**, D-2's `denied` attached as context | D-2 is one application, not every application (approved 2026-11-27) |
 | `directory:tenant roleAssignments/write` | **`inconclusive`** | SD3: no direct attempt; never counts |
-| payroll `listKeys`, invoices `listKeys` | **`inconclusive`** | the permissions API shows the action is gone (evaluated), but neither a read-only probe nor a D-step observes a `listKeys` denial |
+| payroll `listKeys`, invoices `listKeys` | **`pass`**, `verified`, D-6's (D-7's) 403 as supporting evidence | option B: `listKeys` is in the exact-operation table (approved 2026-11-27), on the account's exact ARM ID |
 | invoices `blob/write` (must still do) | **`inconclusive`** | allowed when evaluated; an observed success needs a write, which `prove` never makes |
 
-So expect **exit 3**: five inconclusive over the contract's budget of 2. Option B
-moves the four application items to `pass`, and the five above stay
-(`tests/prove/test_option_b.py`, `test_the_rest_of_the_contract_after_harden`).
+So expect **exit 3**: three inconclusive over the contract's budget of 2. Option B
+moves the four application items and the two `listKeys` items to `pass`, and the
+three above stay (`tests/prove/test_option_b.py`,
+`test_the_rest_of_the_contract_after_harden`).
 Any finding that **fails** is a stop, and so is an application item that is not
 `pass` although its D-step printed `denied` and `403` in D6: send its reasons.
 
@@ -862,12 +868,20 @@ if ($v) { az tag update --resource-id $res.key_vault --operation Delete --tags "
 az keyvault show --ids $res.key_vault --query tags -o json       # project and purpose only
 ```
 
-**S1: the payroll keys.** Make any key the strike read worthless:
+**S1 and D-6: the payroll keys.** Make any key the strike read worthless:
 
 ```powershell
 $payroll = ($res.storage_payroll -split "/")[-1]
 az storage account keys renew -g rg-fns-lab -n $payroll --key primary -o none
 az storage account keys renew -g rg-fns-lab -n $payroll --key secondary -o none
+```
+
+**D-7: the invoices keys.** Only if D-7 printed anything but `denied`:
+
+```powershell
+$invoiceAcct = ($res.storage_invoices -split "/")[-1]
+az storage account keys renew -g rg-fns-lab -n $invoiceAcct --key primary -o none
+az storage account keys renew -g rg-fns-lab -n $invoiceAcct --key secondary -o none
 ```
 
 If the journal is lost, these blocks are also the search by name. They look for

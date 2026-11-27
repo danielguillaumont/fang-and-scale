@@ -47,7 +47,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Final, Literal, Protocol
 
-from fns.adapters.azure.http import TransportError
+from fns.adapters.azure.http import ARM_BASE, TransportError
 from fns.exitcodes import ExitCode
 from fns.journal.sqlite import StrikePhase
 from fns.scope.credentials import CredentialError, TokenProvider, token_claims
@@ -65,7 +65,7 @@ from fns.strike.plan import (
 )
 from fns.strike.reader import LabReader, ReadError
 from fns.strike.secrets import ACCESS_TOKEN, HeldToken, SecretHolder
-from fns.strike.strikes import ASSIGN_KEY, S3_KEY, TOKEN_KEY, LabTargets, read_pre_state
+from fns.strike.strikes import ASSIGN_KEY, LIST_KEYS, S3_KEY, TOKEN_KEY, LabTargets, read_pre_state
 from fns.strike.transport import (
     StrikeRequest,
     StrikeResponse,
@@ -486,19 +486,25 @@ def _same(what: str, ok: bool) -> Check:
 def verify(plan: StrikePlan, reader: LabReader, exposed: set[str]) -> list[Check]:
     """Read every strike object back as the scout and compare it with the pre-state.
 
-    ``exposed`` is the set of write keys that went through or may have: when S1's
-    ``listKeys`` did, both keys must be newer than the pre-state (regenerated);
-    when it did not, they must be unchanged.
+    ``exposed`` is the set of write keys that went through or may have: when a
+    ``listKeys`` to an account did (S1, or a D-6/D-7 that was not denied), both of
+    that account's keys must be newer than the pre-state (regenerated); when none
+    did, they must be unchanged.
     """
     checks: list[Check] = []
     name = f"{CREDENTIAL_PREFIX}{plan.run_id}"
-    s1_sent = any(k.startswith("S1/") for k in exposed)
+    listed = {
+        w.request.url.split("?", 1)[0].removesuffix("/listKeys").removeprefix(ARM_BASE).lower()
+        for w in plan.writes
+        if w.key in exposed and w.request.operation == LIST_KEYS
+    }
     for obj, before in sorted(plan.pre_state.items()):
         kind, _, oid = obj.partition(":")
         try:
             if kind == "arm" and "keyCreationTime" in before:
                 now = _key_times(reader.storage_account(oid))
-                checks.append(_check_keys(oid, now, before["keyCreationTime"], s1_sent))
+                sent = oid.lower() in listed
+                checks.append(_check_keys(oid, now, before["keyCreationTime"], sent))
             elif kind == "arm":
                 tags = reader.vault(oid).get("tags") or {}
                 checks.append(_same(f"tags {oid}", tags == before["tags"]))

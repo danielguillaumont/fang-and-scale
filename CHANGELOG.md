@@ -29,6 +29,14 @@ version may change file formats; each change is listed here.
 - The M4 runbook checks the PIM precondition before session D's strikes, and its
   expected results now include `listKeys` and `blob/write`. With them, session D
   still exits 3.
+- `fns strike`: two more after-harden attempts, D-6 and D-7, `listKeys` on the
+  payroll and invoices storage accounts. Each must be denied; if one succeeds,
+  both of that account's keys are regenerated at once, verified, and the run
+  exits 1. A LIVE 403 counts under option B (the exact-operation table gains
+  `listKeys`, on the account's exact ARM ID), so both `listKeys` items can
+  `pass`. The lab's strike targets include the invoices account. Frozen
+  assertions now also record a `resource:` target's ARM ID; the prove bundle
+  digests change for that reason only.
 
 ## [0.1.0] - 2026-11-27
 

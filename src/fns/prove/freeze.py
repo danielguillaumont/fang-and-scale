@@ -141,9 +141,12 @@ def _resource(snapshot: Snapshot, finding: Finding) -> Entity | None:
     return resolve_resource(snapshot, ref).entity
 
 
-def _object_id(snapshot: Snapshot, finding: Finding) -> str | None:
-    """The object ID of an application or service principal target, if it resolves."""
+def _object_id(snapshot: Snapshot, finding: Finding, resource: Entity | None) -> str | None:
+    """The target's object, if it resolves: a directory object ID, or a resource's
+    normalized ARM ID (the snapshot's entity IDs are normalized)."""
     kind, _, ref = finding.target.partition(":")
+    if kind == "resource":
+        return None if resource is None else resource.id
     entity_kind = {"application": "application", "service_principal": "servicePrincipal"}.get(kind)
     if entity_kind is None:
         return None
@@ -232,7 +235,7 @@ def _assertion(
             *_open_surfaces(snapshot, semantics, target),
             *surfaces,
         ),
-        target_object_id=_object_id(snapshot, finding),
+        target_object_id=_object_id(snapshot, finding, target),
     )
 
 

@@ -1,4 +1,4 @@
-"""``fns prove --after-strike DIR``: D-1 to D-5 as evidence (D6, approved 2026-11-27).
+"""``fns prove --after-strike DIR``: D-1 to D-7 as evidence (D6, approved 2026-11-27).
 
 ``DIR`` is a ``fns strike run`` directory: ``plan.json`` and ``strike-run.json``.
 Before anything is recorded:
@@ -8,7 +8,7 @@ Before anything is recorded:
 - the plan's tenant must be the frozen assertions' tenant, and both runs must be
   the same mode (a FIXTURE strike never becomes LIVE evidence, nor the reverse).
 
-Only after-harden attempts (D-1 to D-5, planned ``expect: denied``) count, and
+Only after-harden attempts (D-1 to D-7, planned ``expect: denied``) count, and
 only two outcomes: ``denied`` (a 401 or 403) and ``unexpected-success``. A
 before-harden strike never counts, whatever its plan says: S4's token claims, in
 particular, are a safety stop and never evidence (approved 2026-11-27). Anything
@@ -31,6 +31,7 @@ from typing import Final
 
 from fns.inputcap import MAX_RECORD_BYTES, read_capped
 from fns.journal.sqlite import SqliteJournal
+from fns.models.armid import ArmIdError, normalize_arm_id
 from fns.models.assertions import AssertionSet, StrikeObservation
 from fns.models.strike_record import StrikeRunRecord
 from fns.probes.runner import FREEZE_STEP, sha256_bytes, write_artifact
@@ -44,8 +45,25 @@ CONTRACT_ITEM: Final = re.compile(r"^((?:resource|directory|application):[^\s:]+
 _OBJECT_IN_URL: Final = re.compile(
     r"/(?:applications|servicePrincipals)/([0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12})/"
 )
-"""The directory object a Graph write names. The verifier compares it with the
-frozen target's object ID (option B); prove only copies it."""
+_ARM_ACTION: Final = re.compile(
+    r"^https://management\.azure\.com(/subscriptions/[^?#]+?)/(\w+)(?:\?|$)"
+)
+
+
+def request_object(url: str) -> str | None:
+    """The object a planned write names: a Graph directory object ID, or the ARM
+    resource an action is posted to (normalized). The verifier compares it with the
+    frozen target's object (option B); prove only copies it."""
+    graph = _OBJECT_IN_URL.search(url)
+    if graph:
+        return graph[1].lower()
+    arm = _ARM_ACTION.match(url)
+    if arm:
+        try:
+            return normalize_arm_id(arm[1])
+        except ArmIdError:
+            return None
+    return None
 
 
 class AfterStrikeError(ValueError):
@@ -79,7 +97,7 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
         if p.strike not in AFTER_HARDEN or p.expect != "denied" or outcome is None:
             continue
         status = w.status
-        object_id = _OBJECT_IN_URL.search(p.request.url)
+        object_id = request_object(p.request.url)
         for item in p.observes:
             m = CONTRACT_ITEM.match(item)
             if m is None:
@@ -99,7 +117,7 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
                     http_status=status,
                     observed_at=at,
                     request_operation=p.request.operation,
-                    request_object_id=object_id[1].lower() if object_id else None,
+                    request_object_id=object_id,
                 )
             )
     return sorted(out, key=lambda o: o.step_key)

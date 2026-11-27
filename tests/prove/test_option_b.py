@@ -60,6 +60,9 @@ VERIFIER_OWNERS = ("application:id-verifier", "owners/update")
 SCOUT_OWNERS = ("application:sp-fns-scout", "owners/update")
 TENANT_CRED = ("directory:tenant", "applications/credentials/update")
 ROLE_WRITE = ("directory:tenant", "roleAssignments/write")
+PAYROLL_KEYS = ("resource:stpayrolltiin02", "listKeys")
+INVOICE_KEYS = ("resource:stinvoicestiin02", "listKeys")
+LIST_KEYS = "arm:Microsoft.Storage/storageAccounts/listKeys/action"
 
 D_STEPS = {
     # write key, strike, request, the items its plan row observes (strikes.OBSERVES)
@@ -67,6 +70,8 @@ D_STEPS = {
     "D-3/add-password": ("D-3", ADD_PASSWORD, SCOUT_CRED, [SCOUT_CRED]),
     "D-4/add-owner": ("D-4", ADD_OWNER, VERIFIER_OWNERS, [VERIFIER_OWNERS]),
     "D-5/add-owner": ("D-5", ADD_OWNER, SCOUT_OWNERS, [SCOUT_OWNERS]),
+    "D-6/list-keys": ("D-6", LIST_KEYS, PAYROLL_KEYS, [PAYROLL_KEYS]),  # approved 2026-11-27
+    "D-7/list-keys": ("D-7", LIST_KEYS, INVOICE_KEYS, [INVOICE_KEYS]),
 }
 
 
@@ -193,10 +198,16 @@ def test_the_frozen_application_items_carry_their_object_ids(lab: AssertionSet) 
     assert _item(lab, VERIFIER_CRED).target_object_id != _item(lab, SCOUT_CRED).target_object_id
     for item in (TENANT_CRED, ROLE_WRITE):
         assert _item(lab, item).target_object_id is None
+    for item in (PAYROLL_KEYS, INVOICE_KEYS):  # a resource's normalized ARM ID
+        oid = _item(lab, item).target_object_id
+        assert oid is not None and oid.startswith("/subscriptions/")
+        assert oid.endswith("/storageaccounts/" + item[0].removeprefix("resource:"))
 
 
 MATRIX = {
-    # item: (verdict without strikes, verdict with D-2 to D-5 denied)
+    # item: (verdict without strikes, verdict with D-2 to D-7 denied)
+    PAYROLL_KEYS: ("inconclusive", "pass"),  # D-6
+    INVOICE_KEYS: ("inconclusive", "pass"),  # D-7
     VERIFIER_CRED: ("inconclusive", "pass"),
     SCOUT_CRED: ("inconclusive", "pass"),
     VERIFIER_OWNERS: ("inconclusive", "pass"),
@@ -212,7 +223,14 @@ def test_the_live_matrix(lab: AssertionSet) -> None:
     after = by_item(after_bundle)
     for item, (old, new) in MATRIX.items():
         assert (before[item].verdict, after[item].verdict) == (old, new), item
-    for item in (VERIFIER_CRED, SCOUT_CRED, VERIFIER_OWNERS, SCOUT_OWNERS):
+    for item in (
+        VERIFIER_CRED,
+        SCOUT_CRED,
+        VERIFIER_OWNERS,
+        SCOUT_OWNERS,
+        PAYROLL_KEYS,
+        INVOICE_KEYS,
+    ):
         f = after[item]
         assert f.coverage == "verified"
         assert strike_roles(f) == [None]  # supporting evidence
@@ -224,21 +242,22 @@ def test_the_live_matrix(lab: AssertionSet) -> None:
 
 
 def test_the_rest_of_the_contract_after_harden(lab: AssertionSet) -> None:
-    """Items no D-step observes are as before. listKeys has no observed probe and
-    blob/write no observed success, so the session-D gate stays at exit 3."""
+    """Items no D-step observes are as before. With D-6 and D-7, three items stay
+    inconclusive: blob/write (no observed success), the tenant-wide item and SD3.
+    Over the old budget of 2 that is exit 3 (the lab contract budget is raised to 3 separately)."""
     after_bundle = verify(lab, all_d_steps(lab))
     after = by_item(after_bundle)
     expect = {
         ("resource:kv-crown-tiin02", "secrets/get"): "pass",
         ("resource:kv-crown-tiin02", "secrets/list"): "pass",
         ("resource:stpayrolltiin02", "blob/read"): "pass",
-        ("resource:stpayrolltiin02", "listKeys"): "inconclusive",
-        ("resource:stinvoicestiin02", "listKeys"): "inconclusive",
+        ("resource:stpayrolltiin02", "listKeys"): "pass",
+        ("resource:stinvoicestiin02", "listKeys"): "pass",
         ("resource:stinvoicestiin02", "blob/read"): "pass",
         ("resource:stinvoicestiin02", "blob/write"): "inconclusive",
     }
     assert {k: after[k].verdict for k in expect} == expect
-    assert after_bundle.summary.inconclusive == 5  # 9 without option B
+    assert after_bundle.summary.inconclusive == 3  # 9 without option B
     assert verify(lab, []).summary.inconclusive == 9
     assert (after_bundle.summary.critical, after_bundle.summary.exit_code) == (0, 3)
 
@@ -286,6 +305,43 @@ NOT_COUNTING = {
     ),
     "tenant-wide": (_row(item=TENANT_CRED), "not the item's exact operation"),
     "role-assignments": (_row(item=ROLE_WRITE), "roleAssignments/write never counts (SD3)"),
+    # listKeys (D-6, D-7)
+    "list-keys-401": (
+        _row({"http_status": 401}, item=PAYROLL_KEYS, key="D-6/list-keys"),
+        "HTTP 401, not 403",
+    ),
+    "list-keys-fixture": (
+        _row(item=PAYROLL_KEYS, key="D-6/list-keys", live=False),
+        "not LIVE: FIXTURE never counts",
+    ),
+    "list-keys-other-account": (
+        _row(
+            {"request_object_id": "/subscriptions/00000000-0000-4000-8000-000000000001/x"},
+            item=PAYROLL_KEYS,
+            key="D-6/list-keys",
+        ),
+        "not the item's exact object",
+    ),
+    "list-keys-by-d2": (
+        _row({"strike": "D-2"}, item=PAYROLL_KEYS, key="D-6/list-keys"),
+        "D-2 does not make that request",
+    ),
+    "list-keys-by-s1-key": (
+        _row(
+            {"request_operation": "arm:Microsoft.Storage/storageAccounts/regenerateKey/action"},
+            item=PAYROLL_KEYS,
+            key="D-6/list-keys",
+        ),
+        "not a write in the exact-operation table",
+    ),
+    "list-keys-on-blob-read": (
+        _row(item=("resource:stpayrolltiin02", "blob/read"), key="D-6/list-keys"),
+        "not the item's exact operation",
+    ),
+    "add-password-on-list-keys": (
+        _row(item=PAYROLL_KEYS, key="D-2/add-password"),
+        "not the item's exact operation",
+    ),
 }
 
 
@@ -366,6 +422,24 @@ def test_a_strike_success_fails_the_item_even_beside_a_denial(lab: AssertionSet)
     f = v.judge_with_strikes(a, {}, lab.contract, [denied, allowed], live=True)
     assert f.verdict == "fail"
     assert f.reasons[0].startswith("an after-harden strike attempt succeeded")
+
+
+@pytest.mark.parametrize(
+    ("key", "item"), [("D-6/list-keys", PAYROLL_KEYS), ("D-7/list-keys", INVOICE_KEYS)]
+)
+def test_a_list_keys_that_succeeds_after_harden_fails_its_item(
+    lab: AssertionSet, key: str, item: tuple[str, str]
+) -> None:
+    """If D-6 or D-7 ever succeeds, the item fails (the run regenerates both keys
+    and exits 1; tests/strike/test_listkeys_d_steps.py)."""
+    a = _item(lab, item)
+    obs = {pid: o for pid, o in _observations(lab).items() if any(p.id == pid for p in a.probes)}
+    allowed = strike(lab, key, item, outcome="allowed", http_status=200, observed_at=AT)
+    f = v.judge_with_strikes(a, obs, lab.contract, [allowed], live=True)
+    assert f.verdict == "fail"
+    assert f.reasons[0].startswith("an after-harden strike attempt succeeded")
+    with_other = verify(lab, [*all_d_steps(lab)])
+    assert by_item(with_other)[item].verdict == "pass"  # the denial alone passes it
 
 
 # --- the PIM precondition for session D (approved 2026-11-27) ----------------------------
@@ -466,11 +540,13 @@ def test_a_forced_breach_raises(lab: AssertionSet, monkeypatch: pytest.MonkeyPat
 DRAW = st.fixed_dictionaries(
     {
         "key": st.sampled_from(sorted(D_STEPS)),
-        "strike": st.sampled_from(["D-1", "D-2", "D-3", "D-4", "D-5"]),
+        "strike": st.sampled_from(["D-1", "D-2", "D-3", "D-4", "D-5", "D-6", "D-7"]),
         "mode": st.sampled_from(["LIVE", "FIXTURE"]),
         "outcome": st.sampled_from(["allowed", "denied"]),
         "http_status": st.sampled_from([200, 201, 204, 400, 401, 403, 404, None]),
-        "request_operation": st.sampled_from([ADD_PASSWORD, ADD_OWNER, "graph:GET /x", None]),
+        "request_operation": st.sampled_from(
+            [ADD_PASSWORD, ADD_OWNER, LIST_KEYS, "graph:GET /x", None]
+        ),
         "object": st.sampled_from(["own", "other", "none"]),
     }
 )
@@ -524,7 +600,9 @@ def test_no_finding_loosens_without_a_counting_denial(
         assert counting
         assert new.verdict == "pass" and not a.open_surfaces
         assert not any(o.outcome == "allowed" for o, _ in strikes)
-        assert all(a.target.startswith("application:") for _ in counting)
+        kinds = {v.COUNTING[str(o.request_operation)][2] for o, _ in counting}
+        assert kinds == {a.target.partition(":")[0]}
+        assert {v.COUNTING[str(o.request_operation)][0] for o, _ in counting} == {a.operation}
         assert (a.target, a.operation) not in v.NEVER_COUNTS
     if not counting:
         assert new == v.with_strikes(baseline, strikes)
@@ -536,4 +614,6 @@ def test_the_verifier_isolation_holds() -> None:
     """The exact-operation table lives in the verifier: nothing from fns.strike."""
     source = Path(v.__file__).read_text(encoding="utf-8")
     assert "from fns.strike" not in source and "import fns.strike" not in source
-    assert json.dumps(sorted(v.COUNTING)) == json.dumps([ADD_PASSWORD, ADD_OWNER])
+    assert json.dumps(sorted(v.COUNTING)) == json.dumps(
+        sorted([ADD_PASSWORD, ADD_OWNER, LIST_KEYS])
+    )

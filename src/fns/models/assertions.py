@@ -78,10 +78,13 @@ class Assertion(FnsModel):
     probes: tuple[ProbeSpec, ...] = ()
     open_surfaces: tuple[str, ...] = ()
     """Uncollected surfaces that could add reach for this operation (blocks a pass, E1)."""
-    target_object_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
-    """The directory object ID of an ``application:`` or ``service_principal:`` target,
-    from the snapshot at freeze. An after-harden strike counts toward a verdict only
-    on this exact object (option B, approved 2026-11-27)."""
+    target_object_id: str | None = Field(
+        default=None, pattern=r"^(?:[0-9a-f-]{36}|/subscriptions/[^\s?#]+)$"
+    )
+    """The target's object at freeze, from the snapshot: the directory object ID of an
+    ``application:`` or ``service_principal:`` target, or the normalized ARM ID of a
+    ``resource:`` target. An after-harden strike counts toward a verdict only on this
+    exact object (option B, approved 2026-11-27)."""
 
     @field_validator("paths")
     @classmethod
@@ -191,7 +194,7 @@ def strike_step_key(write_key: str, item: str) -> str:
 
 
 class StrikeObservation(FnsModel):
-    """One after-harden attempt (D-1 to D-5) as evidence for one contract item (D6).
+    """One after-harden attempt (D-1 to D-7) as evidence for one contract item (D6).
 
     Written by ``fns prove --after-strike`` from a ``fns strike run`` and stored
     content-addressed under ``artifacts/`` like a probe observation. The verifier
@@ -219,8 +222,11 @@ class StrikeObservation(FnsModel):
     observed_at: TzDatetime
     request_operation: str | None = None
     """The planned write's operation, e.g. ``graph:POST /applications/{id}/addPassword``."""
-    request_object_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
-    """The directory object ID in the planned write's URL (lower case)."""
+    request_object_id: str | None = Field(
+        default=None, pattern=r"^(?:[0-9a-f-]{36}|/subscriptions/[^\s?#]+)$"
+    )
+    """The object the planned write names: a directory object ID (lower case), or a
+    normalized ARM resource ID."""
 
     @property
     def step_key(self) -> str:
