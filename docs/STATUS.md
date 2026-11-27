@@ -38,13 +38,20 @@ Tests: 1128 before these PRs, 1152 after.
    Linking it is more honest, but it changes the evidence model and every
    prove golden, so it needs a plan and your approval. The verdicts would not
    change.
-2. **Sigstore production (Rekor).** Still refused in code
+2. **Decided 2026-11-26: stays refused until the repository is public (V3).** The text below is the original question.
+   **Sigstore production (Rekor).** Still refused in code
    (`PRODUCTION_APPROVED = False`). `prove-sign` signs `fixtures/lab-run-3` on
    staging on every push to `main`.
-3. **`PIM_FREE_PLAN_IDS` is empty.** Until it holds verified plan IDs, any tenant
+3. **Decided 2026-11-26: stays empty for now.** FINDINGS has the TODO for filling it from Microsoft's licensing reference. The text below is the original question.
+   **`PIM_FREE_PLAN_IDS` is empty.** Until it holds verified plan IDs, any tenant
    with licences gets `pim-eligibility` not collected when an eligibility listing
    fails, and its findings stay inconclusive. Filling it means checking IDs
    against Microsoft's licensing list. The lab is unaffected.
+
+## Public-readiness audit
+
+See `docs/PUBLIC-READINESS.md` (#43 to #48): findings, fixes, the GitHub
+settings to turn on, four owner decisions, and the recommendation.
 
 ## Next
 
