@@ -65,10 +65,12 @@ def test_cli_schema_writes_lf_files(tmp_path: Path) -> None:
         "assertions.schema.json",
         "contain-report.schema.json",
         "contract.schema.json",
+        "detection-results.schema.json",
         "evidence-bundle.schema.json",
         "mutation-report.schema.json",
         "scope.schema.json",
         "snapshot.schema.json",
+        "strike-run.schema.json",
     ]
     for p in tmp_path.iterdir():
         assert b"\r\n" not in p.read_bytes()

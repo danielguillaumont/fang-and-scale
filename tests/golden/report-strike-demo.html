@@ -1,0 +1,1196 @@
+<main>
+<header>
+<span class="mark">FANG &amp; SCALE</span>
+<span class="tag">Prove what the bite can't reach.</span>
+</header>
+<div class="fixture">FIXTURE: replayed from recorded or hand-written files, not a live tenant.</div>
+<h1>billing-agent-blast-radius</h1>
+<p class="muted">Assumed compromised: <code>sp-billing-agent</code>
+</p>
+<div class="cards">
+<div class="card">
+<b class="fail">contract failed</b>
+<span>result</span>
+</div>
+<div class="card">
+<b class="fail">4 / 0</b>
+<span>critical reachable / allowed</span>
+</div>
+<div class="card">
+<b class="">0</b>
+<span>legitimate use failed</span>
+</div>
+<div class="card">
+<b class="inconclusive">3 / 2</b>
+<span>inconclusive / allowed</span>
+</div>
+<div class="card">
+<b class="pass">1</b>
+<span>passed with evidence</span>
+</div>
+<div class="card">
+<b class="pass">2 / 2</b>
+<span>strike runs clean</span>
+</div>
+<div class="card">
+<b class="fail">2 / 3</b>
+<span>detections fired</span>
+</div>
+<div class="card">
+<b class="inconclusive">offline-test</b>
+<span>bundle signer</span>
+</div>
+</div>
+<h2 id="coverage">Coverage</h2>
+<p class="muted">After `fns prove` (the bundle&#x27;s verdicts). Coverage states say how much was actually checked; read them before the verdicts.</p>
+<div class="chips">
+<span class="chip" title="a live probe observed the result">verified 2</span>
+<span class="chip" title="the platform&#x27;s permission evaluation agreed; no live probe">evaluated-only 3</span>
+<span class="chip" title="only the reach model says so">modeled-only 2</span>
+<span class="chip" title="nothing could decide it (unmodeled surface, missing data)">not-assessed 1</span>
+<span class="chip" title="outside the scope manifest">out-of-scope 0</span>
+</div>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>item</th>
+<th>target</th>
+<th>operation</th>
+<th>verdict</th>
+<th>coverage</th>
+<th>highest rung</th>
+<th>ladder</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>must_not_reach</td>
+<td>
+<code>directory:tenant</code>
+</td>
+<td>
+<code>applications/credentials/update</code>
+</td>
+<td class="fail">fail</td>
+<td>modeled-only</td>
+<td>modeled</td>
+<td>
+<span class="ladder">
+<span class="rung fail" title="modeled: allowed (the reach model over a snapshot)">M:A</span>
+<span class="rung none" title="evaluated: nothing (the platform&#x27;s own permission evaluation)">E:-</span>
+<span class="rung none" title="observed: nothing; context: denied (a live, non-destructive probe)">O:-*</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_not_reach</td>
+<td>
+<code>directory:tenant</code>
+</td>
+<td>
+<code>roleAssignments/write</code>
+</td>
+<td class="fail">fail</td>
+<td>modeled-only</td>
+<td>modeled</td>
+<td>
+<span class="ladder">
+<span class="rung fail" title="modeled: allowed (the reach model over a snapshot)">M:A</span>
+<span class="rung none" title="evaluated: nothing (the platform&#x27;s own permission evaluation)">E:-</span>
+<span class="rung none" title="observed: nothing (a live, non-destructive probe)">O:-</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_not_reach</td>
+<td>
+<code>resource:kv-crown-jewels</code>
+</td>
+<td>
+<code>secrets/get</code>
+</td>
+<td class="fail">fail</td>
+<td>evaluated-only</td>
+<td>evaluated</td>
+<td>
+<span class="ladder">
+<span class="rung fail" title="modeled: allowed (the reach model over a snapshot)">M:A</span>
+<span class="rung fail" title="evaluated: allowed; context: denied (the platform&#x27;s own permission evaluation)">E:A*</span>
+<span class="rung none" title="observed: nothing; context: denied (a live, non-destructive probe)">O:-*</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_not_reach</td>
+<td>
+<code>resource:kv-crown-jewels</code>
+</td>
+<td>
+<code>secrets/list</code>
+</td>
+<td class="fail">fail</td>
+<td>evaluated-only</td>
+<td>evaluated</td>
+<td>
+<span class="ladder">
+<span class="rung fail" title="modeled: allowed (the reach model over a snapshot)">M:A</span>
+<span class="rung fail" title="evaluated: allowed (the platform&#x27;s own permission evaluation)">E:A</span>
+<span class="rung none" title="observed: nothing (a live, non-destructive probe)">O:-</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_not_reach</td>
+<td>
+<code>resource:stpayroll</code>
+</td>
+<td>
+<code>blob/read</code>
+</td>
+<td class="inconclusive">inconclusive</td>
+<td>verified</td>
+<td>observed</td>
+<td>
+<span class="ladder">
+<span class="rung none" title="modeled: unknown (the reach model over a snapshot)">M:-</span>
+<span class="rung pass" title="evaluated: denied (the platform&#x27;s own permission evaluation)">E:D</span>
+<span class="rung pass" title="observed: denied (a live, non-destructive probe)">O:D</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_not_reach</td>
+<td>
+<code>resource:stpayroll</code>
+</td>
+<td>
+<code>listKeys</code>
+</td>
+<td class="inconclusive">inconclusive</td>
+<td>not-assessed</td>
+<td>none</td>
+<td>
+<span class="ladder">
+<span class="rung none" title="modeled: unknown (the reach model over a snapshot)">M:-</span>
+<span class="rung none" title="evaluated: nothing (the platform&#x27;s own permission evaluation)">E:-</span>
+<span class="rung none" title="observed: nothing (a live, non-destructive probe)">O:-</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_still_do</td>
+<td>
+<code>resource:stinvoices</code>
+</td>
+<td>
+<code>blob/read</code>
+</td>
+<td class="pass">pass</td>
+<td>verified</td>
+<td>observed</td>
+<td>
+<span class="ladder">
+<span class="rung pass" title="modeled: allowed (the reach model over a snapshot)">M:A</span>
+<span class="rung none" title="evaluated: nothing (the platform&#x27;s own permission evaluation)">E:-</span>
+<span class="rung pass" title="observed: allowed (a live, non-destructive probe)">O:A</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+<tr>
+<td>must_still_do</td>
+<td>
+<code>resource:stinvoices</code>
+</td>
+<td>
+<code>blob/write</code>
+</td>
+<td class="inconclusive">inconclusive</td>
+<td>evaluated-only</td>
+<td>evaluated</td>
+<td>
+<span class="ladder">
+<span class="rung pass" title="modeled: allowed (the reach model over a snapshot)">M:A</span>
+<span class="rung pass" title="evaluated: allowed (the platform&#x27;s own permission evaluation)">E:A</span>
+<span class="rung none" title="observed: nothing (a live, non-destructive probe)">O:-</span>
+<span class="rung none" title="logged: nothing (the probe also showed up in the logs)">L:-</span>
+</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="muted">Ladder: one cell per rung (Modeled, Evaluated, Observed, Logged). A: allowed, D: denied, -: no result. Green is what the contract wants, red is not. * marks context, a result kept with the finding that settles nothing.</p>
+<h2 id="graph-h">Reach graph</h2>
+<p class="muted">Shortest path to each finding, from the compromised identity. Red-ringed nodes are escalation steps; diamonds are the final way in. Select a node to read it.</p>
+<div id="graph">
+</div>
+<div id="graph-detail" class="muted">
+</div>
+<h2 id="findings">Findings and paths</h2>
+<p class="muted">Verdicts here are from the reach model (`fns contain`); the verdict after `fns prove` is shown beside each.</p>
+<details>
+<summary>
+<span class="fail">FAIL</span> <code>directory:tenant</code> <code>applications/credentials/update</code> <span class="muted">must_not_reach, modeled-only</span> &rarr; after prove <span class="fail">FAIL</span> <span class="muted">modeled-only</span>
+</summary>
+<ul>
+<li>reachable in the model: 4 path(s); shortest: assume-compromised -&gt; owned-object-permission</li>
+<li>only on objects it owns (counts as reachable, D2)</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; graph-permission: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; owned-object-permission: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; owned-object-permission: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; graph-permission: not refutable by a non-destructive probe</li>
+<li>model: reachable in the model: 4 path(s); shortest: assume-compromised -&gt; owned-object-permission</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>observed</td>
+<td>denied</td>
+<td>context</td>
+<td>
+<code>fns.strike/after-harden</code>
+</td>
+<td>D-2/add-password: HTTP 403</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>shortest path, rung modeled (partial)</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owned-object-permission</span> sp-billing-agent owns app-escalation-target; Application.ReadWrite.OwnedBy allows applications/credentials/update on objects it owns<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>only on objects it owns (counts as reachable, D2)</li>
+</ul>
+<h3>alternative 1, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants app-escalation-target the Graph permission Application.ReadWrite.All</li>
+<li>
+<span class="rule">graph-permission</span> Application.ReadWrite.All allows applications/credentials/update on any object in the tenant</li>
+</ol>
+<h3>alternative 2, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants sp-billing-agent the Graph permission Application.ReadWrite.All</li>
+<li>
+<span class="rule">graph-permission</span> Application.ReadWrite.All allows applications/credentials/update on any object in the tenant</li>
+</ol>
+<h3>alternative 3, rung modeled (partial)</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants sp-billing-agent the Graph permission Application.ReadWrite.All</li>
+<li>
+<span class="rule">owned-object-permission</span> sp-billing-agent owns app-escalation-target; Application.ReadWrite.All allows applications/credentials/update on objects it owns<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>only on objects it owns (counts as reachable, D2)</li>
+</ul>
+</details>
+<details>
+<summary>
+<span class="fail">FAIL</span> <code>directory:tenant</code> <code>roleAssignments/write</code> <span class="muted">must_not_reach, modeled-only</span> &rarr; after prove <span class="fail">FAIL</span> <span class="muted">modeled-only</span>
+</summary>
+<ul>
+<li>reachable in the model: 4 path(s); shortest: assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; graph-permission</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; rolemanagement-write -&gt; directory-role: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; graph-permission: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; rolemanagement-write -&gt; directory-role: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; graph-permission: not refutable by a non-destructive probe</li>
+<li>model: reachable in the model: 4 path(s); shortest: assume-compromised -&gt; owner-adds-credential -&gt; approle-self-grant -&gt; graph-permission</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>shortest path, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants app-escalation-target the Graph permission RoleManagement.ReadWrite.Directory</li>
+<li>
+<span class="rule">graph-permission</span> RoleManagement.ReadWrite.Directory allows roleAssignments/write on any object in the tenant</li>
+</ol>
+<h3>alternative 1, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants sp-billing-agent the Graph permission RoleManagement.ReadWrite.Directory</li>
+<li>
+<span class="rule">graph-permission</span> RoleManagement.ReadWrite.Directory allows roleAssignments/write on any object in the tenant</li>
+</ol>
+<h3>alternative 2, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants app-escalation-target the Graph permission RoleManagement.ReadWrite.Directory</li>
+<li>
+<span class="rule">rolemanagement-write</span> with RoleManagement.ReadWrite.Directory, app-escalation-target assigns itself 62e90394-69f5-4237-9190-012177145e10</li>
+<li>
+<span class="rule">directory-role</span> the directory role 62e90394-69f5-4237-9190-012177145e10 allows roleAssignments/write</li>
+</ol>
+<h3>alternative 3, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent holds the Graph permission Application.ReadWrite.OwnedBy<br>
+<span class="muted">hasAppRole: sp-billing-agent -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">owner-adds-credential</span> sp-billing-agent owns app-escalation-target; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-escalation-target<br>
+<span class="muted">owns: sp-billing-agent -&gt; app-escalation-target [graph:GET /applications/{id}/owners]</span>
+<br>
+<span class="muted">instanceOf: app-escalation-target -&gt; app-escalation-target [graph:GET /applications]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> app-escalation-target holds the Graph permission AppRoleAssignment.ReadWrite.All<br>
+<span class="muted">hasAppRole: app-escalation-target -&gt; Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]</span>
+</li>
+<li>
+<span class="rule">approle-self-grant</span> with AppRoleAssignment.ReadWrite.All, app-escalation-target grants sp-billing-agent the Graph permission RoleManagement.ReadWrite.Directory</li>
+<li>
+<span class="rule">rolemanagement-write</span> with RoleManagement.ReadWrite.Directory, sp-billing-agent assigns itself 62e90394-69f5-4237-9190-012177145e10</li>
+<li>
+<span class="rule">directory-role</span> the directory role 62e90394-69f5-4237-9190-012177145e10 allows roleAssignments/write</li>
+</ol>
+</details>
+<details>
+<summary>
+<span class="fail">FAIL</span> <code>resource:kv-crown-jewels</code> <code>secrets/get</code> <span class="muted">must_not_reach, modeled-only</span> &rarr; after prove <span class="fail">FAIL</span> <span class="muted">evaluated-only</span>
+</summary>
+<ul>
+<li>reachable in the model: 2 path(s); shortest: assume-compromised -&gt; kv-control-to-data</li>
+<li>vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+<li>resource kv-crown-jewels resolved to /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-jewels</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>the operation itself was denied when probed, but escalation paths remain</li>
+<li>path assume-compromised -&gt; managed-identity -&gt; rbac-data-action: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; kv-control-to-data: its probes did not refute it</li>
+<li>model: reachable in the model: 2 path(s); shortest: assume-compromised -&gt; kv-control-to-data</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>evaluated</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>fns.probes/arm-permissions</code>
+</td>
+<td>hop: Microsoft.KeyVault/vaults/write on kv-crown-jewels; Contributor on the resource group lists */ write</td>
+</tr>
+<tr>
+<td>evaluated</td>
+<td>denied</td>
+<td>context</td>
+<td>
+<code>fns.probes/arm-permissions</code>
+</td>
+<td>direct: Microsoft.KeyVault/vaults/secrets/getSecret/action on kv-crown-jewels; recorded denied</td>
+</tr>
+<tr>
+<td>observed</td>
+<td>denied</td>
+<td>context</td>
+<td>
+<code>fns.probes/data-read</code>
+</td>
+<td>direct: secrets/get on kv-crown-jewels; Forbidden: caller lacks a Key Vault data role</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>shortest path, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent has Contributor at resource group rg-fns-lab<br>
+<span class="muted">hasRbacRole: sp-billing-agent -&gt; /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">kv-control-to-data</span> Contributor allows Microsoft.KeyVault/vaults/write on kv-crown-jewels (secrets/get)</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe</li>
+</ul>
+<h3>alternative 1, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent has Contributor at resource group rg-fns-lab<br>
+<span class="muted">hasRbacRole: sp-billing-agent -&gt; /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">managed-identity</span> sp-billing-agent runs code on aa-billing-runbooks (Microsoft.Automation/automationAccounts/jobs/write) and acts as its managed identity<br>
+<span class="muted">hasIdentity: aa-billing-runbooks -&gt; aa-billing-runbooks [arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> aa-billing-runbooks has Key Vault Secrets User at kv-crown-jewels<br>
+<span class="muted">hasRbacRole: aa-billing-runbooks -&gt; kv-crown-jewels [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">rbac-data-action</span> Key Vault Secrets User allows Microsoft.KeyVault/vaults/secrets/getSecret/action on kv-crown-jewels (secrets/get)</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>the vault&#x27;s permission model was not collected; assumes either</li>
+<li>data actions apply only to vaults in RBAC mode</li>
+</ul>
+</details>
+<details>
+<summary>
+<span class="fail">FAIL</span> <code>resource:kv-crown-jewels</code> <code>secrets/list</code> <span class="muted">must_not_reach, modeled-only</span> &rarr; after prove <span class="fail">FAIL</span> <span class="muted">evaluated-only</span>
+</summary>
+<ul>
+<li>reachable in the model: 2 path(s); shortest: assume-compromised -&gt; kv-control-to-data</li>
+<li>vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+<li>resource kv-crown-jewels resolved to /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.keyvault/vaults/kv-crown-jewels</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>path assume-compromised -&gt; managed-identity -&gt; rbac-data-action: not refutable by a non-destructive probe</li>
+<li>path assume-compromised -&gt; kv-control-to-data: its probes did not refute it</li>
+<li>2 probe(s) did not run</li>
+<li>model: reachable in the model: 2 path(s); shortest: assume-compromised -&gt; kv-control-to-data</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>evaluated</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>fns.probes/arm-permissions</code>
+</td>
+<td>hop: Microsoft.KeyVault/vaults/write on kv-crown-jewels; Contributor on the resource group lists */ write</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>shortest path, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent has Contributor at resource group rg-fns-lab<br>
+<span class="muted">hasRbacRole: sp-billing-agent -&gt; /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">kv-control-to-data</span> Contributor allows Microsoft.KeyVault/vaults/write on kv-crown-jewels (secrets/list)</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe</li>
+</ul>
+<h3>alternative 1, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent has Contributor at resource group rg-fns-lab<br>
+<span class="muted">hasRbacRole: sp-billing-agent -&gt; /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">managed-identity</span> sp-billing-agent runs code on aa-billing-runbooks (Microsoft.Automation/automationAccounts/jobs/write) and acts as its managed identity<br>
+<span class="muted">hasIdentity: aa-billing-runbooks -&gt; aa-billing-runbooks [arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read]</span>
+</li>
+<li>
+<span class="rule">snapshot</span> aa-billing-runbooks has Key Vault Secrets User at kv-crown-jewels<br>
+<span class="muted">hasRbacRole: aa-billing-runbooks -&gt; kv-crown-jewels [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">rbac-data-action</span> Key Vault Secrets User allows Microsoft.KeyVault/vaults/secrets/readMetadata/action on kv-crown-jewels (secrets/list)</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>the vault&#x27;s permission model was not collected; assumes either</li>
+<li>data actions apply only to vaults in RBAC mode</li>
+</ul>
+</details>
+<details>
+<summary>
+<span class="inconclusive">INCONCLUSIVE</span> <code>resource:stpayroll</code> <code>blob/read</code> <span class="muted">must_not_reach, not-assessed</span> &rarr; after prove <span class="inconclusive">INCONCLUSIVE</span> <span class="muted">verified</span>
+</summary>
+<ul>
+<li>not reachable in the collected model, but it is incomplete</li>
+<li>pim-eligibility not collected: eligible assignments not collected in M1</li>
+<li>collector graph.directory-roles is failed (http-403)</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+<li>resource stpayroll resolved to /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayroll</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>denied when probed, but not collected: collector:graph.directory-roles, pim-eligibility</li>
+<li>model: not reachable in the collected model, but it is incomplete</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>unknown</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>evaluated</td>
+<td>denied</td>
+<td>supports</td>
+<td>
+<code>fns.probes/arm-permissions</code>
+</td>
+<td>direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read on stpayroll; recorded denied</td>
+</tr>
+<tr>
+<td>observed</td>
+<td>denied</td>
+<td>supports</td>
+<td>
+<code>fns.probes/data-read</code>
+</td>
+<td>direct: blob/read on stpayroll; AuthorizationPermissionMismatch with an Entra token</td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<details>
+<summary>
+<span class="inconclusive">INCONCLUSIVE</span> <code>resource:stpayroll</code> <code>listKeys</code> <span class="muted">must_not_reach, not-assessed</span> &rarr; after prove <span class="inconclusive">INCONCLUSIVE</span> <span class="muted">not-assessed</span>
+</summary>
+<ul>
+<li>not reachable in the collected model, but it is incomplete</li>
+<li>pim-eligibility not collected: eligible assignments not collected in M1</li>
+<li>collector graph.directory-roles is failed (http-403)</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+<li>resource stpayroll resolved to /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stpayroll</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>needs an observed denial of the operation (rung 3)</li>
+<li>1 probe(s) did not run</li>
+<li>model: not reachable in the collected model, but it is incomplete</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>unknown</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</details>
+<details>
+<summary>
+<span class="inconclusive">INCONCLUSIVE</span> <code>resource:stinvoices</code> <code>blob/read</code> <span class="muted">must_still_do, modeled-only</span> &rarr; after prove <span class="pass">PASS</span> <span class="muted">verified</span>
+</summary>
+<ul>
+<li>allowed in the model; needs an observed success (M3)</li>
+<li>1 path(s); shortest: assume-compromised -&gt; listkeys-data</li>
+<li>allowSharedKeyAccess was not collected; assumes Azure&#x27;s default (shared key allowed)</li>
+<li>the account key grants full data-plane access</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+<li>resource stinvoices resolved to /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stinvoices</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>succeeded when probed (observed)</li>
+<li>2 probe(s) did not run</li>
+<li>model: allowed in the model; needs an observed success (M3)</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>observed</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>fns.probes/data-read</code>
+</td>
+<td>direct: blob/read on stinvoices; read the synthetic invoice blob</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>shortest path, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent has Contributor at resource group rg-fns-lab<br>
+<span class="muted">hasRbacRole: sp-billing-agent -&gt; /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">listkeys-data</span> Contributor allows Microsoft.Storage/storageAccounts/listKeys/action on stinvoices (blob/read)</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>allowSharedKeyAccess was not collected; assumes Azure&#x27;s default (shared key allowed)</li>
+<li>the account key grants full data-plane access</li>
+</ul>
+</details>
+<details>
+<summary>
+<span class="inconclusive">INCONCLUSIVE</span> <code>resource:stinvoices</code> <code>blob/write</code> <span class="muted">must_still_do, modeled-only</span> &rarr; after prove <span class="inconclusive">INCONCLUSIVE</span> <span class="muted">evaluated-only</span>
+</summary>
+<ul>
+<li>allowed in the model; needs an observed success (M3)</li>
+<li>1 path(s); shortest: assume-compromised -&gt; listkeys-data</li>
+<li>allowSharedKeyAccess was not collected; assumes Azure&#x27;s default (shared key allowed)</li>
+<li>the account key grants full data-plane access</li>
+<li>identity sp:sp-billing-agent resolved to 00000000-0000-4000-8000-000000000100</li>
+<li>resource stinvoices resolved to /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab/providers/microsoft.storage/storageaccounts/stinvoices</li>
+</ul>
+<p class="muted">After prove:</p>
+<ul>
+<li>allowed when evaluated; needs an observed success (rung 3)</li>
+<li>2 probe(s) did not run</li>
+<li>model: allowed in the model; needs an observed success (M3)</li>
+</ul>
+<p class="muted">Evidence after prove:</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>rung</th>
+<th>outcome</th>
+<th>role</th>
+<th>source</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>modeled</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>frozen-assertions/fns.contain</code>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>evaluated</td>
+<td>allowed</td>
+<td>supports</td>
+<td>
+<code>fns.probes/arm-permissions</code>
+</td>
+<td>direct: Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write on stinvoices; recorded allowed</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3>shortest path, rung modeled</h3>
+<ol class="steps">
+<li>
+<span class="rule">assume-compromised</span> assume sp-billing-agent is compromised</li>
+<li>
+<span class="rule">snapshot</span> sp-billing-agent has Contributor at resource group rg-fns-lab<br>
+<span class="muted">hasRbacRole: sp-billing-agent -&gt; /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-fns-lab [arm:Microsoft.Authorization/roleAssignments/read]</span>
+</li>
+<li>
+<span class="rule">listkeys-data</span> Contributor allows Microsoft.Storage/storageAccounts/listKeys/action on stinvoices (blob/write)</li>
+</ol>
+<p class="muted">Assumes:</p>
+<ul>
+<li>allowSharedKeyAccess was not collected; assumes Azure&#x27;s default (shared key allowed)</li>
+<li>the account key grants full data-plane access</li>
+</ul>
+</details>
+<h2 id="proof">Proof bundle</h2>
+<p>Run <code>44e86fa9a61b484f32b428095fcc55c9</code>, verified by <code>fns.verify as fixture-replay</code>, signer <code>offline-test</code>.</p>
+<p class="inconclusive">TEST SIGNATURE: integrity only, not identity, not Sigstore</p>
+<p>1 pass, 4 critical, 0 legitimate use failed, 3 inconclusive: contract failed. 15 probe artifact(s), 5 strike observation(s). This page does not check the signature; run <code>fns verify &lt;run dir&gt;</code>.</p>
+<h2 id="strikes">Strikes</h2>
+<p class="muted">Writes <code>fns strike run</code> made as the assumed-compromised identity, through the scope gate, to lab objects only. Each write was undone, and a separate read-only identity checked the state was back. Before harden, a success shows the capability is real; after harden, every attempt must be denied. Keys and passwords a strike received are never shown or stored.</p>
+<h3>Run <code>202611251200-demo01</code>, S1, S2, S3 (before harden)</h3>
+<p class="muted">Plan <code>sha256:189cc29d57a5dc19d73666c9f367896426fdd1d0aef107b45473e5823f9ec4a2</code>, approved by the operator; as <code>00000000-0000-4000-8000-000000000100</code>.</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>write</th>
+<th>expected</th>
+<th>outcome</th>
+<th>status</th>
+<th>undo</th>
+<th>observes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>S1/list-keys</code>
+</td>
+<td>allowed</td>
+<td class="inconclusive">succeeded: the capability is real</td>
+<td>200</td>
+<td>200, 200</td>
+<td>-</td>
+</tr>
+<tr>
+<td>
+<code>S2/vault-tag</code>
+</td>
+<td>allowed</td>
+<td class="inconclusive">succeeded: the capability is real</td>
+<td>200</td>
+<td>200</td>
+<td>-</td>
+</tr>
+<tr>
+<td>
+<code>S3/add-password</code>
+</td>
+<td>allowed</td>
+<td class="inconclusive">succeeded: the capability is real</td>
+<td>200</td>
+<td>204</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="muted">Verification by the read-only scout:</p>
+<ul>
+<li>
+<span class="pass">ok</span> credentials 00000000-0000-4000-8000-000000000200: as before</li>
+<li>
+<span class="pass">ok</span> tags /subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.KeyVault/vaults/kv-crown-jewels: as before</li>
+<li>
+<span class="pass">ok</span> keys /subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-fns-lab/providers/Microsoft.Storage/storageAccounts/stpayrolltest: both regenerated</li>
+</ul>
+<p class="pass">Exit 0: clean: every write undone and verified</p>
+<h3>Run <code>202611251200-demo02</code>, D-1, D-2, D-3, D-4, D-5 (after harden)</h3>
+<p class="muted">Plan <code>sha256:a8bc03b61717c9d26f74fe259a9b0be11cecdfc73d08b9caadfd5a17deb12294</code>, approved by the operator; as <code>00000000-0000-4000-8000-000000000100</code>.</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>write</th>
+<th>expected</th>
+<th>outcome</th>
+<th>status</th>
+<th>undo</th>
+<th>observes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>D-1/add-password</code>
+</td>
+<td>denied</td>
+<td class="pass">denied, as required</td>
+<td>403</td>
+<td>-</td>
+<td>
+<code>escalation path first hop: ownership without OwnedBy</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>D-2/add-password</code>
+</td>
+<td>denied</td>
+<td class="pass">denied, as required</td>
+<td>403</td>
+<td>-</td>
+<td>
+<code>application:id-verifier credentials/update</code>
+<br>
+<code>directory:tenant applications/credentials/update</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>D-3/add-password</code>
+</td>
+<td>denied</td>
+<td class="pass">denied, as required</td>
+<td>403</td>
+<td>-</td>
+<td>
+<code>application:sp-fns-scout credentials/update</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>D-4/add-owner</code>
+</td>
+<td>denied</td>
+<td class="pass">denied, as required</td>
+<td>403</td>
+<td>-</td>
+<td>
+<code>application:id-verifier owners/update</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>D-5/add-owner</code>
+</td>
+<td>denied</td>
+<td class="pass">denied, as required</td>
+<td>403</td>
+<td>-</td>
+<td>
+<code>application:sp-fns-scout owners/update</code>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="muted">Verification by the read-only scout:</p>
+<ul>
+<li>
+<span class="pass">ok</span> credentials 00000000-0000-4000-8000-000000000200: as before</li>
+<li>
+<span class="pass">ok</span> credentials 00000000-0000-4000-8000-000000000202: as before</li>
+<li>
+<span class="pass">ok</span> credentials 00000000-0000-4000-8000-000000000203: as before</li>
+<li>
+<span class="pass">ok</span> owners 00000000-0000-4000-8000-000000000202: as before</li>
+<li>
+<span class="pass">ok</span> owners 00000000-0000-4000-8000-000000000203: as before</li>
+</ul>
+<p class="pass">Exit 0: clean: every write undone and verified</p>
+<h2 id="detections">Detections: 2 of 3 fired</h2>
+<p class="muted">For strike run <code>202611251200-demo01</code>. Reported by the operator (hand-written for the strike demo, not from a workspace); the tool did not query the workspace, so these results are shown here and are not evidence for any finding. A strike whose rows arrived with no alert is a detection gap. Latency is the first alert minus the strike time.</p>
+<div class="wrap">
+<table>
+<thead>
+<tr>
+<th>strike</th>
+<th>rule</th>
+<th>source rows</th>
+<th>result</th>
+<th>latency</th>
+<th>note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S1</td>
+<td>
+<code>storage-listkeys-by-workload</code>
+</td>
+<td>3</td>
+<td class="pass">fired</td>
+<td>21 min 30 s</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>S2</td>
+<td>
+<code>keyvault-control-plane-write-by-workload</code>
+</td>
+<td>2</td>
+<td class="pass">fired</td>
+<td>36 min 00 s</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>S3</td>
+<td>
+<code>app-credential-added-by-workload</code>
+</td>
+<td>2</td>
+<td class="fail">missed: detection-gap</td>
+<td>-</td>
+<td>hand-written miss, to show a detection gap</td>
+</tr>
+</tbody>
+</table>
+</div>
+<footer>
+<h3>Evidence ladder</h3>
+<ol>
+<li>
+<b>modeled</b>: the reach model over a snapshot</li>
+<li>
+<b>evaluated</b>: the platform&#x27;s own permission evaluation</li>
+<li>
+<b>observed</b>: a live, non-destructive probe</li>
+<li>
+<b>logged</b>: the probe also showed up in the logs</li>
+</ol>
+<p>Contract digest <code>6c0a90e4b0621668bf96fb063076600194ab9f1d6ffbd3ec4a2012af67ede6bc</code>
+<br>Snapshot digest <code>505803b374fcbdce1af01b96dc46cdcaed9794bcecbcfc463ce09adff8db6a39</code>
+<br>Report digest <code>d70d4ee48d9d021b0cd65f30bce85013bcbe3111e3adfcd339c9ec6039958f23</code>
+<br>Semantics v2, fns <version>, generated 2026-11-25T12:00:01+00:00</p>
+<p>Read-only page built from files. It makes no network request: Cytoscape 3.30.2 (MIT licence, The Cytoscape Consortium) is embedded.</p>
+</footer>
+</main>

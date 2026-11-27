@@ -1,0 +1,183 @@
+{
+  "$defs": {
+    "StrikeCheckRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "what": {
+          "minLength": 1,
+          "title": "What",
+          "type": "string"
+        }
+      },
+      "required": [
+        "what",
+        "ok",
+        "detail"
+      ],
+      "title": "StrikeCheckRecord",
+      "type": "object"
+    },
+    "StrikeWriteRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "expect": {
+          "enum": [
+            "allowed",
+            "denied"
+          ],
+          "title": "Expect",
+          "type": "string"
+        },
+        "key": {
+          "pattern": "^(S[1-4]|D-[1-9])/[a-z0-9-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "observes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Observes",
+          "type": "array"
+        },
+        "outcome": {
+          "enum": [
+            "succeeded",
+            "denied",
+            "unexpected-success",
+            "failed",
+            "gate-denied",
+            "unknown",
+            "not-run"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "strike": {
+          "pattern": "^(S[1-4]|D-[1-9])$",
+          "title": "Strike",
+          "type": "string"
+        },
+        "undo": {
+          "default": [],
+          "description": "The status of each undo request sent, in order (empty: nothing to undo).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Undo",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "strike",
+        "expect",
+        "outcome"
+      ],
+      "title": "StrikeWriteRecord",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "aborted": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Aborted"
+    },
+    "exit_code": {
+      "enum": [
+        0,
+        1,
+        4,
+        5
+      ],
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "journal": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Where the run's journal was written (a local path; not shown in reports).",
+      "title": "Journal"
+    },
+    "mode": {
+      "enum": [
+        "LIVE",
+        "FIXTURE"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "plan_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[a-z0-9-]{8,40}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "verification": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StrikeCheckRecord"
+      },
+      "title": "Verification",
+      "type": "array"
+    },
+    "writes": {
+      "items": {
+        "$ref": "#/$defs/StrikeWriteRecord"
+      },
+      "title": "Writes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "mode",
+    "run_id",
+    "plan_hash",
+    "writes",
+    "exit_code"
+  ],
+  "title": "StrikeRunRecord",
+  "type": "object"
+}

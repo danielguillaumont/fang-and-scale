@@ -39,3 +39,10 @@ stripped of secrets (`REDACTED`) before it was written. Replay it with
 `fns strike plan --strikes S1,S2,S3 --fixture fixtures/strike-demo`, then the
 `fns strike run` command that prints. The first live strike recording will come
 from the M4 live run.
+
+`strike-demo/detections.yaml` is **hand-written**: detection results per strike in
+the D5 format (`schemas/detection-results.schema.json`), for the demo run
+`202611251200-demo01`, with S3 marked missed so the report shows a detection
+gap. No workspace was queried. `tests/report_golden.py` builds the report golden
+from it, the bundled `demo-scout` set and both strike runs. They share one
+placeholder tenant.

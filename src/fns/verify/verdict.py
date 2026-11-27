@@ -239,7 +239,7 @@ def with_strikes(f: Finding, strikes: list[tuple[StrikeObservation, str]]) -> Fi
             source=STRIKE_SOURCE,
             artifact_digest=sha,
             observed_at=o.observed_at,
-            notes=f"{o.strike} {o.write_key}: HTTP {o.http_status}"[:500],
+            notes=f"{o.write_key}: HTTP {o.http_status}"[:500],
         )
         if o.outcome == "allowed" and f.item_kind == "must_not_reach":
             succeeded.append(o)

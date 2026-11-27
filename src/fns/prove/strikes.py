@@ -20,13 +20,13 @@ move a finding toward ``pass``.
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
-from typing import Any, Final
+from typing import Final
 
 from fns.journal.sqlite import SqliteJournal
 from fns.models.assertions import AssertionSet, StrikeObservation
+from fns.models.strike_record import StrikeRunRecord
 from fns.probes.runner import FREEZE_STEP, sha256_bytes, write_artifact
 from fns.strike.plan import StrikePlan
 
@@ -44,28 +44,28 @@ class AfterStrikeError(ValueError):
 def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObservation]:
     try:
         plan = StrikePlan.model_validate_json((directory / PLAN_FILE).read_bytes())
-        run: dict[str, Any] = json.loads((directory / RUN_FILE).read_bytes())
+        run = StrikeRunRecord.model_validate_json((directory / RUN_FILE).read_bytes())
     except (OSError, ValueError) as exc:
         raise AfterStrikeError(f"not a strike run directory: {exc}") from exc
-    if run.get("run_id") != plan.run_id:
+    if run.run_id != plan.run_id:
         raise AfterStrikeError("strike-run.json is for another plan")
-    if run.get("plan_hash") != f"sha256:{plan.plan_hash()}":
+    if run.plan_hash != f"sha256:{plan.plan_hash()}":
         raise AfterStrikeError("strike-run.json names another plan hash than plan.json")
     if plan.tenant_id != str(aset.tenant_id).lower():
         raise AfterStrikeError("the strike ran in another tenant than this prove run")
-    if run.get("mode") != aset.mode:
-        raise AfterStrikeError(f"a {run.get('mode')} strike run cannot be {aset.mode} evidence")
+    if run.mode != aset.mode:
+        raise AfterStrikeError(f"a {run.mode} strike run cannot be {aset.mode} evidence")
     planned = {w.key: w for w in plan.writes}
     at = plan.created_at  # the strike run records no per-write time; stable on replay
     out: list[StrikeObservation] = []
-    for w in run.get("writes", []):
-        p = planned.get(str(w.get("key")))
+    for w in run.writes:
+        p = planned.get(w.key)
         if p is None:
-            raise AfterStrikeError(f"strike-run.json names a write the plan lacks: {w.get('key')}")
-        outcome = COUNTED.get(str(w.get("outcome")))
+            raise AfterStrikeError(f"strike-run.json names a write the plan lacks: {w.key}")
+        outcome = COUNTED.get(w.outcome)
         if p.expect != "denied" or outcome is None:
             continue
-        status = w.get("status")
+        status = w.status
         for item in p.observes:
             m = CONTRACT_ITEM.match(item)
             if m is None:
@@ -82,7 +82,7 @@ def load_after_strike(directory: Path, aset: AssertionSet) -> list[StrikeObserva
                     target=target,
                     operation=operation,
                     outcome=outcome,  # type: ignore[arg-type]
-                    http_status=status if isinstance(status, int) else None,
+                    http_status=status,
                     observed_at=at,
                 )
             )
