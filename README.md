@@ -345,7 +345,8 @@ so does an internal error, so a crash never looks like a verdict.
   fix, and run the detections in a Log Analytics workspace. Spec:
   `docs/milestones/M4.md`; live plan (decisions approved):
   `docs/milestones/M4-plan.md`; strike plan (approved; the write gate is built,
-  no strike code yet): `docs/milestones/M4-strikes-plan.md`.
+  no strike code yet): `docs/milestones/M4-strikes-plan.md`. Next live step,
+  the log path check: `docs/runbooks/m4-log-path-check.md`.
 
 Day-to-day state: `docs/STATUS.md`. What each fixture proves: [Real vs.
 fixture](#real-vs-fixture).

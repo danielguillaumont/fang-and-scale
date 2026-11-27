@@ -92,6 +92,12 @@ limit, explained in the README. Build step 1, the write gate, is built and teste
 offline, with nothing calling it. The places where the build differs from the
 plan are in the strike plan's "Build status".
 
+**Next live step: the log path check**, `docs/runbooks/m4-log-path-check.md`. You
+rebuild the lab, create a workspace and the Entra diagnostic setting, and cause
+one audit event and one sign-in, both by the read-only scout. Then you run the
+KQL and paste the results, and clean up with `lab-down`. The rest of M4 waits on
+its result.
+
 ## The morning review (before the M2 and M3 runs)
 
 Every item from the morning review of `docs/OVERNIGHT.md` is done. Each one got
