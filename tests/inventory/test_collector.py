@@ -294,7 +294,10 @@ def test_request_catalogue_matches_demo_scope() -> None:
 @pytest.mark.parametrize(
     "op",
     sorted(
-        set(arm.ARM_OPERATIONS) | set(graph.GRAPH_OPERATIONS) | set(graph.CREDENTIAL_OPERATIONS)
+        set(arm.ARM_OPERATIONS)
+        | set(graph.GRAPH_OPERATIONS)
+        | set(graph.CREDENTIAL_OPERATIONS)
+        | set(graph.FIC_OPERATIONS)
     ),
 )
 def test_catalogue_is_read_only(op: str) -> None:

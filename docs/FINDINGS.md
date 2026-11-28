@@ -252,6 +252,18 @@ by `fns mutate` (M5) on `fixtures/lab-run-1`, hardened in the model.
   plan is in `docs/milestones/M3.md` (R1). No request has been sent; until a
   result is recorded here, writes stay at rung 2 at most (E4).
 
+- **R2. Which pull-request subject does a federated credential need?**
+  (documentation only, 2026-11-28, not run.) Microsoft Learn, "Configure an app
+  to trust an external identity provider" (GitHub Actions, Azure CLI tab), gives
+  the pull-request subject as `repo:<Organization/Repository>:pull-request`
+  (hyphen). GitHub's OIDC reference
+  (<https://docs.github.com/en/actions/reference/security/oidc>) says the token
+  carries `repo:ORG-NAME/REPO-NAME:pull_request` (underscore). Subjects must match
+  exactly and case-sensitively, so a credential with the hyphen may match no
+  token. Handling: `fns.contain.federation` reads `pull_request` as the
+  pull-request front door (high) and `pull-request` as `github-other`
+  (severity unknown), never as safe. Live check LV-7.
+
 ## Open questions from Phase B
 
 - **TODO: fill `graph.PIM_FREE_PLAN_IDS` (decision 3, 2026-11-26; owner

@@ -1,2 +1,3 @@
 # Coverage keys with no detection rule, and why (tests/harden/test_detections.py).
 "rule:member-of": group membership is a standing fact, not an action an attacker takes
+"rule:federated-credential": "pending review (2026-11-28): the sign-in is made by the trusting application (ClientCredentialType federatedIdentityCredential), not by a monitored identity, so the monitored-identity rules cannot see it; a rule would need the trusting applications as a parameter. Not validated live (LV-6)"

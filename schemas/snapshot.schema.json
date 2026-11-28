@@ -348,6 +348,69 @@
       "title": "Entity",
       "type": "object"
     },
+    "FederatedCredential": {
+      "additionalProperties": false,
+      "description": "A federated identity credential on an application (queue item 2, pending review).\n\nWhoever presents a token from ``issuer`` whose ``sub`` equals ``subject`` (exact,\ncase-sensitive, no wildcards) for one of ``audiences`` signs in as the\napplication's service principal. ``subject`` is None when the credential uses\na claims-matching expression (flexible FIC, preview), which Graph v1.0 does not\nreturn. ``description`` is free text and not kept.",
+      "properties": {
+        "audiences": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Audiences",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "issuer": {
+          "maxLength": 600,
+          "minLength": 1,
+          "title": "Issuer",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Object ID of the application.",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "maxLength": 600,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject"
+        }
+      },
+      "required": [
+        "owner",
+        "id",
+        "name",
+        "issuer",
+        "provenance"
+      ],
+      "title": "FederatedCredential",
+      "type": "object"
+    },
     "HasAccessPolicy": {
       "additionalProperties": false,
       "description": "principal -> Key Vault: a vault access policy (applies in access-policy mode only).",
@@ -990,6 +1053,15 @@
         "$ref": "#/$defs/Entity"
       },
       "title": "Entities",
+      "type": "array"
+    },
+    "federated_credentials": {
+      "default": [],
+      "description": "Federated identity credentials of applications (``graph.FIC_OPERATIONS``).",
+      "items": {
+        "$ref": "#/$defs/FederatedCredential"
+      },
+      "title": "Federated Credentials",
       "type": "array"
     },
     "mode": {

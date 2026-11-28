@@ -24,6 +24,7 @@ from fns.models.snapshot import (
     Edge,
     Entity,
     EntityType,
+    FederatedCredential,
     NotCollected,
     Provenance,
     Snapshot,
@@ -43,6 +44,7 @@ class SnapshotBuilder:
         self._edges: dict[tuple[str, ...], tuple[str, Edge]] = {}
         self._annotations: dict[str, dict[str, Any]] = {}
         self._credentials: dict[tuple[str, ...], tuple[str, Credential]] = {}
+        self._fics: dict[tuple[str, ...], tuple[str, FederatedCredential]] = {}
 
     def entity(
         self,
@@ -90,6 +92,14 @@ class SnapshotBuilder:
         if cur is None or text < cur[0]:
             self._credentials[key] = (text, cred)
 
+    def federated_credential(self, data: dict[str, Any], provenance: Provenance) -> None:
+        fic = FederatedCredential.model_validate({**data, "provenance": provenance})
+        key = fic.sort_key()
+        text = fic.canonical_json(for_digest=True)
+        cur = self._fics.get(key)
+        if cur is None or text < cur[0]:
+            self._fics[key] = (text, fic)
+
     def _annotated(self, entity: Entity) -> Entity:
         extra = self._annotations.get(entity.id)
         if not extra:
@@ -130,6 +140,17 @@ class SnapshotBuilder:
                     ),
                 )
             )
+        fics = [f for _, f in self._fics.values() if f.owner in known]
+        if len(fics) < len(self._fics):
+            not_collected.append(
+                NotCollected(
+                    surface="federated-identity-credentials",
+                    reason=(
+                        f"{len(self._fics) - len(fics)} federated credential(s) dropped: "
+                        "the application was not collected"
+                    ),
+                )
+            )
         if dropped:
             not_collected.append(
                 NotCollected(
@@ -147,6 +168,7 @@ class SnapshotBuilder:
                 "entities": [self._annotated(e) for _, _, e in self._entities.values()],
                 "edges": edges,
                 "credentials": creds,
+                "federated_credentials": fics,
                 "coverage": SnapshotCoverage(
                     collectors=coverage.collectors,
                     not_collected=tuple(not_collected),

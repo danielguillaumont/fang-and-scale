@@ -14,13 +14,22 @@ Tests at the start: 2139 passed, 1 skipped (Windows).
 | # | Item | State | PR |
 | --- | --- | --- | --- |
 | 1 | Collector: key/password credential metadata (never values) | done (fixture only) | #96 |
-| 2 | Collector: federated identity credentials + "outside party can sign in" rule | todo | |
+| 2 | Collector: federated identity credentials + "outside party can sign in" rule | done (fixture only) | #97 |
 | 3 | Collector: group memberships for in-scope paths + group-derived reach | todo | |
 | 4 | Conditional access: design only (`docs/proposals/conditional-access.md`) | todo | |
 | 5 | Scenario gallery: 5 FIXTURE tenants with golden tests | todo | |
 | 6 | Reusable GitHub Action for other repos | todo | |
 | 7 | Scale test + `docs/PERFORMANCE.md` | todo | |
 | 8 | Hardening/property tests, README/GUIDE coverage | todo | |
+
+**Item 1 (#96).** `graph.credentials` reads key/password credential metadata
+through two optional per-object GETs; never values. Not in the lab scope yet.
+
+**Item 2 (#97).** `graph.federated-credentials` (optional, every application);
+`fns.contain.federation` classifies who can satisfy each credential; a closure
+rule for credentials that trust a managed identity of this tenant; outside
+parties appear as "Front doors" in `fns contain` (no verdict change). FINDINGS
+R2: Learn writes the PR subject `pull-request`, GitHub `pull_request`.
 
 **To resume (`continue`):** take the first row that is not done, on a new
 branch from `main`; read its notes below and the pending-review rows dated
