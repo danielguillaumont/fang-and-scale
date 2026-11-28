@@ -16,6 +16,9 @@ apart from the tenant and subscription you type in step A1.
 
 > Use the **dedicated lab tenant**, as in M1 to M3.
 
+> **Before session A**, go through [`m4-preflight.md`](m4-preflight.md): credit,
+> clocks, sleep, Claude Code's mode, what to paste back, stop triggers.
+
 ## What this run does
 
 | Session | What | Creates | Removed in |

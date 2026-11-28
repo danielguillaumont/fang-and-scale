@@ -15,9 +15,13 @@ as `poe lab-check`, fixtures and mocked transports only, PRs with required CI.
 | # | Item | State | PR |
 | --- | --- | --- | --- |
 | 1 | Mark the four front-page rows approved; the wheel check is required | done | #91 |
-| 2a | `docs/runbooks/m4-preflight.md`: the checklist before session A | queued | |
+| 2a | `docs/runbooks/m4-preflight.md`: the checklist before session A | done | #92 |
 | 2b | Cross-check `m4-live-run.md` against the code, fix drift with tests | queued | |
 | 2c | Split the runbook into per-session copy-paste blocks with "expect" lines | queued | |
+
+**Preflight (#92).** `docs/runbooks/m4-preflight.md` is the page to go through
+before session A (and briefly before B, C and D). One new row pending review in
+DECISIONS: its two thresholds and the Claude Code rule.
 
 **The wheel check is now required on `main`.** The protection rule, read back on
 2026-11-27, requires all four `ci` checks (strict): `check (ubuntu-latest)`,
