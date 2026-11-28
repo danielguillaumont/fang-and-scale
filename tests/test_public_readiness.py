@@ -63,6 +63,7 @@ def test_the_required_checks_are_exactly_the_ci_jobs_on_pull_requests() -> None:
         "check (ubuntu-latest)",
         "check (windows-latest)",
         "lab (terraform fmt + validate)",
+        "wheel (install + bundled demo)",
     }
 
 

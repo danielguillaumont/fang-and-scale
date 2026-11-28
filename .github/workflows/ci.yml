@@ -53,3 +53,35 @@ jobs:
         run: terraform -chdir=lab init -backend=false -input=false -lockfile=readonly
       - name: Validate
         run: terraform -chdir=lab validate
+
+  wheel:
+    name: wheel (install + bundled demo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          python-version: "3.12"
+          enable-cache: false # install from the wheel alone, as a user would
+      - name: Build the wheel
+        run: uv build --no-sources --wheel --out-dir "$RUNNER_TEMP/dist"
+      # A clean venv outside the checkout: only the wheel and its dependencies, so a
+      # missing package file (the bundled demo set, the semantics) fails here.
+      - name: Install it in a clean venv
+        run: |
+          uv venv --python 3.12 "$RUNNER_TEMP/venv"
+          uv pip install --python "$RUNNER_TEMP/venv/bin/python" "$RUNNER_TEMP"/dist/*.whl
+      - name: Run fns demo contain --bundled from the installed wheel
+        working-directory: ${{ runner.temp }}
+        run: |
+          set +e
+          "$RUNNER_TEMP/venv/bin/fns" demo contain --bundled --out "$RUNNER_TEMP/demo" > demo.txt 2>&1
+          code=$?
+          set -e
+          cat demo.txt
+          # The bundled demo contract fails on purpose: exit 1, every line FIXTURE.
+          test "$code" -eq 1
+          grep -qx "FIXTURE contract FAILED (exit 1)" demo.txt
+          if grep -v "^FIXTURE" demo.txt | grep -q .; then exit 1; fi

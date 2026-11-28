@@ -14,7 +14,7 @@ Same hard rules: no Azure, no tags, PRs with required CI, STATUS current.
 | # | Item | State | PR |
 | --- | --- | --- | --- |
 | 1 | Post-release housekeeping: "Unreleased" with #87, STATUS | done | #88 |
-| 2 | CI: install the built wheel in a clean venv and run `fns demo contain --bundled` | to do | |
+| 2 | CI: install the built wheel in a clean venv and run `fns demo contain --bundled` | done | #89 |
 | 3 | README rework, with generated demo output and a sample FIXTURE report | to do | |
 | 4 | `docs/social-preview.png` (1280x640) | to do | |
 

@@ -12,6 +12,13 @@ version may change file formats; each change is listed here.
 - `docs/DECISIONS.md`: the build choices for D-6/D-7 and for the named
   inconclusive budget are approved (#87). Docs only.
 
+### Added
+
+- CI job `wheel (install + bundled demo)` (#89): it builds the wheel, installs it
+  in a clean venv outside the checkout, and runs `fns demo contain --bundled`,
+  which must exit 1 (the demo contract fails on purpose) with every line
+  labelled `FIXTURE`. A wheel that leaves out a package file fails it.
+
 ## [0.1.0] - 2026-11-27
 
 The first release: contracts, the reach model, read-only probes with signed
