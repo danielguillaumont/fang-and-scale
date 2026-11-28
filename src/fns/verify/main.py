@@ -169,6 +169,8 @@ def render(bundle: EvidenceBundle, signing: dict[str, Any], out: Print) -> None:
     if s.exit_code == 0:
         out("WITHIN BUDGET (exit 0)" + (f"; warning: {s.warning}" if s.warning else ""))
     elif s.exit_code == 3:
+        for item in s.unaccepted_inconclusive:
+            out(f"not accepted by the budget: {item}")
         out("inconclusive over budget (exit 3)")
     else:
         out("contract FAILED (exit 1)")

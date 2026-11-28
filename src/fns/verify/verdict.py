@@ -29,6 +29,7 @@ from __future__ import annotations
 from typing import Final, Literal
 
 from fns.models.assertions import Assertion, ProbeObservation, StrikeObservation, Thresholds
+from fns.models.budget import unaccepted_inconclusive
 from fns.models.bundle import BundleSummary
 from fns.models.evidence import RUNG_ORDER, CoverageState, Evidence, Finding, Gap, Verdict
 
@@ -375,7 +376,11 @@ def summarize(findings: list[Finding], t: Thresholds) -> BundleSummary:
     still_do_failed = sum(f.item_kind == "must_still_do" and f.verdict == "fail" for f in findings)
     inconclusive = sum(f.verdict == "inconclusive" for f in findings)
     passed = sum(f.verdict == "pass" for f in findings)
-    over = inconclusive > t.max_inconclusive
+    unaccepted = unaccepted_inconclusive(
+        ((f.target, f.operation) for f in findings if f.verdict == "inconclusive"),
+        t.accepted_inconclusive,
+    )
+    over = inconclusive > t.max_inconclusive or bool(unaccepted)
     exit_code: Literal[0, 1, 3]
     if critical > t.max_critical_reachable or still_do_failed:
         exit_code = 1
@@ -395,4 +400,5 @@ def summarize(findings: list[Finding], t: Thresholds) -> BundleSummary:
         inconclusive=inconclusive,
         exit_code=exit_code,
         warning=warning,
+        unaccepted_inconclusive=unaccepted,
     )

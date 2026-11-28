@@ -244,7 +244,8 @@ def test_the_live_matrix(lab: AssertionSet) -> None:
 def test_the_rest_of_the_contract_after_harden(lab: AssertionSet) -> None:
     """Items no D-step observes are as before. With D-6 and D-7, three items stay
     inconclusive: blob/write (no observed success), the tenant-wide item and SD3.
-    Over the old budget of 2 that is exit 3 (the lab contract budget is raised to 3 separately)."""
+    lab-run-2's recorded budget of 2 gives exit 3; the lab contract's budget names
+    exactly these three (tests/prove/test_session_d_budget.py)."""
     after_bundle = verify(lab, all_d_steps(lab))
     after = by_item(after_bundle)
     expect = {

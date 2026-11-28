@@ -26,6 +26,7 @@ from fns.contain import semantics as sem
 from fns.contain.closure import Closure, Derivation, Fact, SnapshotIndex, app_perm, controls
 from fns.contain.resolve import resolve_identity, resolve_object, resolve_resource
 from fns.exitcodes import ExitCode
+from fns.models.budget import unaccepted_inconclusive
 from fns.models.contract import (
     ApplicationTarget,
     Contract,
@@ -111,6 +112,7 @@ class Summary:
     on_inconclusive: Literal["fail", "warn"]
     exit_code: int
     warning: str | None = None
+    unaccepted_inconclusive: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -592,10 +594,14 @@ def _summary(contract: Contract, outcomes: list[ItemOutcome]) -> Summary:
     still = sum(f.verdict == "fail" and f.item_kind == "must_still_do" for f in findings)
     inconclusive = sum(f.verdict == "inconclusive" for f in findings)
     b = contract.budget
+    unaccepted = unaccepted_inconclusive(
+        ((f.target, f.operation) for f in findings if f.verdict == "inconclusive"),
+        b.accepted_inconclusive,
+    )
     warning = None
     if critical > b.max_critical_reachable or still:
         code = ExitCode.CONTRACT_FAILED
-    elif inconclusive > b.max_inconclusive:
+    elif inconclusive > b.max_inconclusive or unaccepted:
         if contract.on_inconclusive == "fail":
             code = ExitCode.INCONCLUSIVE_OVER_BUDGET
         else:
@@ -615,6 +621,7 @@ def _summary(contract: Contract, outcomes: list[ItemOutcome]) -> Summary:
         contract.on_inconclusive,
         int(code),
         warning,
+        unaccepted,
     )
 
 

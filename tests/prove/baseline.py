@@ -62,7 +62,8 @@ def decisions(bundle: EvidenceBundle, *, supporting_only: bool = True) -> dict[s
             "reasons": list(f.reasons),
             "evidence": [evidence_row(e) for e in ev],
         }
-    return {"summary": bundle.summary.model_dump(mode="json"), "findings": findings}
+    # The canonical form: a field added later is left out while empty (``__omit_empty__``).
+    return {"summary": json.loads(bundle.summary.canonical_json()), "findings": findings}
 
 
 def main() -> None:

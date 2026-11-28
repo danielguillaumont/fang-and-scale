@@ -1,5 +1,38 @@
 {
   "$defs": {
+    "AcceptedInconclusive": {
+      "additionalProperties": false,
+      "description": "One contract item the budget lets stay inconclusive.",
+      "properties": {
+        "operation": {
+          "maxLength": 200,
+          "pattern": "^\\S+$",
+          "title": "Operation",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why this item may stay inconclusive. Required: an accepted gap is explained.",
+          "maxLength": 500,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "target": {
+          "description": "The item's target as findings name it, e.g. ``directory:tenant``.",
+          "maxLength": 300,
+          "pattern": "^(?:resource|directory|application|service_principal):\\S+$",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "operation",
+        "reason"
+      ],
+      "title": "AcceptedInconclusive",
+      "type": "object"
+    },
     "Assertion": {
       "additionalProperties": false,
       "properties": {
@@ -204,6 +237,15 @@
     "Thresholds": {
       "additionalProperties": false,
       "properties": {
+        "accepted_inconclusive": {
+          "default": [],
+          "description": "The contract budget's named inconclusive items, frozen with it.",
+          "items": {
+            "$ref": "#/$defs/AcceptedInconclusive"
+          },
+          "title": "Accepted Inconclusive",
+          "type": "array"
+        },
         "max_critical_reachable": {
           "minimum": 0,
           "title": "Max Critical Reachable",

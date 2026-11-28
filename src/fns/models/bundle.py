@@ -37,6 +37,8 @@ class StrikeArtifactRef(FnsModel):
 
 
 class BundleSummary(FnsModel):
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"unaccepted_inconclusive"})
+
     passed: NonNegativeInt
     critical: NonNegativeInt
     """Failed must_not_reach findings."""
@@ -44,6 +46,8 @@ class BundleSummary(FnsModel):
     inconclusive: NonNegativeInt
     exit_code: Literal[0, 1, 3]
     warning: str | None = None
+    unaccepted_inconclusive: tuple[str, ...] = ()
+    """Inconclusive items the budget does not name (``budget.accepted_inconclusive``)."""
 
 
 class EvidenceBundle(FnsModel):

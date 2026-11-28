@@ -25,5 +25,17 @@ must_still_do:
 
 budget:
   max_critical_reachable: 0
-  max_inconclusive: 2
+  max_inconclusive: 3
+  # Approved 2026-11-27: only these three may stay inconclusive. Any other
+  # inconclusive item is over budget, whatever the count.
+  accepted_inconclusive:
+    - target: resource:${invoices}
+      operation: blob/write
+      reason: writes stay rung 2 by design; prove never makes a write
+    - target: directory:tenant
+      operation: applications/credentials/update
+      reason: one app's denial isn't tenant-wide
+    - target: directory:tenant
+      operation: roleAssignments/write
+      reason: SD3, no direct attempt; a strike never counts for it
 on_inconclusive: fail

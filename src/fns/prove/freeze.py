@@ -91,6 +91,7 @@ def freeze(
             max_critical_reachable=b.max_critical_reachable,
             max_inconclusive=b.max_inconclusive,
             on_inconclusive=contract.on_inconclusive,
+            accepted_inconclusive=b.accepted_inconclusive,
         ),
         frozen_at=frozen_at,
         assertions=assertions,

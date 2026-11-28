@@ -23,7 +23,13 @@ def test_example_contract_loads() -> None:
     }
     assert any(isinstance(i, DirectoryTarget) for i in c.must_not_reach)
     assert c.on_inconclusive == "fail"
-    assert c.budget.max_inconclusive == 2
+    assert c.budget.max_inconclusive == 3  # approved 2026-11-27, three named items
+    assert [a.item for a in c.budget.accepted_inconclusive] == [
+        "directory:tenant applications/credentials/update",
+        "directory:tenant roleAssignments/write",
+        "resource:st-invoices blob/write",
+    ]
+    assert all(a.reason for a in c.budget.accepted_inconclusive)
 
 
 def test_defaults() -> None:

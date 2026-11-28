@@ -37,6 +37,13 @@ version may change file formats; each change is listed here.
   `pass`. The lab's strike targets include the invoices account. Frozen
   assertions now also record a `resource:` target's ARM ID; the prove bundle
   digests change for that reason only.
+- Contracts can name the items they accept as inconclusive, each with a reason
+  (`budget.accepted_inconclusive`). Once a contract names any, every other
+  inconclusive item is over budget (exit 3), whatever the count; `fns contain` and
+  `fns verify` print each as `not accepted by the budget`. The example and lab
+  contracts set `max_inconclusive: 3` and name invoices `blob/write`, the
+  tenant-wide `applications/credentials/update` and `roleAssignments/write`. With
+  every D-step denied and no surface open, session D now expects exit 0.
 
 ## [0.1.0] - 2026-11-27
 

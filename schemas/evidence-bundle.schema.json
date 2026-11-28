@@ -60,6 +60,15 @@
           "title": "Still Do Failed",
           "type": "integer"
         },
+        "unaccepted_inconclusive": {
+          "default": [],
+          "description": "Inconclusive items the budget does not name (``budget.accepted_inconclusive``).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Unaccepted Inconclusive",
+          "type": "array"
+        },
         "warning": {
           "anyOf": [
             {

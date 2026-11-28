@@ -229,6 +229,13 @@ first hop is attempted and denied. The item itself still reports `inconclusive`,
 with that reason, and counts against the contract's `max_inconclusive`. It is not
 reported as a pass, because nothing observed the direct operation fail.
 
+A contract can name the items it accepts as inconclusive, each with its reason
+(`budget.accepted_inconclusive`). Once it names any, every other inconclusive item
+is over budget (exit 3), whatever the count, and `max_inconclusive` still caps
+the total. The example contract names three: this one, the tenant-wide
+`applications/credentials/update` (one app's denial isn't tenant-wide), and
+`blob/write` on the invoices account (writes stay rung 2 by design).
+
 | Rung | Means | Produced by | Status |
 | --- | --- | --- | --- |
 | 1 modeled | the reach model says so, from a snapshot | `fns contain` | built; live scout ran in M1 |
