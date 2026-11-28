@@ -19,6 +19,10 @@ and the in-scope service principals, and keeps metadata only (never a value).
 The ``app-credentials`` surface closes only when both reads are allowed, every
 request succeeded and no service principal was left out.
 
+Transitive group memberships (``graph.transitive-memberships``) run only when the
+scope lists ``graph.OP_SP_TRANSITIVE_GROUPS``: every group an in-scope service
+principal is in, nested ones included, with ``isAssignableToRole``.
+
 Federated identity credentials (``graph.federated-credentials``) run only when the
 scope lists ``graph.OP_APP_FICS``, for every application. The surface stays not
 collected either way: user-assigned managed identities hold theirs in ARM.
@@ -68,6 +72,12 @@ PIM_ELIGIBILITY: Final = "pim-eligibility"
 PIM_COLLECTOR: Final = "pim.eligibility"
 APP_CREDENTIALS: Final = "app-credentials"
 CREDENTIALS_COLLECTOR: Final = "graph.credentials"
+MEMBERSHIPS: Final = "user-group-memberships"
+TRANSITIVE_COLLECTOR: Final = "graph.transitive-memberships"
+MEMBERSHIPS_LEFT: Final = (
+    "users' and other tenants' service principals' memberships not read "
+    "(no modeled path starts from them)"
+)
 FICS: Final = "federated-identity-credentials"
 FICS_COLLECTOR: Final = "graph.federated-credentials"
 UAMI_FICS_NOT_READ: Final = (
@@ -85,7 +95,7 @@ NOT_COLLECTED: Final = (
     ),
     NotCollected(surface=FICS, reason="not collected in M1"),
     NotCollected(
-        surface="user-group-memberships",
+        surface=MEMBERSHIPS,
         reason="memberships collected for in-scope service principals only",
     ),
 )
@@ -497,6 +507,25 @@ class Collector:
 
             self._attempt(t, member_of)
         t.ended = self.clock.monotonic()
+
+        if graph.OP_SP_TRANSITIVE_GROUPS in allowed:
+            t = collector(TRANSITIVE_COLLECTOR, sps_t)
+            for sp in in_scope_sps:
+
+                def nested(sp: str = sp) -> int:
+                    items, prov = self._list(graph.sp_transitive_groups_request(sp))
+                    t.errors.update(graph.parse_transitive_groups(b, sp, items, prov))
+                    return len(items)
+
+                self._attempt(t, nested)
+            t.ended = self.clock.monotonic()
+            why = ["transitive group memberships of in-scope service principals collected"]
+            if (status := t.run().status) != "complete":
+                why = [f"collector {t.name} is {status}"]
+            not_collected = [n for n in not_collected if n.surface != MEMBERSHIPS]
+            not_collected.append(
+                NotCollected(surface=MEMBERSHIPS, reason="; ".join([*why, MEMBERSHIPS_LEFT]))
+            )
 
         t = collector("graph.directory-roles")
 

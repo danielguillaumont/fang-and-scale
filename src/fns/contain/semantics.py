@@ -28,6 +28,8 @@ APP_READWRITE_ALL: Final = "Application.ReadWrite.All"
 APP_READWRITE_OWNEDBY: Final = "Application.ReadWrite.OwnedBy"
 APPROLE_READWRITE_ALL: Final = "AppRoleAssignment.ReadWrite.All"
 ROLEMANAGEMENT_READWRITE: Final = "RoleManagement.ReadWrite.Directory"
+GROUPMEMBER_READWRITE_ALL: Final = "GroupMember.ReadWrite.All"
+GROUP_READWRITE_ALL: Final = "Group.ReadWrite.All"
 
 ROLE_ASSIGNMENTS_WRITE: Final = "Microsoft.Authorization/roleAssignments/write"
 KV_WRITE: Final = "Microsoft.KeyVault/vaults/write"
@@ -241,6 +243,7 @@ def graph_permissions_in_use() -> frozenset[str]:
     """Graph app permissions any rule or table row depends on (self-grant targets)."""
     values = {APP_READWRITE_ALL, APP_READWRITE_OWNEDBY, APPROLE_READWRITE_ALL}
     values.add(ROLEMANAGEMENT_READWRITE)
+    values.update((GROUPMEMBER_READWRITE_ALL, GROUP_READWRITE_ALL))
     for sem in _TABLE:
         for way in sem.ways:
             if way.kind in {"appPerm", "ownedObjectPerm"}:

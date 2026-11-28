@@ -17,7 +17,13 @@ from fns.inventory.builder import (
     SnapshotBuilder,
 )
 from fns.models.armid import GUID_RE
-from fns.models.snapshot import AGENT_ID_ODATA_TYPES, AGENT_ID_PROPERTY, EntityType, Provenance
+from fns.models.snapshot import (
+    AGENT_ID_ODATA_TYPES,
+    AGENT_ID_PROPERTY,
+    GROUP_ROLE_ASSIGNABLE,
+    EntityType,
+    Provenance,
+)
 from fns.scope.targets import DirectoryTarget
 
 OP_SERVICE_PRINCIPALS: Final = "graph:GET /servicePrincipals"
@@ -70,6 +76,20 @@ federatedIdentityCredentials", read 2026-11-28). No ``$select``: the list page
 does not document it. The parser keeps id, name, issuer, subject and audiences;
 ``description`` (free text) is dropped. User-assigned managed identities keep
 their federated credentials in ARM, which this does not read."""
+
+OP_SP_TRANSITIVE_GROUPS: Final = (
+    "graph:GET /servicePrincipals/{id}/transitiveMemberOf/microsoft.graph.group"
+)
+MEMBERSHIP_OPERATIONS: Final = (OP_SP_TRANSITIVE_GROUPS,)
+"""Every group an in-scope service principal is in, nested ones included, with
+``isAssignableToRole`` (2026-11-28, pending review).
+
+Optional like :data:`CREDENTIAL_OPERATIONS`. Application.Read.All is the
+least-privileged application permission, and the listing "will include all groups
+that this service principal is a nested member of" (Microsoft Learn, "List
+servicePrincipal transitiveMemberOf", read 2026-11-28). The ``microsoft.graph.group``
+cast keeps directory roles and administrative units out and lets ``$select`` name a
+group property."""
 
 PIM_PLAN_IDS: Final = frozenset({"eec0eb4f-6444-4f95-aba0-50c24d67f998"})
 """Service plans known to carry PIM: AAD_PREMIUM_P2 (Microsoft Entra ID P2).
@@ -197,6 +217,14 @@ def sp_app_role_assignments_request(sp_id: str) -> ApiRequest:
 def sp_member_of_request(sp_id: str) -> ApiRequest:
     return _req(
         OP_SP_MEMBER_OF, f"/servicePrincipals/{_guid(sp_id)}/memberOf?$select=id,displayName"
+    )
+
+
+def sp_transitive_groups_request(sp_id: str) -> ApiRequest:
+    return _req(
+        OP_SP_TRANSITIVE_GROUPS,
+        f"/servicePrincipals/{_guid(sp_id)}/transitiveMemberOf/microsoft.graph.group"
+        "?$select=id,displayName,isAssignableToRole",
     )
 
 
@@ -414,6 +442,29 @@ def parse_federated_credentials(
                 prov,
             )
         except (ParseError, ValueError):
+            errors.append("bad-item")
+    return errors
+
+
+def parse_transitive_groups(
+    b: SnapshotBuilder, member_id: str, items: list[dict[str, Any]], prov: Provenance
+) -> list[str]:
+    """memberOf edges to every group (direct or nested), and each group's
+    ``isAssignableToRole`` when the response states it as a boolean."""
+    errors: list[str] = []
+    for item in items:
+        try:
+            group = b.entity(
+                _guid(item.get("id")),
+                "group",
+                display_name=item.get("displayName"),
+                priority=PRIORITY_REFERENCE,
+            )
+            assignable = item.get("isAssignableToRole")
+            if isinstance(assignable, bool):
+                b.annotate(group, {GROUP_ROLE_ASSIGNABLE: assignable})
+            b.edge({"type": "memberOf", "src": member_id, "dst": group}, prov)
+        except ParseError:
             errors.append("bad-item")
     return errors
 

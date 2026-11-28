@@ -61,6 +61,10 @@ AGENT_ID_LABELS: Final[dict[str, str]] = {
     "agentIdentityBlueprint": "an agent identity blueprint",
     "agentIdentityBlueprintPrincipal": "a blueprint principal",
 }
+GROUP_ROLE_ASSIGNABLE: Final = "isAssignableToRole"
+"""Group property, set only when Graph returned it (``graph.MEMBERSHIP_OPERATIONS``).
+Absent means unknown, never false."""
+
 AGENT_ID_NOT_MODELED: Final = "Agent ID inheritance not modeled"
 """The reason every finding gets when the attacker controls an Agent ID object."""
 

@@ -298,6 +298,7 @@ def test_request_catalogue_matches_demo_scope() -> None:
         | set(graph.GRAPH_OPERATIONS)
         | set(graph.CREDENTIAL_OPERATIONS)
         | set(graph.FIC_OPERATIONS)
+        | set(graph.MEMBERSHIP_OPERATIONS)
     ),
 )
 def test_catalogue_is_read_only(op: str) -> None:
