@@ -41,8 +41,10 @@ Since then:
 ## Require CI to pass (applied)
 
 Branch protection on `main` requires the three `ci` checks below (read back from
-the protection rule on 2026-11-27). This section stays as the record of how it
-was set, and the command to set it again. These are the
+the protection rule on 2026-11-27). A fourth `ci` job, `wheel (install + bundled
+demo)`, was added after v0.1.0; it is required only once the command below is run
+again. This section stays as the record of how it was set, and the command to set
+it. These are the
 checks that run on every pull request, with the names GitHub uses for them
 (read from the check runs of #51):
 
@@ -51,6 +53,7 @@ checks that run on every pull request, with the names GitHub uses for them
 | `check (ubuntu-latest)` | `ci` | GitHub Actions (app 15368) | **yes**: ruff, mypy, import boundaries, schema drift, pytest |
 | `check (windows-latest)` | `ci` | GitHub Actions | **yes**: the same on Windows (about 5 minutes) |
 | `lab (terraform fmt + validate)` | `ci` | GitHub Actions | **yes**: the lab Terraform, no credentials |
+| `wheel (install + bundled demo)` | `ci` | GitHub Actions | **yes, once the command is run again**: the built wheel, installed in a clean venv outside the checkout, runs `fns demo contain --bundled` |
 | `codeql (python)`, `codeql (actions)` | `codeql` | GitHub Actions | optional: they pass even when they raise an alert. Use a code scanning merge rule to gate on alerts instead |
 | `CodeQL` | code scanning results | GitHub Advanced Security (app 57789) | no: it is the alert summary, not a job |
 | `blast radius (fixture)` | `blast-radius` | GitHub Actions | no: it reports and is meant not to gate. Its comment step fails on fork PRs (read-only token) |
@@ -59,11 +62,11 @@ checks that run on every pull request, with the names GitHub uses for them
 Not PR checks: `prove-sign` on a push to `main` (the production signature) and
 the weekly CodeQL schedule.
 
-To require the three `ci` checks, run this **one** command. It works in
+To require the four `ci` checks, run this **one** command. It works in
 PowerShell and in bash:
 
 ```
-'{"required_status_checks":{"strict":true,"checks":[{"context":"check (ubuntu-latest)","app_id":15368},{"context":"check (windows-latest)","app_id":15368},{"context":"lab (terraform fmt + validate)","app_id":15368}]},"enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null,"allow_force_pushes":false,"allow_deletions":false}' | gh api -X PUT repos/danielguillaumont/fang-and-scale/branches/main/protection --input -
+'{"required_status_checks":{"strict":true,"checks":[{"context":"check (ubuntu-latest)","app_id":15368},{"context":"check (windows-latest)","app_id":15368},{"context":"lab (terraform fmt + validate)","app_id":15368},{"context":"wheel (install + bundled demo)","app_id":15368}]},"enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null,"allow_force_pushes":false,"allow_deletions":false}' | gh api -X PUT repos/danielguillaumont/fang-and-scale/branches/main/protection --input -
 ```
 
 What it does:
