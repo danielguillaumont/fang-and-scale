@@ -1,5 +1,55 @@
 # Status
 
+## Summary: coverage build session (2026-11-28) — done
+
+All eight queue items are merged; the queue is empty. Nothing called Azure,
+Graph or a tenant; everything new is FIXTURE or modeled and **not yet
+validated live**.
+
+| PR | Item |
+| --- | --- |
+| #96 | Credential metadata collector (key/password metadata, never values) |
+| #97 | Federated identity credentials, `federated-credential` rule, "Front doors" |
+| #98 | Transitive group memberships, `group-membership-write` rule |
+| #99 | Conditional access: design only (`docs/proposals/conditional-access.md`) |
+| #100 | Scenario gallery: 5 FIXTURE tenants with golden tests (`docs/scenarios/`) |
+| #101 | GitHub Action for other repos: `fixture` input, `contain-json`, `docs/ACTION.md`, example + self-test job |
+| #102 | Scale test (10,000 SPs, 51,350 edges), `docs/PERFORMANCE.md`; contain faster, same results |
+| #103 | Property tests; fix: a malformed Graph object no longer aborts the scout |
+| #104 | This summary |
+
+**Tests:** 2139 passed, 1 skipped at the start; **2322 passed, 11 skipped** at
+the end (Windows `poe check`; the 10 new skips are bash-only action tests,
+which run on ubuntu CI). All four required checks and CodeQL green on every PR.
+
+**Verdict semantics, the evidence ladder, coverage states and exit codes are
+unchanged.** Every committed fixture's contain report is byte-identical to
+before the session. No new Graph or ARM permission; the lab scope is
+unchanged.
+
+**Pending review (8 DECISIONS rows dated 2026-11-28):** credential metadata;
+federated credentials, rule and front doors; transitive memberships and rule;
+CA stays not collected (options A/B/C, recommends C); scenario gallery from
+specs; the action's `fixture` input; performance changes (and the journal
+change not made); malformed Graph objects are `bad-item`.
+
+**Needs Daniel:** see "Needs Daniel (coverage build)" below: review those rows,
+pick a CA option, decide on replay journal durability (or leave it), tag the
+next release and fill in the action pin, and run the live checks.
+
+**Live-validation backlog:** `docs/runbooks/live-validation-backlog.md`, LV-1
+to LV-15 (credentials LV-1 to 3, federated credentials and front doors LV-4 to
+8, memberships LV-9 and 10, CA LV-11 to 13, gallery LV-14, action LV-15).
+
+**Found along the way:** FINDINGS R2 (Learn writes the GitHub PR subject
+`pull-request`, GitHub `pull_request`); the Graph list parsers' crash on a
+wrongly typed field (fixed in #103); scout replay is bound by the journal's
+fsync per write (by design, not changed).
+
+**Incident:** the laptop crashed during item 3 (parallel test runs). The
+uncommitted work was intact and was finished; from then on one test run at a
+time.
+
 ## Coverage build session (2026-11-28, autonomous)
 
 Hard rules: no Azure, Graph or tenant call, no `az`, Terraform only as
@@ -71,13 +121,18 @@ The uncommitted item 3 work was intact; one `poe check` alone passed (2207,
 5 min instead of 14 with parallel runs) and #98 merged. From here: one test run
 at a time, nothing heavy alongside it.
 
-**To resume (`continue`):** take the first row that is not done, on a new
-branch from `main`; read its notes below and the pending-review rows dated
-2026-11-28 in DECISIONS.
+**To resume (`continue`):** every row is done. Next work comes from Daniel's
+answers to "Needs Daniel" below, or the M4 live sessions; read the
+pending-review rows dated 2026-11-28 in DECISIONS first.
 
 #### Needs Daniel (coverage build)
 
-- Review the DECISIONS rows marked **Pending review** dated 2026-11-28.
+- Review the 8 DECISIONS rows marked **Pending review** dated 2026-11-28.
+- Conditional access: pick option A, B or C in
+  `docs/proposals/conditional-access.md` (B needs `Policy.Read.All`).
+- The new optional reads are in no committed scope: adding them to the lab
+  scope changes the M4 session's scope counts and scout digest, so it waits
+  for you (`tests/test_lab.py` pins that).
 - Run the checks in `docs/runbooks/live-validation-backlog.md` during or after
   the M4 sessions; until then the new collectors are fixture-only.
 - Scout replay at scale is journal-bound (`docs/PERFORMANCE.md`): decide
