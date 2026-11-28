@@ -1,0 +1,27 @@
+$ uv run fns demo contain --fixture docs/scenarios/04-github-trust-too-broad/tenant
+FIXTURE Replaying fixture 'docs/scenarios/04-github-trust-too-broad/tenant'; no network calls are made.
+FIXTURE contract deployer-blast-radius  compromised sp-deployer 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:54be87e08dc6eb5013e2834dc92e986c7b721898109b87a47b2cda348b279c30  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=1  not-assessed=1
+FIXTURE Findings
+FIXTURE   inconclusive not-reach -        not-assessed  kv-crown secrets/get
+FIXTURE   inconclusive still-do  modeled  modeled-only  kv-deploy secrets/get
+FIXTURE Inconclusive
+FIXTURE   resource:kv-crown secrets/get: not reachable in the collected model, but it is incomplete
+FIXTURE       key-vault-access-policies not collected: vault access policies (non-RBAC) not collected in M1
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE   resource:kv-deploy secrets/get: allowed in the model; needs an observed success (M3)
+FIXTURE       1 path(s); shortest: assume-compromised -> rbac-data-action
+FIXTURE       the vault's permission model was not collected; assumes either
+FIXTURE       data actions apply only to vaults in RBAC mode
+FIXTURE Front doors (outside parties that can sign in as an identity above; modeled, not validated live)
+FIXTURE   high     sp-deployer: any workflow run for a pull request in contoso/billing
+FIXTURE            credential github-1, github-pull-request
+FIXTURE            GitHub puts pull_request in the subject of every run triggered by a pull request event: whoever can open a pull request that runs a workflow can sign in, whatever its branch or review state
+FIXTURE            branch protection and environment approvals do not apply to this subject
+FIXTURE critical reachable: 0/0 max  must_still_do failed: 0  inconclusive: 2/2 max (on_inconclusive: fail)
+FIXTURE contract WITHIN BUDGET (exit 0)
+FIXTURE report sha256:fac2f28922b930ec0fbde87574a97bc0bb458c14adb5f676b78b4b18177fd400
+FIXTURE wrote <report>.FIXTURE.json
+(exit 0)

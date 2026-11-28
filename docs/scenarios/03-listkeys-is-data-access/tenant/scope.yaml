@@ -1,0 +1,30 @@
+# FIXTURE scope for a scenario-gallery tenant (scripts/build_scenarios.py).
+# Replay freezes the clock at recorded_at, so this expiry stays valid.
+version: 1
+tenant_id: 00000000-0000-4000-8000-000000000001
+subscription_ids:
+  - 00000000-0000-4000-8000-000000000010
+allowed_resource_groups:
+  - /subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-app
+test_identities:
+  - object_id: 00000000-0000-4000-8000-000000000100
+    kind: servicePrincipal
+    name: sp-rotation-agent
+allowed_operations:
+  scout:
+    - arm:Microsoft.Authorization/roleAssignments/read
+    - arm:Microsoft.Authorization/roleDefinitions/read
+    - arm:Microsoft.Authorization/denyAssignments/read
+    - arm:Microsoft.Resources/subscriptions/resourceGroups/resources/read
+    - graph:GET /servicePrincipals
+    - graph:GET /applications
+    - graph:GET /servicePrincipals/{id}/owners
+    - graph:GET /applications/{id}/owners
+    - graph:GET /servicePrincipals/{id}/appRoleAssignments
+    - graph:GET /servicePrincipals/{id}/memberOf
+    - graph:GET /roleManagement/directory/roleDefinitions
+    - graph:GET /roleManagement/directory/roleAssignments
+budget:
+  max_api_calls: 200
+  max_minutes: 15
+expires_at: "2026-12-05T12:00:00Z"

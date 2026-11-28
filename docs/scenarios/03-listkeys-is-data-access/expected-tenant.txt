@@ -1,0 +1,29 @@
+$ uv run fns demo contain --fixture docs/scenarios/03-listkeys-is-data-access/tenant
+FIXTURE Replaying fixture 'docs/scenarios/03-listkeys-is-data-access/tenant'; no network calls are made.
+FIXTURE contract rotation-agent-blast-radius  compromised sp-rotation-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:c68d921b258c4ceb080866a4ca7a8c4240fe54bf6ca05134118005fe0672df4c  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=2
+FIXTURE Findings
+FIXTURE   fail         not-reach modeled  modeled-only  stpayroll blob/read
+FIXTURE   fail         not-reach modeled  modeled-only  stpayroll blob/write
+FIXTURE Escalation paths
+FIXTURE FAIL resource:stpayroll blob/read  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-rotation-agent is compromised
+FIXTURE   2. [snapshot] sp-rotation-agent has Storage Account Key Operator Service Role at stpayroll
+FIXTURE        from hasRbacRole: sp-rotation-agent -> stpayroll [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   3. [listkeys-data] Storage Account Key Operator Service Role allows Microsoft.Storage/storageAccounts/listKeys/action on stpayroll (blob/read)
+FIXTURE      assumes: allowSharedKeyAccess was not collected; assumes Azure's default (shared key allowed)
+FIXTURE      assumes: the account key grants full data-plane access
+FIXTURE FAIL resource:stpayroll blob/write  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-rotation-agent is compromised
+FIXTURE   2. [snapshot] sp-rotation-agent has Storage Account Key Operator Service Role at stpayroll
+FIXTURE        from hasRbacRole: sp-rotation-agent -> stpayroll [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   3. [listkeys-data] Storage Account Key Operator Service Role allows Microsoft.Storage/storageAccounts/listKeys/action on stpayroll (blob/write)
+FIXTURE      assumes: allowSharedKeyAccess was not collected; assumes Azure's default (shared key allowed)
+FIXTURE      assumes: the account key grants full data-plane access
+FIXTURE critical reachable: 2/0 max  must_still_do failed: 0  inconclusive: 0/2 max (on_inconclusive: fail)
+FIXTURE contract FAILED (exit 1)
+FIXTURE report sha256:8e8ed6a51849dba6b311adf1d14a06ca19de18a786b32a796645a70e9904fc63
+FIXTURE wrote <report>.FIXTURE.json
+(exit 1)

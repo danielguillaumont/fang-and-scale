@@ -1,0 +1,24 @@
+$ uv run fns demo contain --fixture docs/scenarios/02-contributor-key-vault-flip/fixed
+FIXTURE Replaying fixture 'docs/scenarios/02-contributor-key-vault-flip/fixed'; no network calls are made.
+FIXTURE contract batch-agent-blast-radius  compromised sp-batch-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:aa896ae024554284b7d0623db9e0264cfacf2385558e4c6d641f00923b6b6209  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=1  not-assessed=2
+FIXTURE Findings
+FIXTURE   inconclusive not-reach -        not-assessed  kv-crown secrets/get
+FIXTURE   inconclusive not-reach -        not-assessed  kv-crown secrets/list
+FIXTURE   inconclusive still-do  modeled  modeled-only  stbatch blob/write
+FIXTURE Inconclusive
+FIXTURE   resource:kv-crown secrets/get: not reachable in the collected model, but it is incomplete
+FIXTURE       key-vault-access-policies not collected: vault access policies (non-RBAC) not collected in M1
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE   resource:kv-crown secrets/list: not reachable in the collected model, but it is incomplete
+FIXTURE       key-vault-access-policies not collected: vault access policies (non-RBAC) not collected in M1
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE   resource:stbatch blob/write: allowed in the model; needs an observed success (M3)
+FIXTURE       1 path(s); shortest: assume-compromised -> rbac-data-action
+FIXTURE critical reachable: 0/0 max  must_still_do failed: 0  inconclusive: 3/3 max (on_inconclusive: fail)
+FIXTURE contract WITHIN BUDGET (exit 0)
+FIXTURE report sha256:d7aef5951352cc11a826fdb07b306ad3881f980a02c53201176e19550789bdc9
+FIXTURE wrote <report>.FIXTURE.json
+(exit 0)

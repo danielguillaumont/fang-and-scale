@@ -1,0 +1,26 @@
+$ uv run fns demo contain --fixture docs/scenarios/01-owner-of-privileged-app/tenant
+FIXTURE Replaying fixture 'docs/scenarios/01-owner-of-privileged-app/tenant'; no network calls are made.
+FIXTURE contract report-agent-blast-radius  compromised sp-report-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:4d403fdb4c5431a7baeb9bd4c83cb46ef1e2af71b08503d2cff73ad0388196e1  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=1
+FIXTURE Findings
+FIXTURE   fail         not-reach modeled  modeled-only  kv-crown secrets/get
+FIXTURE Escalation paths
+FIXTURE FAIL resource:kv-crown secrets/get  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-report-agent is compromised
+FIXTURE   2. [snapshot] sp-report-agent holds the Graph permission Application.ReadWrite.OwnedBy
+FIXTURE        from hasAppRole: sp-report-agent -> Microsoft Graph [graph:GET /servicePrincipals/{id}/appRoleAssignments]
+FIXTURE   3. [owner-adds-credential] sp-report-agent owns app-deployer; with Application.ReadWrite.OwnedBy it adds a credential and signs in as app-deployer
+FIXTURE        from owns: sp-report-agent -> app-deployer [graph:GET /applications/{id}/owners]
+FIXTURE        from instanceOf: app-deployer -> app-deployer [graph:GET /applications]
+FIXTURE   4. [snapshot] app-deployer has Key Vault Secrets User at kv-crown
+FIXTURE        from hasRbacRole: app-deployer -> kv-crown [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   5. [rbac-data-action] Key Vault Secrets User allows Microsoft.KeyVault/vaults/secrets/getSecret/action on kv-crown (secrets/get)
+FIXTURE      assumes: the vault's permission model was not collected; assumes either
+FIXTURE      assumes: data actions apply only to vaults in RBAC mode
+FIXTURE critical reachable: 1/0 max  must_still_do failed: 0  inconclusive: 0/1 max (on_inconclusive: fail)
+FIXTURE contract FAILED (exit 1)
+FIXTURE report sha256:2b465dde9b5fc49b9c56a86c5342b0a34a1fd977557191be056a57ff07e4a636
+FIXTURE wrote <report>.FIXTURE.json
+(exit 1)

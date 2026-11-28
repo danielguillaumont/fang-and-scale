@@ -1,0 +1,13 @@
+# Scenario gallery contract (FIXTURE). `fns demo contain` evaluates it.
+version: 1
+contract: rotation-agent-blast-radius
+assume_compromised: sp:sp-rotation-agent
+
+must_not_reach:
+  - resource: stpayroll
+    operations: [blob/read, blob/write]
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 2
+on_inconclusive: fail

@@ -20,6 +20,7 @@ SCANNED = [
     ROOT / "src" / "fns" / "fixtures" / "data",
     ROOT / "contracts",
     ROOT / "detections",
+    ROOT / "docs" / "scenarios",
 ]
 SCANNED_FILES = [ROOT / "scope.example.yaml"]
 SECRET_KEY_RE = re.compile(

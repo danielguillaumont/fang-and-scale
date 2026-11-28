@@ -1,0 +1,32 @@
+$ uv run fns demo contain --fixture docs/scenarios/05-nested-group-owner/tenant
+FIXTURE Replaying fixture 'docs/scenarios/05-nested-group-owner/tenant'; no network calls are made.
+FIXTURE contract sync-agent-blast-radius  compromised sp-sync-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:7938fe97885235ea7e4de802c1a871fff86581f466ee0c8ee8876637ee7f9dbd  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=2
+FIXTURE Findings
+FIXTURE   fail         not-reach modeled  modeled-only  kv-crown roleAssignments/write
+FIXTURE   fail         not-reach modeled  modeled-only  kv-crown secrets/get
+FIXTURE Escalation paths
+FIXTURE FAIL resource:kv-crown roleAssignments/write  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-sync-agent is compromised
+FIXTURE   2. [member-of] sp-sync-agent is in the group grp-platform-admins; its grants apply
+FIXTURE        from memberOf: sp-sync-agent -> grp-platform-admins [graph:GET /servicePrincipals/{id}/transitiveMemberOf/microsoft.graph.group]
+FIXTURE   3. [snapshot] grp-platform-admins has Owner at resource group rg-app
+FIXTURE        from hasRbacRole: grp-platform-admins -> /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-app [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   4. [rbac-action] Owner allows Microsoft.Authorization/roleAssignments/write on kv-crown (roleAssignments/write)
+FIXTURE   (+1 alternative path(s) in the JSON report)
+FIXTURE FAIL resource:kv-crown secrets/get  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-sync-agent is compromised
+FIXTURE   2. [member-of] sp-sync-agent is in the group grp-platform-admins; its grants apply
+FIXTURE        from memberOf: sp-sync-agent -> grp-platform-admins [graph:GET /servicePrincipals/{id}/transitiveMemberOf/microsoft.graph.group]
+FIXTURE   3. [snapshot] grp-platform-admins has Owner at resource group rg-app
+FIXTURE        from hasRbacRole: grp-platform-admins -> /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-app [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   4. [kv-control-to-data] Owner allows Microsoft.KeyVault/vaults/write on kv-crown (secrets/get)
+FIXTURE      assumes: vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe
+FIXTURE   (+2 alternative path(s) in the JSON report)
+FIXTURE critical reachable: 2/0 max  must_still_do failed: 0  inconclusive: 0/2 max (on_inconclusive: fail)
+FIXTURE contract FAILED (exit 1)
+FIXTURE report sha256:cef93703d24f8a724cddc0b6f4dea206d488996b627b3746b41633f15c1ab12a
+FIXTURE wrote <report>.FIXTURE.json
+(exit 1)

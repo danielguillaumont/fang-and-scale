@@ -1,0 +1,19 @@
+$ uv run fns demo contain --fixture docs/scenarios/03-listkeys-is-data-access/fixed
+FIXTURE Replaying fixture 'docs/scenarios/03-listkeys-is-data-access/fixed'; no network calls are made.
+FIXTURE contract rotation-agent-blast-radius  compromised sp-rotation-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:5b6768bad9130b143935feb18d440ea8a1db6dd78e0991e0c534ce84e9717cb5  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: not-assessed=2
+FIXTURE Findings
+FIXTURE   inconclusive not-reach -        not-assessed  stpayroll blob/read
+FIXTURE   inconclusive not-reach -        not-assessed  stpayroll blob/write
+FIXTURE Inconclusive
+FIXTURE   resource:stpayroll blob/read: not reachable in the collected model, but it is incomplete
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE   resource:stpayroll blob/write: not reachable in the collected model, but it is incomplete
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE critical reachable: 0/0 max  must_still_do failed: 0  inconclusive: 2/2 max (on_inconclusive: fail)
+FIXTURE contract WITHIN BUDGET (exit 0)
+FIXTURE report sha256:03ad7b381aacc175784df3f7deb81b773072ce17cefc91d1f7b9b5f95fd9abe4
+FIXTURE wrote <report>.FIXTURE.json
+(exit 0)

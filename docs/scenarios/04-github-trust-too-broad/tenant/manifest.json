@@ -1,0 +1,8 @@
+{
+  "description": "Scenario gallery (tenant): a GitHub federated credential trusts every pull request. Hand-written spec in scripts/build_scenarios.py; placeholder GUIDs only.",
+  "format": 1,
+  "label": "FIXTURE",
+  "name": "scenario-04-github-trust-too-broad-tenant",
+  "recorded_at": "2026-11-28T12:00:00Z",
+  "tenant_id": "00000000-0000-4000-8000-000000000001"
+}

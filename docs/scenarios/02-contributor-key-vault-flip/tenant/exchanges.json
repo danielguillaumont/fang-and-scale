@@ -1,0 +1,224 @@
+[
+ {
+  "request": "GET https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-app/resources?api-version=2021-04-01",
+  "response": {
+   "body": {
+    "value": [
+     {
+      "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-app/providers/Microsoft.KeyVault/vaults/kv-crown",
+      "location": "westus",
+      "name": "kv-crown",
+      "type": "Microsoft.KeyVault/vaults"
+     },
+     {
+      "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-app/providers/Microsoft.Storage/storageAccounts/stbatch",
+      "location": "westus",
+      "name": "stbatch",
+      "type": "Microsoft.Storage/storageAccounts"
+     }
+    ]
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01",
+  "response": {
+   "body": {
+    "value": [
+     {
+      "id": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-app/providers/Microsoft.Authorization/roleAssignments/00000000-0000-4000-8000-000000000700",
+      "name": "00000000-0000-4000-8000-000000000700",
+      "properties": {
+       "condition": null,
+       "conditionVersion": null,
+       "principalId": "00000000-0000-4000-8000-000000000100",
+       "principalType": "ServicePrincipal",
+       "roleDefinitionId": "/subscriptions/00000000-0000-4000-8000-000000000010/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c",
+       "scope": "/subscriptions/00000000-0000-4000-8000-000000000010/resourceGroups/rg-app"
+      },
+      "type": "Microsoft.Authorization/roleAssignments"
+     }
+    ]
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c?api-version=2022-04-01",
+  "response": {
+   "body": {
+    "id": "/subscriptions/00000000-0000-4000-8000-000000000010/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c",
+    "name": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+    "properties": {
+     "assignableScopes": [
+      "/"
+     ],
+     "permissions": [
+      {
+       "actions": [
+        "*"
+       ],
+       "dataActions": [],
+       "notActions": [
+        "Microsoft.Authorization/*/Delete",
+        "Microsoft.Authorization/*/Write",
+        "Microsoft.Authorization/elevateAccess/Action"
+       ],
+       "notDataActions": []
+      }
+     ],
+     "roleName": "Contributor",
+     "type": "BuiltInRole"
+    },
+    "type": "Microsoft.Authorization/roleDefinitions"
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://management.azure.com/subscriptions/00000000-0000-4000-8000-000000000010/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/servicePrincipals?$select=id,appId,displayName,servicePrincipalType,appOwnerOrganizationId,appRoles",
+  "response": {
+   "body": {
+    "value": [
+     {
+      "appId": "00000003-0000-0000-c000-000000000000",
+      "appOwnerOrganizationId": "f8cdef31-a31e-4b4a-93e4-5f571e91255a",
+      "appRoles": [
+       {
+        "allowedMemberTypes": [
+         "Application"
+        ],
+        "id": "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30",
+        "isEnabled": true,
+        "value": "Application.Read.All"
+       },
+       {
+        "allowedMemberTypes": [
+         "Application"
+        ],
+        "id": "18a4783c-866b-4cc7-a460-3d5e5662c884",
+        "isEnabled": true,
+        "value": "Application.ReadWrite.OwnedBy"
+       }
+      ],
+      "displayName": "Microsoft Graph",
+      "id": "00000000-0000-4000-8000-000000000103",
+      "servicePrincipalType": "Application"
+     },
+     {
+      "appId": "00000000-0000-4000-8000-000000000700",
+      "appOwnerOrganizationId": "00000000-0000-4000-8000-000000000001",
+      "appRoles": [],
+      "displayName": "sp-batch-agent",
+      "id": "00000000-0000-4000-8000-000000000100",
+      "servicePrincipalType": "Application"
+     }
+    ]
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/applications?$select=id,appId,displayName",
+  "response": {
+   "body": {
+    "value": [
+     {
+      "appId": "00000000-0000-4000-8000-000000000700",
+      "displayName": "sp-batch-agent",
+      "id": "00000000-0000-4000-8000-000000000300"
+     }
+    ]
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/servicePrincipals/00000000-0000-4000-8000-000000000100/owners?$select=id,displayName",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/applications/00000000-0000-4000-8000-000000000300/owners?$select=id,displayName",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/servicePrincipals/00000000-0000-4000-8000-000000000100/appRoleAssignments",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/servicePrincipals/00000000-0000-4000-8000-000000000100/memberOf?$select=id,displayName",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/roleManagement/directory/roleDefinitions?$select=id,displayName,templateId,isBuiltIn",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ },
+ {
+  "request": "GET https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?$select=id,principalId,roleDefinitionId,directoryScopeId",
+  "response": {
+   "body": {
+    "value": []
+   },
+   "request_id": null,
+   "retry_after": null,
+   "status": 200
+  }
+ }
+]
