@@ -7,6 +7,11 @@ version may change file formats; each change is listed here.
 
 ## [Unreleased]
 
+### Changed
+
+- `docs/DECISIONS.md`: the build choices for D-6/D-7 and for the named
+  inconclusive budget are approved (#87). Docs only.
+
 ## [0.1.0] - 2026-11-27
 
 The first release: contracts, the reach model, read-only probes with signed
