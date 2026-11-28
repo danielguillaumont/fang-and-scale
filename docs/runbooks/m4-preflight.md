@@ -68,15 +68,16 @@ Terraform reads the next pasted line as the answer to its `yes` prompt
 (FINDINGS, 2026-11-27). Each of these is in a block of its own in the runbook.
 Paste it, read the plan, type the answer yourself.
 
-| Step | Command | Plan to expect |
+| Block | Command | Plan to expect |
 | --- | --- | --- |
-| A2, B1, C1, D3 | `uv run poe lab-up` | the counts in that step |
-| D5 | `terraform -chdir=lab apply "-replace=time_offset.strike_expiry[0]"` | 2 to add, 0 to change, 2 to destroy |
-| Any session more than 7 days after A2 | `terraform -chdir=lab apply "-replace=time_offset.scope_expiry"` (renews the scope) | 2 to add, 0 to change, 2 to destroy |
-| Teardown; emergency step 4 | `uv run poe lab-down` | everything A2, B1 and C1 added, less the two grants D3 removed |
+| A2b, B1b, C1a, D3b | `uv run poe lab-up` | the counts in that step |
+| D5b | `terraform -chdir=lab apply "-replace=time_offset.strike_expiry[0]"` | 2 to add, 0 to change, 2 to destroy |
+| B0c, C0c, D0c, only if the scope has less than a day left | `terraform -chdir=lab apply "-replace=time_offset.scope_expiry"` (renews the scope) | 2 to add, 0 to change, 2 to destroy |
+| T1; emergency E4 | `uv run poe lab-down` | everything A2, B1 and C1 added, less the two grants D3 removed |
 
-`az login --tenant <TENANT_ID>` opens a sign-in window: run it alone too, and
-wait for it to return before the next line.
+`az login --tenant <TENANT_ID>` (each session's 0a block) opens a sign-in window
+and may ask you to pick a subscription: run it alone too, and wait for it to
+return before the next block.
 
 ## 5. What to paste back after each session
 
