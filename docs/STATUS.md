@@ -5,11 +5,21 @@
 Working through Daniel's decisions of 2026-11-27, one focused PR per item. Same
 hard rules as before: no Azure, Graph or Log Analytics call, no `az`, Terraform
 only as `poe lab-check`, fixtures and mocked transports only. CI (three checks)
-is now required on `main`.
+is required on `main`. **Nothing is tagged or published.** Stopped here, as
+asked.
 
 ### Queue
 
-Second batch (Daniel's decisions after the option-B plan; marked in DECISIONS):
+Third batch (Daniel's decisions on the exit-3 gap and the tag commit; marked in
+DECISIONS in #84):
+
+| # | Item | State | PR |
+| --- | --- | --- | --- |
+| 9 | D-6 and D-7: `listKeys` after harden on both storage accounts, and `listKeys` in option B's table | done | #84 |
+| 10 | The lab budget: `max_inconclusive: 3`, the three items named with reasons, any other inconclusive fails; runbook D7; the logged `blob/write` future proposal | done | #85 |
+| 11 | Fold option B, #83, #84 and #85 into the 0.1.0 changelog; the tag commands on `main` | done | #86 |
+
+Second batch:
 
 | # | Item | State | PR |
 | --- | --- | --- | --- |
@@ -29,59 +39,46 @@ First batch:
 
 ### Decisions of 2026-11-27 (marked in `docs/DECISIONS.md`)
 
-- Every "Pending review" row from the build session: **approved**, including
-  exit 5 for a failed post-undo verification (revisit with a dedicated exit code
-  in a later release).
-- Agent ID `not-assessed`: approved and built (#77). Its build choices are pending review in DECISIONS (base types plus `agentIdType`, "controls" like PIM, a modeled reach still fails).
-- S4: approved with conditions, and built (#78): right after S3 in the same run, the token never written anywhere (only `oid` and `roles` journaled), S3's password removed as soon as the token is held, the marker role defined by Terraform, and an emergency cleanup step in the M4 runbook. Tested against the fake tenant only; it has not run live. Its nine build choices are approved (2026-11-27), the unverified-signature claims check on the condition that it is a safety stop only, never verdict evidence (pinned by `tests/prove/test_s4_not_evidence.py`).
-- M4 exit gate: option B, approved as written and **built (#82)**, with: D-2 not
-  counting for the tenant-wide item; the PIM precondition (complete, or not
-  applicable with evidence), pinned by tests and checked in the runbook at D4.
-  Its build choices are pending review in DECISIONS.
-- The release attestation's token scope: approved. #83 narrows it to one job
-  that runs two pinned actions, so no other step can mint the token.
-- Folding "Unreleased" into 0.1.0: approved.
-- **M6 Agent ID licensing and the LLM bake-off: deferred.**
-- Threat model open gaps: size caps and build provenance approved, and built (#79): `fns.inputcap` for every JSON and YAML read, bounded MCP stdin, and a pinned build provenance attestation in `release.yml`. THREAT-MODEL "Open gaps" now lists only required reviews (CI is required on `main`). The build choices are pending review in DECISIONS.
+- **Exit-3 gap.** (1) Approved and **built (#84)**: D-6 (payroll) and D-7
+  (invoices) try `listKeys` after harden and must be denied. A LIVE 403 on the
+  account's exact ARM ID counts under option B. If one ever succeeds, both of
+  that account's keys are regenerated at once (as SD1), the scout verifies it,
+  the item fails and the run exits 1. (2) Not now: logged `blob/write` evidence
+  stays out of verdicts. It is written up as a future proposal only
+  (`docs/proposals/logged-blob-write-evidence.md`, #85). (3) Approved and **built
+  (#85)**: the lab contract's `max_inconclusive` is 3 and names invoices
+  `blob/write`, the tenant-wide `applications/credentials/update` and
+  `roleAssignments/write`, each with its reason. Any other inconclusive item is
+  over budget (exit 3) even within the count.
+- **Session D now expects exit 0** only if those three are the only inconclusive
+  items and no surface is open (runbook D7; `tests/prove/test_session_d_budget.py`
+  replays the hardened lab-run-2 with every D-step denied).
+- **Tag `main`, not #81.** Option B, #83, #84 and #85 are folded into 0.1.0
+  (#86), and `uv run poe release-check` prints `release check: ok`.
+- Every other "Pending review" row: approved (Agent ID as built, the two open
+  gaps as built, option B as built, the attestation job).
+- Earlier the same day: S4 approved with conditions and built (#78); option B
+  approved and built (#82), with the PIM precondition; the attestation token
+  scope approved and narrowed to one job (#83); M6 Agent ID licensing and the
+  LLM bake-off deferred.
 
 ### Needs Daniel
 
-- **Session D still exits 3, even with option B** (found while building #82;
-  `tests/prove/test_option_b.py`, `test_the_rest_of_the_contract_after_harden`).
-  The four application items now `pass`. Five items stay `inconclusive`, against
-  `max_inconclusive: 2`:
-  - payroll `listKeys` and invoices `listKeys`: only the permissions API
-    evaluates them after harden, and nothing observes a denial (SD4's note
-    said the probes did; they don't);
-  - invoices `blob/write` (must still do): an observed success needs a write;
-  - `directory:tenant applications/credentials/update`: one app is not every
-    app (your decision);
-  - `roleAssignments/write`: SD3.
-
-  The plan counted two, because it missed the first three. Nothing was
-  loosened. Possible next steps, each its own decision:
-  - **a.** A D-step `listKeys` attempt on both storage accounts after harden,
-    expecting 403. S1's write form already exists. It would count under option
-    B only if `listKeys` rows are added to the exact-operation table.
-  - **b.** Accept `blob/write` on `fns record`'s logged evidence (rung 4) from
-    session B. Today `prove` doesn't use it.
-  - **c.** Raise the lab contract's `max_inconclusive`, with a reason per item.
-- **The v0.1.0 tag commit.** See the commands below and the last note there:
-  tagging #81's commit keeps 0.1.0 as dated, with the job-level token you
-  approved. Tagging `main` after #83 would need option B and #83 folded into
-  0.1.0 first.
-- **Tag and publish v0.1.0** (prepared in #80; nothing is tagged or published).
-  `CHANGELOG.md` is dated 2026-11-27, with the earlier "Unreleased" entries folded
-  into 0.1.0 because the tag ships them, and `uv run poe release-check` prints
-  `release check: ok`. These commands work in PowerShell and in bash:
+- **Two new rows pending review in DECISIONS**: how D-6 and D-7 are built (#84),
+  and how the named inconclusive budget is built (#85). The conservative choice
+  was taken each time, for example: naming any item with `on_inconclusive: warn`
+  is refused, and the strike fixture `fixtures/strike-demo` keeps its recorded
+  D-1 to D-5.
+- **Tag and publish v0.1.0** (nothing is tagged or published). The tag goes on
+  the merge commit of #86, the last PR of this session, which is `main` as it is
+  now. These commands work in PowerShell and in bash:
 
   ```
   git switch main
   git pull --ff-only
-  git switch --detach 1c6a2b956a1358eae988d0b64c09430daeac8594
+  git log -1 --format="%H %s"
   uv run poe release-check
   git tag v0.1.0
-  git switch main
   git push origin v0.1.0
   gh run list --workflow release.yml --limit 1
   gh run watch <run id from the line above> --exit-status
@@ -91,17 +88,12 @@ First batch:
   gh release edit v0.1.0 --draft=false
   ```
 
-  - **The tag goes on #81's merge commit, not on `main`** (pending review in
-    DECISIONS). #82 changed the verdict rules after 0.1.0 was dated, so `main`
-    holds more than the 0.1.0 section lists. `git switch --detach` checks out
-    that commit; `git switch main` goes back after tagging it.
-  - A tag runs the `release.yml` of the commit it names. So v0.1.0 attests from
-    one job holding `id-token: write` for every step, which is the scope you
-    approved. #83's split (only the attest job can mint the token) applies from
-    the next tag. To have it in v0.1.0 instead, tag `main` after #83. The
-    "Unreleased" entries (option B and the split) would then need folding into
-    0.1.0 first. That is your choice; tell me and it is one docs PR.
+  - `git log -1` must print `Merge pull request #86 from
+    danielguillaumont/docs/fold-0.1.0`. If it prints something newer, stop and
+    tell me: the changelog may need that change folded in too.
   - `release-check` must print `release check: ok` before you tag.
+  - A tag runs the `release.yml` of the commit it names, so v0.1.0 uses #83's
+    split: only the `attest` job can mint the signing token.
   - The workflow runs the full check, builds, writes the SBOM and
     `SHA256SUMS`, attests every file and creates a **draft**. `gh run watch`
     exits non-zero if any step fails. If it does, delete nothing: tell me, and
@@ -112,6 +104,8 @@ First batch:
     `refs/tags/v0.1.0`. Run it for any other file the same way.
   - The last line publishes the draft. You can do the same in the GitHub UI
     instead.
+- **M4 sessions A to D** have still not run live: `docs/runbooks/m4-live-run.md`.
+  Session D now runs D-1 to D-7.
 
 
 ## Summary of the build session: the queue is done (2026-11-27)

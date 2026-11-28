@@ -203,6 +203,15 @@ def test_the_changelog_says_what_did_not_run_live() -> None:
         assert attribution not in CHANGELOG
 
 
+def test_everything_built_is_in_the_release_the_tag_ships() -> None:
+    """Approved 2026-11-27: the tag goes on ``main``, so "Unreleased" is folded in."""
+    unreleased = CHANGELOG[CHANGELOG.index("## [Unreleased]") : CHANGELOG.index(f"## [{VERSION}]")]
+    assert unreleased.strip() == "## [Unreleased]"
+    section = CHANGELOG[CHANGELOG.index(f"## [{VERSION}]") :]
+    for needed in ("option B", "D-6 and D-7", "accepted_inconclusive", "in its own job"):
+        assert needed in section, needed
+
+
 def test_poe_has_the_release_tasks() -> None:
     tasks = PYPROJECT["tool"]["poe"]["tasks"]
     assert "release_check.py" in tasks["release-check"]["cmd"]

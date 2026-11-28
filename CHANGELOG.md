@@ -7,44 +7,6 @@ version may change file formats; each change is listed here.
 
 ## [Unreleased]
 
-### Changed
-
-- `fns prove --after-strike` / `fns verify`: an after-harden strike denial can
-  now count like an observed probe denial (option B). It counts only if it is
-  LIVE, D-2 to D-5, a 403, and on the item's exact operation and exact object.
-  It never counts for `directory:tenant roleAssignments/write`, and D-2 never
-  counts for the tenant-wide `applications/credentials/update`. `pass` still
-  needs every path refuted and no open surface. FIXTURE, D-1, S4 and
-  before-harden strikes never count. Any other strike result only adds context,
-  or fails the finding. The verifier judges each finding with and without strikes,
-  and raises `GuardrailError` if it loosened without a counting denial.
-- Frozen assertions record the object ID of `application:` and
-  `service_principal:` targets (`target_object_id`), and strike observations
-  record the planned write's operation and object ID. All three fields are
-  omitted when empty. The lab-run prove bundle digests change for that reason
-  only; no verdict changes.
-- The release workflow attests the build provenance in its own job, which runs
-  only two pinned actions, so no other step can mint the signing token. The
-  check, build and draft run in jobs without `id-token: write`.
-- The M4 runbook checks the PIM precondition before session D's strikes, and its
-  expected results now include `listKeys` and `blob/write`. With them, session D
-  still exits 3.
-- `fns strike`: two more after-harden attempts, D-6 and D-7, `listKeys` on the
-  payroll and invoices storage accounts. Each must be denied; if one succeeds,
-  both of that account's keys are regenerated at once, verified, and the run
-  exits 1. A LIVE 403 counts under option B (the exact-operation table gains
-  `listKeys`, on the account's exact ARM ID), so both `listKeys` items can
-  `pass`. The lab's strike targets include the invoices account. Frozen
-  assertions now also record a `resource:` target's ARM ID; the prove bundle
-  digests change for that reason only.
-- Contracts can name the items they accept as inconclusive, each with a reason
-  (`budget.accepted_inconclusive`). Once a contract names any, every other
-  inconclusive item is over budget (exit 3), whatever the count; `fns contain` and
-  `fns verify` print each as `not accepted by the budget`. The example and lab
-  contracts set `max_inconclusive: 3` and name invoices `blob/write`, the
-  tenant-wide `applications/credentials/update` and `roleAssignments/write`. With
-  every D-step denied and no surface open, session D now expects exit 0.
-
 ## [0.1.0] - 2026-11-27
 
 The first release: contracts, the reach model, read-only probes with signed
@@ -57,6 +19,14 @@ built and tested offline only (see "Not in 0.1.0").
 - Contract files (`*.fns.yaml`, schema v2): `must_not_reach` and `must_still_do`
   items on resources, the directory, applications and service principals, with
   budgets and `on_inconclusive`.
+- A budget can name the items it accepts as inconclusive, each with a reason
+  (`budget.accepted_inconclusive`). Once a contract names any, every other
+  inconclusive item is over budget (exit 3), whatever the count, and
+  `max_inconclusive` still caps the total. `fns contain` and `fns verify` print
+  each unnamed one as `not accepted by the budget`. The example and lab contracts
+  set `max_inconclusive: 3` and name invoices `blob/write` (writes stay rung 2 by
+  design), the tenant-wide `applications/credentials/update` (one app's denial
+  isn't tenant-wide) and `roleAssignments/write` (SD3).
 - `fns scope check` and the scope gate. Every Azure and Graph call goes through
   it; it denies by default, pins the tenant, and checks targets, URLs and
   expiry. Data-plane reads for `prove` are bound to their resource and to the
@@ -98,10 +68,20 @@ built and tested offline only (see "Not in 0.1.0").
   the `sigstore` extra. A failure exits 5.
 - Denied probes that settle nothing are kept with their finding as `context`
   evidence, which never changes a verdict.
-- `fns prove --after-strike <dir>`: the D-1 to D-5 results of a strike run after
-  harden. A denial is added as context. A success fails the finding. No finding
-  can move toward `pass` because of a strike, and tests re-run every prove
-  golden to check that.
+- `fns prove --after-strike <dir>`: the D-1 to D-7 results of a strike run after
+  harden. A denial counts like an observed probe denial (option B) only if it
+  is LIVE, D-2 to D-7, a 403, and on the item's exact operation and exact object
+  (an application's object ID, or a storage account's ARM ID). It never counts
+  for `directory:tenant roleAssignments/write`, and D-2 never counts for the
+  tenant-wide `applications/credentials/update`. `pass` still needs every path
+  refuted and no open surface. FIXTURE, D-1, S4 and before-harden strikes never
+  count. Any other strike result only adds context, or fails the finding. The
+  verifier judges each finding with and without strikes and raises
+  `GuardrailError` if one loosened without a counting denial.
+- Frozen assertions record their target's object (`target_object_id`: a
+  directory object ID, or a resource's ARM ID), and strike observations record
+  the planned write's operation and object. The fields are left out while
+  empty.
 
 ### Harden, record and detections
 
@@ -121,7 +101,7 @@ built and tested offline only (see "Not in 0.1.0").
 - A write gate for `fns strike`. It allows listed write forms only, to lab
   targets only, with body allowlists. Its hard denylist no scope can lift.
   There are negative and fuzz tests for every rule.
-- `fns strike plan | run | cleanup`, for S1 to S4 before harden and D-1 to D-5
+- `fns strike plan | run | cleanup`, for S1 to S4 before harden and D-1 to D-7
   after:
   - each plan has a sha256 hash, and the operator approves that hash
     (`--approve`);
@@ -138,13 +118,17 @@ built and tested offline only (see "Not in 0.1.0").
   assigned to the agent and removed. S3's password is removed as soon as the
   token is held. The token is never written anywhere; the journal gets its `oid`
   and `roles` claims only. The claims check is a safety stop, never verdict evidence:
-  `fns prove --after-strike` counts only D-1 to D-5. The marker role is defined by Terraform
+  `fns prove --after-strike` counts only after-harden strikes. The marker role is defined by Terraform
   (`enable_strikes`), and the scope's new `strike.escalation` block authorises
   the token request and the escalated identity. `fns strike cleanup` can't undo
   the assignment (no token): it exits 5 and the M4 runbook's emergency cleanup
   removes it. Fixture mode refuses S4: the recording has S1 to S3.
+- D-6 and D-7 after harden: `listKeys` on the payroll and invoices storage
+  accounts, which must be denied. If one succeeds, both of that account's keys
+  are regenerated at once, the scout verifies it, and the run exits 1. Key
+  verification is per account.
 - Two-identity live sign-in from two Azure CLI profiles, and a strict fixture
-  replay (`fixtures/strike-demo`).
+  replay (`fixtures/strike-demo`, recorded with D-1 to D-5).
 
 ### Reports and CI
 
@@ -179,6 +163,9 @@ built and tested offline only (see "Not in 0.1.0").
 - The release workflow attests the build provenance of every release file
   (Sigstore, `actions/attest-build-provenance` pinned by SHA). Check a download
   with `gh attestation verify <file> --repo danielguillaumont/fang-and-scale`.
+  The attestation runs in its own job, which runs only two pinned actions, so no
+  other step can mint the signing token; the check, build and draft jobs have no
+  `id-token: write`.
 
 ### Docs
 
@@ -196,9 +183,15 @@ built and tested offline only (see "Not in 0.1.0").
 - `lab/`: Terraform for the lab tenant: the identities, the vault, two storage
   accounts, the rendered scope and contract, an optional budget alert, an
   optional lab group, optional monitoring (workspace, Sentinel, diagnostic
-  settings, the rules), and an optional strike block. Every optional part is
-  off by default.
-- Runbooks for every live session in `docs/runbooks/`.
+  settings, the rules), and an optional strike block whose targets include both
+  storage accounts. Every optional part is off by default.
+- Runbooks for every live session in `docs/runbooks/`. The M4 runbook checks the
+  PIM precondition before session D's strikes, and expects session D to exit 0
+  only if invoices `blob/write`, the tenant-wide `applications/credentials/update`
+  and `roleAssignments/write` are the only inconclusive items and no surface is
+  open.
+- A future proposal, not built: logged `blob/write` evidence from `fns record`
+  (`docs/proposals/logged-blob-write-evidence.md`). Verdicts don't read it.
 
 ### Not in 0.1.0
 
