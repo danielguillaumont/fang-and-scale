@@ -148,6 +148,7 @@ def test_action_script_on_the_lab_fixture(tmp_path: Path) -> None:
         "FNS_PROBES": str(LAB_RUN / "probes.json"),
         "FNS_LAB": str(ROOT / "lab"),
         "FNS_BASELINE": "",
+        "FNS_FIXTURE": "",
     }
     done = subprocess.run(  # noqa: S603
         ["bash", "-c", _script("run")],  # noqa: S607
@@ -245,8 +246,9 @@ def _run_action(tmp_path: Path, **inputs: str) -> tuple[subprocess.CompletedProc
         "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.md"),
         **{f"FNS_{k.upper()}": v for k, v in inputs.items()},
     }
-    for name in ("contract", "snapshot", "probes", "lab", "baseline", "fixture"):
-        env.setdefault(f"FNS_{name.upper()}", "")
+    run = next(s for s in _load(ACTION)["runs"]["steps"] if s.get("id") == "run")
+    for name in run["env"]:  # every input the action passes, as the runner sets them
+        env.setdefault(name, "")
     done = subprocess.run(  # noqa: S603
         ["bash", "-c", _script("run")],  # noqa: S607
         env=env,
@@ -308,3 +310,11 @@ def test_bad_inputs_stop_before_any_fns_call(
     assert message in done.stderr
     assert not (tmp_path / "fns-action" / "scout").exists()
     assert not outputs.exists()
+
+
+def test_the_lab_fixture_test_sets_every_variable_the_action_passes() -> None:
+    run = next(s for s in _load(ACTION)["runs"]["steps"] if s.get("id") == "run")
+    source = Path(__file__).read_text(encoding="utf-8")
+    lab_test = source.split("def test_action_script_on_the_lab_fixture", 1)[1].split("\ndef ", 1)[0]
+    for name in run["env"]:
+        assert f'"{name}"' in lab_test, f"{name} is set by the action but not by the test"
