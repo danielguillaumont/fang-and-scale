@@ -74,6 +74,8 @@ def render_summary(result: ScoutResult, out: Printer) -> None:
 
     counts("entities", Counter(e.type for e in snap.entities))
     counts("edges", Counter(e.type for e in snap.edges))
+    if snap.credentials:
+        counts("credentials (metadata only)", Counter(c.kind for c in snap.credentials))
     out.print(
         "not collected (findings that depend on these will be inconclusive):",
         style="fns.inconclusive",

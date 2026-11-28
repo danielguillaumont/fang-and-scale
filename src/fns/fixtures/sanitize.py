@@ -51,6 +51,7 @@ REDACT_KEYS: Final = frozenset(
         "client_secret",
         "key",
         "customKeyIdentifier",
+        "hint",
         "thumbprint",
         "access_token",
         "accessToken",

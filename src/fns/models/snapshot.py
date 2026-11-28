@@ -284,6 +284,43 @@ Edge = Annotated[
     Field(discriminator="type"),
 ]
 
+CredentialKind = Literal["key", "password"]
+"""``key``: an entry of ``keyCredentials`` (a certificate or symmetric key);
+``password``: an entry of ``passwordCredentials`` (a client secret)."""
+
+
+class Credential(FnsModel):
+    """Metadata of one key or password credential on an application or service principal.
+
+    Never a value: Graph's ``key`` (certificate data), ``customKeyIdentifier``
+    (thumbprint), ``hint`` (the first three characters of a password) and
+    ``secretText`` have no field here, and ``extra="forbid"`` rejects them.
+    """
+
+    owner: str = Field(min_length=1)
+    """Object ID of the application or service principal that holds the credential."""
+    kind: CredentialKind
+    key_id: Guid
+    display_name: str | None = Field(default=None, max_length=1024)
+    key_type: str | None = Field(default=None, max_length=64)
+    """``keyCredential.type``, e.g. ``AsymmetricX509Cert``; None for passwords."""
+    usage: str | None = Field(default=None, max_length=64)
+    """``keyCredential.usage`` (``Verify`` or ``Sign``); None for passwords."""
+    start: TzDatetime | None = None
+    end: TzDatetime | None = None
+    provenance: Provenance
+
+    @field_validator("owner")
+    @classmethod
+    def _owner(cls, v: str) -> str:
+        if not GUID_RE.fullmatch(v):
+            raise ValueError(f"credential owner must be an object GUID, got {v!r}")
+        return v.lower()
+
+    def sort_key(self) -> tuple[str, str, str]:
+        return (self.owner, self.kind, str(self.key_id))
+
+
 CollectorStatus = Literal["complete", "partial", "failed", "skipped", "not-applicable"]
 """``not-applicable``: the surface the collector reads does not exist in this tenant,
 with the evidence in ``coverage.not_applicable`` (never inferred)."""
@@ -361,6 +398,7 @@ class Snapshot(FnsModel):
     """A read-only inventory of one tenant + its in-scope subscriptions."""
 
     __volatile__: ClassVar[frozenset[str]] = frozenset({"collected_at", "collector_version"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"credentials"})
 
     version: Literal[1]
     mode: Literal["LIVE", "FIXTURE"]
@@ -369,7 +407,18 @@ class Snapshot(FnsModel):
     collector_version: str
     entities: tuple[Entity, ...] = ()
     edges: tuple[Edge, ...] = ()
+    credentials: tuple[Credential, ...] = ()
+    """Key and password credential metadata (collected only when the scope allows the
+    per-object reads; see ``graph.CREDENTIAL_OPERATIONS``)."""
     coverage: SnapshotCoverage = SnapshotCoverage()
+
+    @field_validator("credentials")
+    @classmethod
+    def _sort_credentials(cls, v: tuple[Credential, ...]) -> tuple[Credential, ...]:
+        keys = [c.sort_key() for c in v]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate credential")
+        return tuple(sorted(v, key=lambda c: c.sort_key()))
 
     @field_validator("entities")
     @classmethod
@@ -396,4 +445,7 @@ class Snapshot(FnsModel):
         )
         if dangling:
             raise ValueError(f"edges reference unknown entities: {dangling[:5]}")
+        orphans = sorted({c.owner for c in self.credentials if c.owner not in known})
+        if orphans:
+            raise ValueError(f"credentials reference unknown entities: {orphans[:5]}")
         return self

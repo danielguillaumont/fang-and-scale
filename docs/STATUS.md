@@ -1,5 +1,37 @@
 # Status
 
+## Coverage build session (2026-11-28, autonomous)
+
+Hard rules: no Azure, Graph or tenant call, no `az`, Terraform only as
+`poe lab-check`, fixtures and mocked transports only; one PR per item with the
+four required checks green; no new Graph or ARM permission (anything that needs
+one is design only); every new choice is a DECISIONS row **pending review**;
+everything new is modeled or fixture and **not yet validated live**, with each
+live check in `docs/runbooks/live-validation-backlog.md`.
+
+Tests at the start: 2139 passed, 1 skipped (Windows).
+
+| # | Item | State | PR |
+| --- | --- | --- | --- |
+| 1 | Collector: key/password credential metadata (never values) | done (fixture only) | #96 |
+| 2 | Collector: federated identity credentials + "outside party can sign in" rule | todo | |
+| 3 | Collector: group memberships for in-scope paths + group-derived reach | todo | |
+| 4 | Conditional access: design only (`docs/proposals/conditional-access.md`) | todo | |
+| 5 | Scenario gallery: 5 FIXTURE tenants with golden tests | todo | |
+| 6 | Reusable GitHub Action for other repos | todo | |
+| 7 | Scale test + `docs/PERFORMANCE.md` | todo | |
+| 8 | Hardening/property tests, README/GUIDE coverage | todo | |
+
+**To resume (`continue`):** take the first row that is not done, on a new
+branch from `main`; read its notes below and the pending-review rows dated
+2026-11-28 in DECISIONS.
+
+#### Needs Daniel (coverage build)
+
+- Review the DECISIONS rows marked **Pending review** dated 2026-11-28.
+- Run the checks in `docs/runbooks/live-validation-backlog.md` during or after
+  the M4 sessions; until then the new collectors are fixture-only.
+
 ## v0.1.0 is released (2026-11-27)
 
 Daniel tagged `v0.1.0` on #86's merge commit (`0ddfa34`) and published the
