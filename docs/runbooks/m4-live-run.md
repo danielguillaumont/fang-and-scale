@@ -95,7 +95,25 @@ $agentId = $agent.client_id
 $agentOid = $agent.object_id
 $mon = terraform -chdir=lab output -json monitoring | ConvertFrom-Json   # null before B1
 $ws = $mon.workspace_customer_id
+uv run fns scope check scope.lab.yaml            # the "expires" line: time left
 ```
+
+The scope is valid for 7 days from A2 (`scope_valid_days`). If `scope check`
+says `invalid ... expired`, or less than a day is left, renew it before anything
+else in the session.
+
+### Renew the scope (only when needed)
+
+Never between a strike plan and its run: the plan is bound to the scope file's
+hash. Paste this line **on its own**:
+
+```powershell
+terraform -chdir=lab apply "-replace=time_offset.scope_expiry"
+```
+
+The plan: `time_offset.scope_expiry` and `local_file.scope` replaced, **2 to
+add, 0 to change, 2 to destroy**. Anything else is a stop. Then run `scope check`
+again: 7 days left.
 
 ## Session A: rebuild the lab
 
@@ -139,8 +157,8 @@ uv run fns scope check scope.lab.yaml
 terraform -chdir=lab output -json resources | ConvertFrom-Json   # the new names
 ```
 
-`scope check`: the lab tenant, subscription and `rg-fns-lab`, 17 scout and 6
-prove operations, no `strike` operations, and an expiry 7 days out. Wait about 10
+`scope check`: the lab tenant, subscription and `rg-fns-lab`, `operations
+prove 6, scout 17` (no `strike`), no `strike` line, and an expiry 7 days out. Wait about 10
 minutes for the Graph grants to show up in tokens.
 
 ### A3. Baseline scout as `sp-fns-scout`, recorded as `lab-run-4`
@@ -211,8 +229,11 @@ enable_monitoring = true
 
 ```powershell
 uv run fns detections check                      # every rule against its sample rows
-uv run fns detections export --terraform --check # lab/detections.json is up to date
+uv run fns detections export --terraform lab/detections.json --check   # up to date
 ```
+
+Expected: `11 rule(s), 0 problem(s)`, then `ok lab/detections.json matches 11
+rule(s)`.
 
 Then paste this line **on its own**:
 
@@ -305,9 +326,22 @@ If the blob count is 0, wait 15 minutes and run the last three lines again.
 uv run fns record (Join-Path $logs "blob.json") (Join-Path $logs "activity.json") --identity $agentOid --contract contracts\lab\billing-agent.fns.yaml --out .fns\m4\recorded.fns.yaml
 ```
 
-Expected: `resource: st-invoices` with `blob/read` and `blob/write`,
-`source: recorded`, and an `unmapped` list. Send the output and the `unmapped`
-list (they name operations, not IDs).
+Expected, exit 0:
+
+```
+<n> row(s): 2 recorded resource operation(s), 0 failed, <k> by other identities, <u> unmapped
+  unmapped StorageBlobLogs:<operation> x<count>
+  already declared stinvoices<suffix> blob/read
+  already declared stinvoices<suffix> blob/write
+wrote .fns/m4/recorded.fns.yaml
+```
+
+The lab contract already declares `blob/read` and `blob/write` on the invoices
+account (`source: declared`), so the recording confirms them and adds nothing:
+`recorded.fns.yaml` is the lab contract. An `added <account> <operation> (source:
+recorded)` line is a legitimate operation the contract did not know: send it. A
+`CONFLICT` line (exit 1) is a recorded operation the contract forbids: a stop.
+Send the output (it names operations and the account, not IDs).
 
 ---
 
@@ -340,9 +374,10 @@ uv run fns scope check scope.lab.yaml
 terraform -chdir=lab output -raw scope_expires_at
 ```
 
-`scope check` now also lists 9 `strike` operations, a strike expiry 4 hours out
-(`strike_valid_hours`) and the `escalation` block (S4's service principal and
-the marker role). Sessions C and D must each start inside that window. D5 renews
+`scope check` now prints `operations    prove 6, scout 18, strike 9` (S4 adds
+one scout read), a `strike` line with an expiry 4 hours out
+(`strike_valid_hours`) and 7 targets, and an `escalation` line (S4's service
+principal and the marker role). Sessions C and D must each start inside that window. D5 renews
 it.
 
 ### C2. A certificate for the scout and one for the agent, each in its own profile
@@ -506,7 +541,8 @@ Poll every 10 minutes, for at most 2 hours after the strike:
 ```powershell
 $deadline = $strikeAt.AddHours(2)
 do {
-    $alerts = @(az monitor log-analytics query -w $ws --analytics-query $qAlerts -o json | ConvertFrom-Json)
+    $rows = az monitor log-analytics query -w $ws --analytics-query $qAlerts -o json | ConvertFrom-Json
+    $alerts = @($rows | Where-Object { $_ })     # one item per alert, in 5.1 and 7
     "{0:u}  alerts: {1}" -f (Get-Date).ToUniversalTime(), (@($alerts | ForEach-Object { $_.AlertName }) -join "; ")
     if ($alerts.Count -ge 4) { break }
     Start-Sleep -Seconds 600
@@ -604,11 +640,14 @@ grants in D2. Anything else is a stop: answer `no`.
 
 ```powershell
 $env:AZURE_CONFIG_DIR = $scoutDir
-uv run fns scout --scope scope.lab.yaml
+uv run fns scout --scope scope.lab.yaml --record fixtures/lab-run-5
 Remove-Item Env:AZURE_CONFIG_DIR
 $snap = (Get-ChildItem .fns\snapshots\*.LIVE.json | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 uv run fns contain --contract .fns\m4\recorded.fns.yaml --snapshot $snap
 ```
+
+The scout records `fixtures/lab-run-5`: D7's `prove --record` adds its probes to
+that recording, and refuses a directory with no scout recording in it.
 
 Expected: **0 critical reachable**. Wait 10 minutes: removed grants can stay in
 cached tokens for a while.
@@ -632,8 +671,9 @@ M2 and M3. Anything else is a stop: no `pim.eligibility` row (it did not run),
 
 ### D5. Renew the strike expiry
 
-Only if the strike expiry printed by `scope check` is less than 1 hour away.
-Paste this line **on its own**:
+Run `uv run fns scope check scope.lab.yaml` and read its `strike` line. Renew
+if it says `expired`, or less than 1 hour left: almost always, unless D follows
+C1 within 4 hours. Paste this line **on its own**:
 
 ```powershell
 terraform -chdir=lab apply "-replace=time_offset.strike_expiry[0]"
@@ -755,8 +795,9 @@ my checks.
 ## Teardown
 
 Once every fixture is committed. Paste this line **on its own**, check that it
-destroys what A2, B1 and C1 added (less the two grants D3 removed), then type
-`yes`:
+destroys what A2, B1 and C1 added, less the two grants D3 removed: **55 to
+destroy** with the defaults (37 + 18 + 2 - 2; 2 more with `budget_alert_email`,
+1 more with `github_repository`). Then type `yes`:
 
 ```powershell
 uv run poe lab-down
@@ -769,7 +810,9 @@ foreach ($n in "sp-billing-agent", "app-escalation-target", "id-verifier", "sp-f
 }
 az rest --method get --url "https://management.azure.com/providers/microsoft.aadiam/diagnosticSettings?api-version=2017-04-01-preview" --query "value[].name" -o tsv   # must list nothing ending in -entra
 Remove-Item -Recurse -Force .fns\m4\logs
+git restore lab/identities.tf lab/resources.tf                   # undo D3's git apply
 git switch main
+git status --short lab                                           # must print nothing
 ```
 
 Then set `enable_monitoring` and `enable_strikes` back to `false` (or remove the
@@ -777,12 +820,13 @@ lines) in `lab/terraform.tfvars`. The Sentinel trial ends with the workspace.
 
 ## Report back
 
-Per session, paste:
+Replace every GUID (tenant, subscription, object and app IDs) with the lab name
+or `<id>` first (`docs/runbooks/m4-preflight.md`, section 5). Per session, paste:
 
 - **A:** the plan summary line; the `scope check` output; the scout summary.
 - **B:** the plan summary line; `$mon.rules.Count`; the `fns record` output.
 - **C:** the plan summary line; the C3 review lines **with the IDs replaced by
-  the lab names**; the full `fns strike run` output; `$LASTEXITCODE`; the C5
+  the lab names**; the full `fns strike run` output, its IDs replaced the same way; `$LASTEXITCODE`; the C5
   checks; the five query outputs and the start time from C6.
 - **D:** the harden proposal; the D3 plan summary; the D4 contain summary; the
   D6 run output; the D7 output and exit code; the D8 checks.
@@ -805,9 +849,16 @@ kept. It prints `needs-emergency-cleanup` for it and exits 5 until step 2's S4
 block has removed the assignment. Run step 1 again afterwards: exit 0 means
 everything is back and verified.
 
+In a new window, run [Start of every session](#start-of-every-session) (both
+blocks) first, and set `$hash` again: it is the `plan sha256:` line the plan
+printed, or, if the run finished, `plan_hash` in its `strike-run.json`.
+
 ```powershell
 $plan = (Get-ChildItem .fns\strike\*\plan.json | Sort-Object LastWriteTime | Select-Object -Last 1).FullName
 $journal = Join-Path (Split-Path $plan) "journal.sqlite"
+$run = Join-Path (Split-Path $plan) "strike-run.json"
+if (Test-Path $run) { (Get-Content $run | ConvertFrom-Json).plan_hash }   # the hash, if the run finished
+$hash                                            # empty: set it, $hash = "<the 64 hex characters>"
 uv run fns strike cleanup --plan $plan --approve $hash --journal $journal --scope scope.lab.yaml --agent-config $agentDir --scout-config $scoutDir
 $LASTEXITCODE                                    # 0: clean and verified; go to step 3
 ```
