@@ -23,13 +23,15 @@ as `poe lab-check`, fixtures and mocked transports only, PRs with required CI.
 ID (A0a ... D8a, T1, T2, E1a ... E4) and an **Expect** line; prompting blocks
 are marked **alone** (now including `az login --tenant`); each session starts
 with its own 0a to 0c blocks and ends with a "Paste back" list. Same commands as
-before (checked line for line). One row pending review.
+before (checked line for line). Its row approved 2026-11-27.
 
 #### Needs Daniel (M4 readiness)
 
-- **Four rows pending review in DECISIONS:** the preflight's thresholds and
+- ~~Four rows pending review in DECISIONS~~: the preflight's thresholds and
   Claude Code rule (#92); `scope check`'s new strike and escalation lines (#93);
-  the cross-check fixes (#93); the block layout (#94).
+  the cross-check fixes (#93); the block layout (#94). **All approved
+  2026-11-27.**
+- **Next: Daniel's live session A.**
 - **Before session A:** `docs/runbooks/m4-preflight.md`, then
   `docs/runbooks/m4-live-run.md` from A0a. Sessions A to D have still not run
   live.
@@ -44,11 +46,12 @@ would have stopped a live session: B1's export check wrote a file named
 `fixtures/lab-run-5` (D4 did not record it); nothing renewed the 7-day scope; B4
 expected a `source: recorded` item the lab contract makes impossible; Teardown
 would carry D3's uncommitted diff onto `main`. `fns scope check` now prints the
-strike window and the escalation (display only). Two rows pending review.
+strike window and the escalation (display only). Both rows approved
+2026-11-27.
 
 **Preflight (#92).** `docs/runbooks/m4-preflight.md` is the page to go through
 before session A (and briefly before B, C and D). One new row pending review in
-DECISIONS: its two thresholds and the Claude Code rule.
+DECISIONS: its two thresholds and the Claude Code rule (approved 2026-11-27).
 
 **The wheel check is now required on `main`.** The protection rule, read back on
 2026-11-27, requires all four `ci` checks (strict): `check (ubuntu-latest)`,
