@@ -172,7 +172,7 @@ cannot import adapters, credentials, the journal, strike or harden.
 | Harden, mutate | Model only, on the recorded snapshot and `lab/*.tf`. Nothing applied. `fns mutate --harden` on the live M2 snapshot scored 6/8, with the two accepted app-owner survivors. |
 | Record mode | Hand-written sample logs. |
 | Detections | Structural lint only; never deployed. |
-| GitHub Action | Runs on this repo's PRs against `fixtures/lab-run-1`; no Azure login. |
+| GitHub Action | Runs on this repo's PRs against `fixtures/lab-run-1` and the bundled set; no Azure login. Not yet used from another repository ([ACTION](ACTION.md)). |
 
 Anything replayed from a fixture prints `FIXTURE`, and reports built from one say
 so in the title.

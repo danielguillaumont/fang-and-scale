@@ -54,3 +54,30 @@ jobs:
           lab: lab
           baseline: ${{ runner.temp }}/baseline.json
           fail-on-contract: "false"
+
+  # The consumer example in docs/examples/blast-radius.yml, run here on the bundled
+  # FIXTURE set (tests/test_action.py keeps the two in step). It does not comment:
+  # the fixture job above owns this repository's sticky comment.
+  example:
+    name: action example (bundled fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: fns
+        uses: ./
+        with:
+          fixture: bundled
+          fail-on-contract: "false"
+          comment: "false"
+      - name: Check the outputs
+        env:
+          CODE: ${{ steps.fns.outputs.exit-code }}
+          REPORT: ${{ steps.fns.outputs.contain-json }}
+          COMMENT: ${{ steps.fns.outputs.comment-file }}
+        run: |
+          set -euo pipefail
+          case "$CODE" in 0|1|3) ;; *) echo "unexpected exit code $CODE" >&2; exit 1 ;; esac
+          test -s "$REPORT"
+          grep -q FIXTURE "$COMMENT"

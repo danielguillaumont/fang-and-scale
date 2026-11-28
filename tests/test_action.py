@@ -59,8 +59,9 @@ def test_blast_radius_workflow_is_least_privilege() -> None:
     text = (WORKFLOWS / "blast-radius.yml").read_text(encoding="utf-8")
     assert "pull_request_target" not in text
     assert "azure/login" not in text
-    checkout = next(s for s in _steps(doc) if str(s.get("uses", "")).startswith("actions/checkout"))
-    assert checkout["with"]["persist-credentials"] is False
+    checkouts = [s for s in _steps(doc) if str(s.get("uses", "")).startswith("actions/checkout")]
+    assert len(checkouts) == len(doc["jobs"])
+    assert all(c["with"]["persist-credentials"] is False for c in checkouts)
 
 
 def test_action_contract() -> None:
@@ -147,6 +148,7 @@ def test_action_script_on_the_lab_fixture(tmp_path: Path) -> None:
         "FNS_PROBES": str(LAB_RUN / "probes.json"),
         "FNS_LAB": str(ROOT / "lab"),
         "FNS_BASELINE": "",
+        "FNS_FIXTURE": "",
     }
     done = subprocess.run(  # noqa: S603
         ["bash", "-c", _script("run")],  # noqa: S607
@@ -184,3 +186,135 @@ def test_dependabot_watches_every_ecosystem_we_pin() -> None:
     doc = _load(ROOT / ".github" / "dependabot.yml")
     got = {(u["package-ecosystem"], u["directory"]) for u in doc["updates"]}
     assert got == {("uv", "/"), ("github-actions", "/"), ("terraform", "/lab")}
+
+
+# The action as other repositories use it (docs/ACTION.md, docs/examples/blast-radius.yml).
+ACTION_DOC = ROOT / "docs" / "ACTION.md"
+EXAMPLE = ROOT / "docs" / "examples" / "blast-radius.yml"
+_ROW = re.compile(r"^\| `([\w-]+)` \| (.+?) \|", re.MULTILINE)
+
+
+def _doc_table(heading: str) -> dict[str, str]:
+    section = ACTION_DOC.read_text(encoding="utf-8").split(f"## {heading}\n", 1)[1]
+    return dict(_ROW.findall(section.split("\n## ", 1)[0]))
+
+
+def test_the_docs_list_every_input_with_its_default_and_every_output() -> None:
+    doc = _load(ACTION)
+    inputs = _doc_table("Inputs")
+    assert sorted(inputs) == sorted(doc["inputs"])
+    for name, spec in doc["inputs"].items():
+        assert "required" not in spec, f"{name}: the script checks what is required"
+        default = str(spec["default"])
+        shown = f"`{default}`" if default.startswith("$") else f'`"{default}"`'
+        assert inputs[name] == shown, name
+    assert sorted(_doc_table("Outputs")) == sorted(doc["outputs"])
+    run = _script("run")
+    for name in doc["outputs"]:
+        assert f'echo "{name}=' in run, f"the script never writes the {name} output"
+
+
+def test_the_example_is_the_self_test_with_a_pinned_ref_and_the_comment_on() -> None:
+    example = _load(EXAMPLE)
+    on: dict[str, Any] = example["on"] if "on" in example else example[True]  # type: ignore[index]
+    assert set(on) == {"pull_request"}
+    assert example["permissions"] == {"contents": "read", "pull-requests": "write"}
+    (job,) = example["jobs"].values()
+    mine = _load(WORKFLOWS / "blast-radius.yml")["jobs"]["example"]
+    theirs = [dict(s) for s in job["steps"]]
+    ours = [dict(s) for s in mine["steps"]]
+    action = next(s for s in theirs if s.get("id") == "fns")
+    assert action["uses"] == "danielguillaumont/fang-and-scale@RELEASE_COMMIT_SHA"
+    assert next(s for s in ours if s.get("id") == "fns")["uses"] == "./"
+    for steps in (theirs, ours):
+        fns = next(s for s in steps if s.get("id") == "fns")
+        fns["uses"] = "ACTION"
+        fns["with"] = {k: v for k, v in fns["with"].items() if k != "comment"}
+    assert theirs == ours
+    assert "comment" not in action["with"], "the example keeps the sticky comment on"
+    assert "persist-credentials" in str(theirs[0])
+    assert "secrets." not in EXAMPLE.read_text(encoding="utf-8")
+
+
+def _run_action(tmp_path: Path, **inputs: str) -> tuple[subprocess.CompletedProcess[str], Path]:
+    outputs = tmp_path / "out.txt"
+    env = {
+        **os.environ,
+        "GITHUB_ACTION_PATH": str(ROOT),
+        "RUNNER_TEMP": str(tmp_path),
+        "GITHUB_OUTPUT": str(outputs),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary.md"),
+        **{f"FNS_{k.upper()}": v for k, v in inputs.items()},
+    }
+    run = next(s for s in _load(ACTION)["runs"]["steps"] if s.get("id") == "run")
+    for name in run["env"]:  # every input the action passes, as the runner sets them
+        env.setdefault(name, "")
+    done = subprocess.run(  # noqa: S603
+        ["bash", "-c", _script("run")],  # noqa: S607
+        env=env,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=600,
+    )
+    return done, outputs
+
+
+_BASH = pytest.mark.skipif(
+    sys.platform == "win32" or shutil.which("bash") is None, reason="runs the action's bash script"
+)
+
+
+@_BASH
+@pytest.mark.parametrize(
+    ("fixture", "contract", "code"),
+    [
+        ("bundled", "", "1"),
+        ("docs/scenarios/02-contributor-key-vault-flip/fixed", "", "0"),
+    ],
+)
+def test_the_fixture_input_replays_a_set_and_labels_it(
+    tmp_path: Path, fixture: str, contract: str, code: str
+) -> None:
+    done, outputs = _run_action(tmp_path, fixture=fixture, contract=contract)
+    assert done.returncode == 0, done.stdout + done.stderr
+    lines = dict(line.split("=", 1) for line in outputs.read_text(encoding="utf-8").splitlines())
+    assert lines["exit-code"] == code
+    report = ContainReport.model_validate_json(
+        Path(lines["contain-json"]).read_text(encoding="utf-8")
+    )
+    assert report.mode == "FIXTURE"
+    assert "FIXTURE" in Path(lines["comment-file"]).read_text(encoding="utf-8")
+
+
+@_BASH
+@pytest.mark.parametrize(
+    ("inputs", "message"),
+    [
+        ({"fixture": "/etc"}, "relative path inside the action"),
+        ({"fixture": "../outside"}, "relative path inside the action"),
+        ({"fixture": "docs/../../outside"}, "relative path inside the action"),
+        ({"fixture": "C:/x"}, "relative path inside the action"),
+        ({"fixture": "docs"}, "no recorded fixture set at docs"),
+        ({"fixture": "bundled", "snapshot": "s.json"}, "set snapshot or fixture, not both"),
+        ({}, "contract is required"),
+        ({"contract": "c.fns.yaml"}, "snapshot is required"),
+    ],
+)
+def test_bad_inputs_stop_before_any_fns_call(
+    tmp_path: Path, inputs: dict[str, str], message: str
+) -> None:
+    done, outputs = _run_action(tmp_path, **inputs)
+    assert done.returncode == 2, done.stdout + done.stderr
+    assert message in done.stderr
+    assert not (tmp_path / "fns-action" / "scout").exists()
+    assert not outputs.exists()
+
+
+def test_the_lab_fixture_test_sets_every_variable_the_action_passes() -> None:
+    run = next(s for s in _load(ACTION)["runs"]["steps"] if s.get("id") == "run")
+    source = Path(__file__).read_text(encoding="utf-8")
+    lab_test = source.split("def test_action_script_on_the_lab_fixture", 1)[1].split("\ndef ", 1)[0]
+    for name in run["env"]:
+        assert f'"{name}"' in lab_test, f"{name} is set by the action but not by the test"

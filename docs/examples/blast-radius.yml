@@ -1,0 +1,41 @@
+# Example: the Fang & Scale action in another repository (docs/ACTION.md).
+#
+# As written it replays the bundled FIXTURE tenant, so it runs with no Azure
+# login and no secrets, and everything it reports is labelled FIXTURE. For your
+# own tenant, replace `fixture` with `contract` and `snapshot` (a snapshot your
+# scout run wrote; docs/ACTION.md, "Your own tenant").
+#
+# Pin the action to the full commit SHA of a release tag, with the tag in a
+# comment, like every other action here. `fixture` and `contain-json` are newer
+# than v0.1.0: use the first release tag after it.
+name: blast-radius
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write # only for the sticky comment; drop it with comment: "false"
+
+jobs:
+  blast-radius:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: fns
+        uses: danielguillaumont/fang-and-scale@RELEASE_COMMIT_SHA # vX.Y.Z (first release after v0.1.0)
+        with:
+          fixture: bundled
+          fail-on-contract: "false"
+      - name: Check the outputs
+        env:
+          CODE: ${{ steps.fns.outputs.exit-code }}
+          REPORT: ${{ steps.fns.outputs.contain-json }}
+          COMMENT: ${{ steps.fns.outputs.comment-file }}
+        run: |
+          set -euo pipefail
+          case "$CODE" in 0|1|3) ;; *) echo "unexpected exit code $CODE" >&2; exit 1 ;; esac
+          test -s "$REPORT"
+          grep -q FIXTURE "$COMMENT"
