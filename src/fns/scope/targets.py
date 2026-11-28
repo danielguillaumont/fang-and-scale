@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Final
 from urllib.parse import urlsplit
 
-from fns.models.armid import ArmIdError, ArmPath, parse_arm_id
+from fns.models.armid import ArmIdError, ArmPath, has_ascii_whitespace, parse_arm_id
 from fns.models.operations import Api
 
 API_HOSTS: Final[dict[str, str]] = {
@@ -56,7 +56,7 @@ Target = ArmTarget | DirectoryTarget
 
 
 def _split(url: str) -> tuple[str, list[str]]:
-    if not isinstance(url, str) or not url.isascii() or any(c.isspace() for c in url):
+    if not isinstance(url, str) or not url.isascii() or has_ascii_whitespace(url):
         raise TargetError("URL must be an ASCII string without whitespace")
     parts = urlsplit(url)
     if parts.scheme != "https":

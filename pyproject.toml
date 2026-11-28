@@ -109,6 +109,9 @@ scout.help = "Live read-only scout of the lab (needs az login, see README)"
 demo.cmd = "fns demo scout"
 demo.help = "Replay the recorded lab run fixtures/lab-run-3 through scout (no tenant needed)"
 
+scale.cmd = "python scripts/scale_test.py --sps 10000"
+scale.help = "Opt-in scale test: a synthetic 10,000-SP FIXTURE tenant through scout replay and contain (about 20 min on Windows; docs/PERFORMANCE.md)"
+
 release-check.cmd = "python scripts/release_check.py"
 release-check.help = "Version, changelog and lock agree (the release workflow adds the tag)"
 sbom.cmd = "uv export --frozen --format cyclonedx1.5 --no-dev --all-extras --output-file dist/sbom.cdx.json"

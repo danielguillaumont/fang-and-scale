@@ -229,3 +229,22 @@ def test_every_derivation_rests_on_earlier_facts(s: Snap) -> None:
 def test_rules_are_all_registered_once() -> None:
     names = [r.__name__ for r in RULES]
     assert len(names) == len(set(names)) == 10
+
+
+@given(random_tenant())
+def test_indexed_queries_match_a_full_scan(s: Snap) -> None:
+    """The indexes ``_add`` keeps (docs/PERFORMANCE.md) answer as scanning every fact."""
+    c = Closure(SnapshotIndex(s.build()), pid(100))
+    facts = list(c.derivations)
+    assert c.controlled() == sorted(f.principal for f in facts if f.kind == "controls")
+    principals = {f.principal for f in facts} | {pid(100), pid(999)}
+    for p in principals:
+        members = {f.args[0] for f in facts if f.kind == "member" and f.principal == p}
+        assert c.effective(p) == frozenset({p, *members})
+        perms = {f.args[0] for f in facts if f.kind == "app-perm" and f.principal == p}
+        assert c.app_perms(p) == perms
+    kinds = {f.kind for f in facts}
+    for kind in kinds:
+        for group in (frozenset(principals), frozenset({pid(100)}), frozenset()):
+            scan = sorted(f for f in facts if f.kind == kind and f.principal in group)
+            assert c.facts_of(kind, group) == scan

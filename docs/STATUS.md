@@ -19,7 +19,7 @@ Tests at the start: 2139 passed, 1 skipped (Windows).
 | 4 | Conditional access: design only (`docs/proposals/conditional-access.md`) | done (design, pending review) | #99 |
 | 5 | Scenario gallery: 5 FIXTURE tenants with golden tests | done (fixture only) | #100 |
 | 6 | Reusable GitHub Action for other repos | done (fixture only) | #101 |
-| 7 | Scale test + `docs/PERFORMANCE.md` | todo | |
+| 7 | Scale test + `docs/PERFORMANCE.md` | done (fixture only) | #102 |
 | 8 | Hardening/property tests, README/GUIDE coverage | todo | |
 
 **Item 1 (#96).** `graph.credentials` reads key/password credential metadata
@@ -54,6 +54,12 @@ the sticky comment and pinning; `docs/examples/blast-radius.yml` is run by the
 new `action example (bundled fixture)` job. Placeholder pin until the next
 release tag (Needs Daniel). LV-15.
 
+**Item 7 (#102).** `poe scale` (opt-in): 10,000 SPs, 51,350 edges. Scout
+replay about 13 min as shipped (journal fsync per write; about 6 min without),
+442 MiB; contain 3.1 s, wide agent 3.3 s (was 8.8 s), 225 MiB. Closure indexes
+and a faster whitespace check; every digest unchanged. The journal is the
+bottleneck and stays as approved (Needs Daniel, if replay speed matters).
+
 **Crash recovery (2026-11-28).** The laptop crashed during item 3's `poe check`.
 The uncommitted item 3 work was intact; one `poe check` alone passed (2207,
 5 min instead of 14 with parallel runs) and #98 merged. From here: one test run
@@ -68,6 +74,8 @@ branch from `main`; read its notes below and the pending-review rows dated
 - Review the DECISIONS rows marked **Pending review** dated 2026-11-28.
 - Run the checks in `docs/runbooks/live-validation-backlog.md` during or after
   the M4 sessions; until then the new collectors are fixture-only.
+- Scout replay at scale is journal-bound (`docs/PERFORMANCE.md`): decide
+  whether replay-only journal durability is worth changing (it is not changed).
 - Tag the next release when ready, then put its commit SHA in place of
   `RELEASE_COMMIT_SHA` in `docs/examples/blast-radius.yml` and `docs/ACTION.md`
   (and the test that pins it), and run LV-15.

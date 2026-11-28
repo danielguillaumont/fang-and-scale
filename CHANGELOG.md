@@ -9,6 +9,9 @@ version may change file formats; each change is listed here.
 
 ### Changed
 
+- `fns contain` is faster on large snapshots (#102): the closure indexes its
+  facts and front doors group `instanceOf` edges once (wide agent at 10,000
+  SPs: 8.8 s to 3.3 s). Every report is byte-identical.
 - `docs/DECISIONS.md`: the build choices for D-6/D-7 and for the named
   inconclusive budget are approved (#87). Docs only.
 - The README is a front page now (#90): why, the loop, real output of
@@ -24,6 +27,10 @@ version may change file formats; each change is listed here.
 
 ### Added
 
+- Scale test (#102): `scripts/scale_test.py` and the opt-in `poe scale` run a
+  synthetic 10,000-SP FIXTURE tenant (51,350 edges) through scout replay and
+  contain; `docs/PERFORMANCE.md` has the numbers. `tests/test_scale.py` runs a
+  60-SP version in CI.
 - The GitHub Action for other repositories (#101): a `fixture` input (`bundled`
   or a recorded set inside the action) to try it without a tenant, a
   `contain-json` output, `docs/ACTION.md` (inputs, outputs, the sticky comment,

@@ -300,6 +300,7 @@ Day-to-day state: `docs/STATUS.md`.
 | [QUICKSTART](docs/QUICKSTART.md) | every `fns demo` in under 5 minutes, installed or from a checkout |
 | [GUIDE](docs/GUIDE.md) | the full demo, how the pieces fit, real vs. fixture, the MCP server, the lab, development |
 | [GitHub Action](docs/ACTION.md) | use the action from another repository: inputs, outputs, the sticky comment, pinning, an example on a bundled FIXTURE |
+| [PERFORMANCE](docs/PERFORMANCE.md) | a synthetic 10,000-SP tenant: scout replay and contain time and memory, and where the time goes |
 | [Scenario gallery](docs/scenarios/README.md) | five FIXTURE tenants, each a common misconfiguration: the story, the contract, the verdicts before and after the smallest fix |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | the trust boundaries, with diagrams, and what enforces each |
 | [THREAT-MODEL](docs/THREAT-MODEL.md) | hostile inputs, and what does not hold |
