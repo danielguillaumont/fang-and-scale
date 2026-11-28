@@ -30,6 +30,7 @@ from fns.models.snapshot import (
     AGENT_ID_LABELS,
     AGENT_ID_NOT_MODELED,
     AGENT_ID_PROPERTY,
+    GROUP_ROLE_ASSIGNABLE,
     TENANT_ROOT_SCOPE,
     DenyAssignment,
     Entity,
@@ -141,6 +142,18 @@ class SnapshotIndex:
                 self.denies.append(edge)
             elif isinstance(edge, HasAccessPolicy):
                 self.access_policies[edge.dst].append(edge)
+        self.granted_groups: tuple[str, ...] = tuple(
+            sorted(
+                {
+                    e.src
+                    for e in snapshot.edges
+                    if isinstance(e, HasRbacRole | HasDirectoryRole | HasAppRole)
+                    and e.src in self.entities
+                    and self.entities[e.src].type == "group"
+                }
+            )
+        )
+        """Groups that hold an RBAC, directory or app role grant."""
         tenant = str(snapshot.tenant_id)
         self.fics_of: dict[str, list[tuple[FederatedCredential, federation.Trust]]] = defaultdict(
             list
@@ -627,6 +640,55 @@ def _rule_federated_credential(c: Closure) -> Iterator[_Candidate]:
                 )
 
 
+def _rule_group_membership_write(c: Closure) -> Iterator[_Candidate]:
+    """An app-only caller adds itself to a group that holds grants (Microsoft Learn,
+    read 2026-11-28).
+
+    "Add members": adding a service principal needs GroupMember.ReadWrite.All and
+    Application.ReadWrite.All; a role-assignable group also needs
+    RoleManagement.ReadWrite.Directory ("groups-concept": "The Group.ReadWrite.All
+    permission won't work"). Group.ReadWrite.All counts for other groups (its
+    description: "update group properties and memberships"). A group whose
+    ``isAssignableToRole`` was not collected is left open (uncertain). Group
+    ownership and the Groups Administrator role are not modeled: what they allow an
+    app-only caller is not stated in the pages read.
+    """
+    ix = c.index
+    if not ix.granted_groups:
+        return
+    for p in c.controlled():
+        perms = c.app_perms(p)
+        write = [v for v in (sem.GROUPMEMBER_READWRITE_ALL, sem.GROUP_READWRITE_ALL) if v in perms]
+        if not write or sem.APP_READWRITE_ALL not in perms:
+            continue
+        for g in ix.granted_groups:
+            assignable = ix.entities[g].properties.get(GROUP_ROLE_ASSIGNABLE)
+            premises = [controls(p), app_perm(p, sem.APP_READWRITE_ALL)]
+            if assignable is True:
+                if sem.GROUPMEMBER_READWRITE_ALL not in perms or (
+                    sem.ROLEMANAGEMENT_READWRITE not in perms
+                ):
+                    continue
+                needs = [sem.GROUPMEMBER_READWRITE_ALL, sem.ROLEMANAGEMENT_READWRITE]
+            elif assignable is False:
+                needs = [write[0]]
+            else:
+                c.uncertain.add(
+                    f"{ix.name(p)} can add members to groups ({write[0]}); whether "
+                    f"{ix.name(g)} is role-assignable was not collected"
+                )
+                continue
+            premises += [app_perm(p, v) for v in needs]
+            yield _Candidate(
+                Fact("member", p, (g,)),
+                "group-membership-write",
+                tuple(premises),
+                (),
+                f"with {' and '.join([*needs, sem.APP_READWRITE_ALL])}, {ix.name(p)} adds "
+                f"itself to the group {ix.name(g)}; its grants apply",
+            )
+
+
 RULES: Final[tuple[Rule, ...]] = (
     _rule_member_of,
     _rule_owner_adds_credential,
@@ -637,4 +699,5 @@ RULES: Final[tuple[Rule, ...]] = (
     _rule_rbac_write,
     _rule_managed_identity,
     _rule_federated_credential,
+    _rule_group_membership_write,
 )

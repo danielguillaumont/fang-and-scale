@@ -15,7 +15,7 @@ Tests at the start: 2139 passed, 1 skipped (Windows).
 | --- | --- | --- | --- |
 | 1 | Collector: key/password credential metadata (never values) | done (fixture only) | #96 |
 | 2 | Collector: federated identity credentials + "outside party can sign in" rule | done (fixture only) | #97 |
-| 3 | Collector: group memberships for in-scope paths + group-derived reach | todo | |
+| 3 | Collector: group memberships for in-scope paths + group-derived reach | done (fixture only) | #98 |
 | 4 | Conditional access: design only (`docs/proposals/conditional-access.md`) | todo | |
 | 5 | Scenario gallery: 5 FIXTURE tenants with golden tests | todo | |
 | 6 | Reusable GitHub Action for other repos | todo | |
@@ -30,6 +30,12 @@ through two optional per-object GETs; never values. Not in the lab scope yet.
 rule for credentials that trust a managed identity of this tenant; outside
 parties appear as "Front doors" in `fns contain` (no verdict change). FINDINGS
 R2: Learn writes the PR subject `pull-request`, GitHub `pull_request`.
+
+**Item 3 (#98).** `graph.transitive-memberships` (optional) reads every group
+an in-scope service principal is in, nested included, with `isAssignableToRole`;
+rule `group-membership-write` for GroupMember/Group.ReadWrite.All plus
+Application.ReadWrite.All (role-assignable groups need RoleManagement too;
+unknown ones stay open). No existing report changes.
 
 **To resume (`continue`):** take the first row that is not done, on a new
 branch from `main`; read its notes below and the pending-review rows dated

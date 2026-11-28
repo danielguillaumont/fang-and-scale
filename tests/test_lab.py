@@ -128,7 +128,8 @@ def test_lab_operations_match_the_collector_catalogue() -> None:
 def test_the_lab_does_not_read_credential_metadata_or_fics_yet() -> None:
     """Pending review (2026-11-28): adding the reads to the lab changes the M4 live
     session's scope counts and its scout digest, so it waits for Daniel."""
-    assert not {*graph.CREDENTIAL_OPERATIONS, *graph.FIC_OPERATIONS} & set(_scope_tf_operations())
+    optional = {*graph.CREDENTIAL_OPERATIONS, *graph.FIC_OPERATIONS, *graph.MEMBERSHIP_OPERATIONS}
+    assert not optional & set(_scope_tf_operations())
 
 
 def test_rendered_scope_is_a_valid_read_only_manifest() -> None:
