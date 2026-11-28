@@ -14,11 +14,12 @@ appId or object id>``. A version 1 contract cannot use them.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import Discriminator, Field, NonNegativeInt, Tag, field_validator, model_validator
 
 from fns.models.base import FnsModel
+from fns.models.budget import AcceptedInconclusive, sorted_accepted
 from fns.yamlio import load_yaml
 
 ContractOperation = Annotated[
@@ -165,8 +166,29 @@ class StillDoItem(ResourceTarget):
 class ContractThresholds(FnsModel):
     """Contract-level limits (YAML key ``budget``). Semantics are applied in M2."""
 
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"accepted_inconclusive"})
+
     max_critical_reachable: NonNegativeInt = 0
     max_inconclusive: NonNegativeInt = 0
+    accepted_inconclusive: tuple[AcceptedInconclusive, ...] = ()
+    """The items that may stay inconclusive, each with its reason (``fns.models.budget``).
+    Once any is named, any other inconclusive item is over budget."""
+
+    @field_validator("accepted_inconclusive")
+    @classmethod
+    def _sort_accepted(
+        cls, v: tuple[AcceptedInconclusive, ...]
+    ) -> tuple[AcceptedInconclusive, ...]:
+        return sorted_accepted(v)
+
+    @model_validator(mode="after")
+    def _accepted_fit(self) -> ContractThresholds:
+        if len(self.accepted_inconclusive) > self.max_inconclusive:
+            raise ValueError(
+                f"accepted_inconclusive names {len(self.accepted_inconclusive)} items, "
+                f"more than max_inconclusive {self.max_inconclusive}"
+            )
+        return self
 
 
 class Contract(FnsModel):
@@ -223,6 +245,23 @@ class Contract(FnsModel):
         )
         if both:
             raise ValueError(f"operations in both must_not_reach and must_still_do: {both}")
+        return self
+
+    @model_validator(mode="after")
+    def _accepted_are_items(self) -> Contract:
+        accepted = self.budget.accepted_inconclusive
+        if not accepted:
+            return self
+        if self.on_inconclusive != "fail":
+            raise ValueError("accepted_inconclusive needs on_inconclusive: fail")
+        items = {
+            (i.target_key, op)
+            for i in (*self.must_not_reach, *self.must_still_do)
+            for op in i.operations
+        }
+        unknown = sorted(a.item for a in accepted if (a.target, a.operation) not in items)
+        if unknown:
+            raise ValueError(f"accepted_inconclusive names items not in the contract: {unknown}")
         return self
 
 

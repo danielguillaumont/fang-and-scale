@@ -717,12 +717,20 @@ or another mode before anything is recorded.
 | payroll `listKeys`, invoices `listKeys` | **`pass`**, `verified`, D-6's (D-7's) 403 as supporting evidence | option B: `listKeys` is in the exact-operation table (approved 2026-11-27), on the account's exact ARM ID |
 | invoices `blob/write` (must still do) | **`inconclusive`** | allowed when evaluated; an observed success needs a write, which `prove` never makes |
 
-So expect **exit 3**: three inconclusive over the contract's budget of 2. Option B
-moves the four application items and the two `listKeys` items to `pass`, and the
-three above stay (`tests/prove/test_option_b.py`,
-`test_the_rest_of_the_contract_after_harden`).
-Any finding that **fails** is a stop, and so is an application item that is not
-`pass` although its D-step printed `denied` and `403` in D6: send its reasons.
+So expect **exit 0**, `WITHIN BUDGET`, only if those three are the **only**
+inconclusive items and no surface is open. The lab contract's budget (approved
+2026-11-27) is `max_inconclusive: 3` and names exactly them in
+`accepted_inconclusive`, each with its reason: invoices `blob/write` (writes stay
+rung 2 by design), `directory:tenant applications/credentials/update` (one app's
+denial isn't tenant-wide) and `directory:tenant roleAssignments/write` (SD3).
+Option B moves the four application items and the two `listKeys` items to `pass`
+(`tests/prove/test_session_d_budget.py`).
+
+- **Exit 3** with a `not accepted by the budget: <item>` line: another item is
+  inconclusive. That is a stop, even when the count is 3 or less. The usual
+  causes: a D-step that did not print `denied` and `403` in D6, or an open
+  surface (D4's PIM check). Send its reasons.
+- **Exit 1**, or any finding that **fails**: a stop. Send the reasons.
 
 ### D8. Sign out and delete the certificates
 

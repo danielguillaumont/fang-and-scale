@@ -104,6 +104,8 @@ def render_contain(report: ContainReport, out: Printer, *, max_alternatives: int
     )
     if s.warning:
         out.print(f"warning: {s.warning}", style="fns.warn", markup=False)
+    for item in s.unaccepted_inconclusive:
+        out.print(f"not accepted by the budget: {item}", style="fns.inconclusive", markup=False)
     # Exit 0 is "within budget", never "pass": no finding passes on modeled evidence.
     verdict = {0: "WITHIN BUDGET", 1: "FAILED", 3: "INCONCLUSIVE OVER BUDGET"}[s.exit_code]
     style = {0: "fns.muted", 1: "fns.fail", 3: "fns.inconclusive"}[s.exit_code]

@@ -13,6 +13,7 @@ from typing import ClassVar, Literal
 from pydantic import Field, NonNegativeInt, field_validator, model_validator
 
 from fns.models.base import FnsModel
+from fns.models.budget import AcceptedInconclusive
 from fns.models.evidence import ItemKind, Outcome
 from fns.models.ids import TzDatetime
 
@@ -113,9 +114,13 @@ class Assertion(FnsModel):
 
 
 class Thresholds(FnsModel):
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"accepted_inconclusive"})
+
     max_critical_reachable: NonNegativeInt
     max_inconclusive: NonNegativeInt
     on_inconclusive: Literal["fail", "warn"]
+    accepted_inconclusive: tuple[AcceptedInconclusive, ...] = ()
+    """The contract budget's named inconclusive items, frozen with it."""
 
 
 class AssertionSet(FnsModel):

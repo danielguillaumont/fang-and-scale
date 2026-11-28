@@ -82,6 +82,7 @@ def build_report(
             on_inconclusive=s.on_inconclusive,
             exit_code=s.exit_code,  # type: ignore[arg-type]
             warning=s.warning,
+            unaccepted_inconclusive=s.unaccepted_inconclusive,
         ),
     )
 

@@ -170,8 +170,15 @@ def test_prove_after_harden_carries_the_strike_evidence() -> None:
     assert "--live" in line and "--after-strike $dRun" in line
     assert "--record fixtures/lab-run-5" in line
     d7 = _section("### D7.")
-    assert "exit 3" in d7  # blob/write, the tenant-wide item, SD3 over a budget of 2
-    assert "three inconclusive" in d7
+    # The lab budget (approved 2026-11-27): exit 0 only with exactly three named items.
+    assert "expect **exit 0**, `WITHIN BUDGET`, only if those three are the **only**" in d7
+    assert "no surface is open" in d7 and "`max_inconclusive: 3`" in d7
+    for reason in ("rung 2 by design", "isn't tenant-wide", "(SD3)"):
+        assert reason in d7, reason
+    line = "not accepted by the budget: <item>"
+    assert line in d7 and "even when the count is 3 or less" in d7
+    verify_main = (ROOT / "src" / "fns" / "verify" / "main.py").read_text(encoding="utf-8")
+    assert 'f"not accepted by the budget: {item}"' in verify_main
     assert "| payroll `listKeys`, invoices `listKeys` | **`pass`**, `verified`" in d7
     for item in ("credentials/update", "owners/update"):
         assert item in d7
