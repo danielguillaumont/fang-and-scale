@@ -76,6 +76,7 @@ class Snap:
     not_collected: list[dict[str, str]] = field(default_factory=list)
     collectors: list[dict[str, Any]] = field(default_factory=list)
     not_applicable: list[dict[str, Any]] = field(default_factory=list)
+    fics: list[dict[str, Any]] = field(default_factory=list)
     _n: int = 0
 
     def __post_init__(self) -> None:
@@ -169,6 +170,29 @@ class Snap:
     def access_policy(self, principal: str, vault: str, secrets: tuple[str, ...]) -> Snap:
         return self.edge("hasAccessPolicy", principal, vault.lower(), secrets=secrets)
 
+    def fic(
+        self,
+        app: str,
+        issuer: str,
+        subject: str | None,
+        audiences: tuple[str, ...] = ("api://AzureADTokenExchange",),
+        name: str | None = None,
+    ) -> Snap:
+        """A federated identity credential on ``app``."""
+        self._n += 1
+        self.fics.append(
+            {
+                "owner": app,
+                "id": pid(6000 + self._n),
+                "name": name or f"fic-{self._n}",
+                "issuer": issuer,
+                "subject": subject,
+                "audiences": audiences,
+                "provenance": _prov("graph:GET /applications/{id}/federatedIdentityCredentials"),
+            }
+        )
+        return self
+
     def missing(self, surface: str) -> Snap:
         self.not_collected.append({"surface": surface, "reason": "test"})
         return self
@@ -183,6 +207,7 @@ class Snap:
                 "collector_version": "test",
                 "entities": list(self.entities.values()),
                 "edges": self.edges,
+                "federated_credentials": self.fics,
                 "coverage": {
                     "collectors": self.collectors,
                     "not_collected": self.not_collected,

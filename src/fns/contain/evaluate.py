@@ -36,6 +36,7 @@ from fns.models.contract import (
     ServicePrincipalTarget,
 )
 from fns.models.evidence import CoverageState, Evidence, Finding, ItemKind, Outcome, Verdict
+from fns.models.report import FrontDoor
 from fns.models.snapshot import Entity, Snapshot
 
 MAX_PATHS: Final = 4
@@ -122,6 +123,8 @@ class Evaluation:
     compromised: str | None
     outcomes: tuple[ItemOutcome, ...]
     summary: Summary
+    front_doors: tuple[FrontDoor, ...] = ()
+    """Outside parties that can sign in as an identity the attacker controls."""
 
 
 # -- reach queries -----------------------------------------------------------
@@ -655,4 +658,32 @@ def evaluate(contract: Contract, snapshot: Snapshot) -> Evaluation:
         who.entity.id if who.entity is not None else None,
         tuple(outcomes),
         _summary(contract, outcomes),
+        _front_doors(closure) if closure is not None else (),
     )
+
+
+def _front_doors(closure: Closure) -> tuple[FrontDoor, ...]:
+    """Federated credentials an outside party can satisfy, on every controlled identity."""
+    ix = closure.index
+    out: dict[tuple[str, str], FrontDoor] = {}
+    for p in closure.controlled():
+        apps = [p] if ix.type_of(p) == "application" else []
+        apps += [e.dst for e in ix.snapshot.edges if e.type == "instanceOf" and e.src == p]
+        for app in apps:
+            for fic, trust in ix.fics_of.get(app, ()):
+                if trust.kind == "entra-principal":
+                    continue  # a principal in this tenant: the closure rule covers it
+                out[(p, str(fic.id))] = FrontDoor(
+                    identity=p,
+                    identity_name=ix.entities[p].display_name if p in ix.entities else None,
+                    application=app,
+                    credential=fic.name,
+                    issuer=fic.issuer,
+                    subject=fic.subject,
+                    kind=trust.kind,
+                    severity=trust.severity,
+                    party=trust.party,
+                    reasons=trust.reasons,
+                    sources=trust.sources,
+                )
+    return tuple(sorted(out.values(), key=lambda f: f.sort_key()))

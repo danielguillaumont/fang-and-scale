@@ -19,6 +19,10 @@ and the in-scope service principals, and keeps metadata only (never a value).
 The ``app-credentials`` surface closes only when both reads are allowed, every
 request succeeded and no service principal was left out.
 
+Federated identity credentials (``graph.federated-credentials``) run only when the
+scope lists ``graph.OP_APP_FICS``, for every application. The surface stays not
+collected either way: user-assigned managed identities hold theirs in ARM.
+
 PIM eligibility (M3 E1) runs only when the scope allows its reads. The surface
 ``pim-eligibility`` then ends in one of three states:
 
@@ -64,6 +68,11 @@ PIM_ELIGIBILITY: Final = "pim-eligibility"
 PIM_COLLECTOR: Final = "pim.eligibility"
 APP_CREDENTIALS: Final = "app-credentials"
 CREDENTIALS_COLLECTOR: Final = "graph.credentials"
+FICS: Final = "federated-identity-credentials"
+FICS_COLLECTOR: Final = "graph.federated-credentials"
+UAMI_FICS_NOT_READ: Final = (
+    "user-assigned managed identities' federated credentials (ARM) not collected"
+)
 NOT_COLLECTED: Final = (
     NotCollected(surface=PIM_ELIGIBILITY, reason="eligible assignments not collected in M1"),
     NotCollected(surface="conditional-access", reason="not collected in M1"),
@@ -74,7 +83,7 @@ NOT_COLLECTED: Final = (
     NotCollected(
         surface=APP_CREDENTIALS, reason="key/password credential metadata not collected in M1"
     ),
-    NotCollected(surface="federated-identity-credentials", reason="not collected in M1"),
+    NotCollected(surface=FICS, reason="not collected in M1"),
     NotCollected(
         surface="user-group-memberships",
         reason="memberships collected for in-scope service principals only",
@@ -449,6 +458,23 @@ class Collector:
             not_collected = [n for n in not_collected if n.surface != APP_CREDENTIALS]
             if gap is not None:
                 not_collected.append(gap)
+
+        if graph.OP_APP_FICS in allowed:
+            t = collector(FICS_COLLECTOR, apps_t)
+            for app in app_ids:
+
+                def fics(app: str = app) -> int:
+                    items, prov = self._list(graph.app_fics_request(app))
+                    t.errors.update(graph.parse_federated_credentials(b, app, items, prov))
+                    return len(items)
+
+                self._attempt(t, fics)
+            t.ended = self.clock.monotonic()
+            why = [UAMI_FICS_NOT_READ]
+            if (status := t.run().status) != "complete":
+                why.insert(0, f"collector {t.name} is {status}")
+            not_collected = [n for n in not_collected if n.surface != FICS]
+            not_collected.append(NotCollected(surface=FICS, reason="; ".join(why)))
 
         t = collector("graph.app-role-assignments", sps_t)
         for sp in in_scope_sps:

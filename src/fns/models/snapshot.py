@@ -321,6 +321,41 @@ class Credential(FnsModel):
         return (self.owner, self.kind, str(self.key_id))
 
 
+class FederatedCredential(FnsModel):
+    """A federated identity credential on an application (queue item 2, pending review).
+
+    Whoever presents a token from ``issuer`` whose ``sub`` equals ``subject`` (exact,
+    case-sensitive, no wildcards) for one of ``audiences`` signs in as the
+    application's service principal. ``subject`` is None when the credential uses
+    a claims-matching expression (flexible FIC, preview), which Graph v1.0 does not
+    return. ``description`` is free text and not kept.
+    """
+
+    owner: str = Field(min_length=1)
+    """Object ID of the application."""
+    id: Guid
+    name: str = Field(min_length=1, max_length=200)
+    issuer: str = Field(min_length=1, max_length=600)
+    subject: str | None = Field(default=None, min_length=1, max_length=600)
+    audiences: SetOfStr = ()
+    provenance: Provenance
+
+    @field_validator("owner")
+    @classmethod
+    def _owner(cls, v: str) -> str:
+        if not GUID_RE.fullmatch(v):
+            raise ValueError(f"federated credential owner must be an object GUID, got {v!r}")
+        return v.lower()
+
+    @field_validator("audiences")
+    @classmethod
+    def _audiences(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        return _sorted_set(v)
+
+    def sort_key(self) -> tuple[str, str]:
+        return (self.owner, str(self.id))
+
+
 CollectorStatus = Literal["complete", "partial", "failed", "skipped", "not-applicable"]
 """``not-applicable``: the surface the collector reads does not exist in this tenant,
 with the evidence in ``coverage.not_applicable`` (never inferred)."""
@@ -398,7 +433,7 @@ class Snapshot(FnsModel):
     """A read-only inventory of one tenant + its in-scope subscriptions."""
 
     __volatile__: ClassVar[frozenset[str]] = frozenset({"collected_at", "collector_version"})
-    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"credentials"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"credentials", "federated_credentials"})
 
     version: Literal[1]
     mode: Literal["LIVE", "FIXTURE"]
@@ -410,6 +445,8 @@ class Snapshot(FnsModel):
     credentials: tuple[Credential, ...] = ()
     """Key and password credential metadata (collected only when the scope allows the
     per-object reads; see ``graph.CREDENTIAL_OPERATIONS``)."""
+    federated_credentials: tuple[FederatedCredential, ...] = ()
+    """Federated identity credentials of applications (``graph.FIC_OPERATIONS``)."""
     coverage: SnapshotCoverage = SnapshotCoverage()
 
     @field_validator("credentials")
@@ -418,6 +455,14 @@ class Snapshot(FnsModel):
         keys = [c.sort_key() for c in v]
         if len(set(keys)) != len(keys):
             raise ValueError("duplicate credential")
+        return tuple(sorted(v, key=lambda c: c.sort_key()))
+
+    @field_validator("federated_credentials")
+    @classmethod
+    def _sort_fics(cls, v: tuple[FederatedCredential, ...]) -> tuple[FederatedCredential, ...]:
+        keys = [c.sort_key() for c in v]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate federated credential")
         return tuple(sorted(v, key=lambda c: c.sort_key()))
 
     @field_validator("entities")
@@ -445,7 +490,8 @@ class Snapshot(FnsModel):
         )
         if dangling:
             raise ValueError(f"edges reference unknown entities: {dangling[:5]}")
-        orphans = sorted({c.owner for c in self.credentials if c.owner not in known})
+        owners = {c.owner for c in self.credentials} | {f.owner for f in self.federated_credentials}
+        orphans = sorted(owners - known)
         if orphans:
             raise ValueError(f"credentials reference unknown entities: {orphans[:5]}")
         return self

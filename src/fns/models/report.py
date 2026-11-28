@@ -60,6 +60,35 @@ class ReachPath(FnsModel):
         return self
 
 
+class FrontDoor(FnsModel):
+    """An outside party that can sign in as an identity in this blast radius.
+
+    From a federated identity credential (queue item 2, pending review). It adds no
+    reach for the compromised identity and changes no verdict: it says who else can
+    start from this identity. Modeled from the credential's issuer and subject
+    only, not validated live.
+    """
+
+    identity: str = Field(min_length=1)
+    """Object ID of the service principal the party signs in as."""
+    identity_name: str | None = None
+    application: str = Field(min_length=1)
+    """Object ID of the application that holds the credential."""
+    credential: str = Field(min_length=1)
+    issuer: str = Field(min_length=1)
+    subject: str | None = None
+    kind: str = Field(min_length=1, max_length=64)
+    severity: Literal["high", "medium", "unknown"]
+    party: str = Field(min_length=1)
+    reasons: tuple[str, ...] = Field(min_length=1)
+    sources: tuple[str, ...] = Field(min_length=1)
+    """Documentation the classification rests on."""
+
+    def sort_key(self) -> tuple[int, str, str, str]:
+        rank = {"high": 0, "medium": 1, "unknown": 2}[self.severity]
+        return (rank, self.identity, self.application, self.credential)
+
+
 class ReportSummary(FnsModel):
     __omit_empty__: ClassVar[frozenset[str]] = frozenset({"unaccepted_inconclusive"})
 
@@ -78,6 +107,7 @@ class ReportSummary(FnsModel):
 
 class ContainReport(FnsModel):
     __volatile__: ClassVar[frozenset[str]] = frozenset({"generated_at", "tool_version"})
+    __omit_empty__: ClassVar[frozenset[str]] = frozenset({"front_doors"})
 
     version: Literal[1]
     mode: Literal["LIVE", "FIXTURE"]
@@ -93,7 +123,16 @@ class ContainReport(FnsModel):
     tool_version: str
     findings: tuple[Finding, ...]
     paths: tuple[ReachPath, ...] = ()
+    front_doors: tuple[FrontDoor, ...] = ()
     summary: ReportSummary
+
+    @field_validator("front_doors")
+    @classmethod
+    def _sort_front_doors(cls, v: tuple[FrontDoor, ...]) -> tuple[FrontDoor, ...]:
+        keys = [f.sort_key() for f in v]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate front door")
+        return tuple(sorted(v, key=lambda f: f.sort_key()))
 
     @field_validator("paths")
     @classmethod

@@ -228,4 +228,4 @@ def test_every_derivation_rests_on_earlier_facts(s: Snap) -> None:
 
 def test_rules_are_all_registered_once() -> None:
     names = [r.__name__ for r in RULES]
-    assert len(names) == len(set(names)) == 8
+    assert len(names) == len(set(names)) == 9

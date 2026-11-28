@@ -206,6 +206,108 @@
       "title": "Finding",
       "type": "object"
     },
+    "FrontDoor": {
+      "additionalProperties": false,
+      "description": "An outside party that can sign in as an identity in this blast radius.\n\nFrom a federated identity credential (queue item 2, pending review). It adds no\nreach for the compromised identity and changes no verdict: it says who else can\nstart from this identity. Modeled from the credential's issuer and subject\nonly, not validated live.",
+      "properties": {
+        "application": {
+          "description": "Object ID of the application that holds the credential.",
+          "minLength": 1,
+          "title": "Application",
+          "type": "string"
+        },
+        "credential": {
+          "minLength": 1,
+          "title": "Credential",
+          "type": "string"
+        },
+        "identity": {
+          "description": "Object ID of the service principal the party signs in as.",
+          "minLength": 1,
+          "title": "Identity",
+          "type": "string"
+        },
+        "identity_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identity Name"
+        },
+        "issuer": {
+          "minLength": 1,
+          "title": "Issuer",
+          "type": "string"
+        },
+        "kind": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "party": {
+          "minLength": 1,
+          "title": "Party",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Reasons",
+          "type": "array"
+        },
+        "severity": {
+          "enum": [
+            "high",
+            "medium",
+            "unknown"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "sources": {
+          "description": "Documentation the classification rests on.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject"
+        }
+      },
+      "required": [
+        "identity",
+        "application",
+        "credential",
+        "issuer",
+        "kind",
+        "severity",
+        "party",
+        "reasons",
+        "sources"
+      ],
+      "title": "FrontDoor",
+      "type": "object"
+    },
     "HopCheck": {
       "additionalProperties": false,
       "description": "What a probe asks the platform about this hop: ``action`` at ``scope``.",
@@ -462,6 +564,14 @@
         "$ref": "#/$defs/Finding"
       },
       "title": "Findings",
+      "type": "array"
+    },
+    "front_doors": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/FrontDoor"
+      },
+      "title": "Front Doors",
       "type": "array"
     },
     "generated_at": {

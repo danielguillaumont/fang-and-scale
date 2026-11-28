@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Final, Literal
 
-from fns.contain import rbac
+from fns.contain import federation, rbac
 from fns.contain import semantics as sem
 from fns.fixtures import wellknown as wk
 from fns.models.armid import ArmIdError, parse_arm_id
@@ -33,6 +33,7 @@ from fns.models.snapshot import (
     TENANT_ROOT_SCOPE,
     DenyAssignment,
     Entity,
+    FederatedCredential,
     HasAccessPolicy,
     HasAppRole,
     HasDirectoryRole,
@@ -140,6 +141,18 @@ class SnapshotIndex:
                 self.denies.append(edge)
             elif isinstance(edge, HasAccessPolicy):
                 self.access_policies[edge.dst].append(edge)
+        tenant = str(snapshot.tenant_id)
+        self.fics_of: dict[str, list[tuple[FederatedCredential, federation.Trust]]] = defaultdict(
+            list
+        )
+        self.trusted_by: dict[str, list[tuple[FederatedCredential, federation.Trust]]] = (
+            defaultdict(list)
+        )
+        for fic in snapshot.federated_credentials:
+            trust = federation.classify(fic.issuer, fic.subject, fic.audiences, tenant)
+            self.fics_of[fic.owner].append((fic, trust))
+            if trust.principal is not None:
+                self.trusted_by[trust.principal].append((fic, trust))
 
     def name(self, entity_id: str) -> str:
         e = self.entities.get(entity_id)
@@ -156,6 +169,12 @@ class SnapshotIndex:
         kind = getattr(edge, "type")  # noqa: B009
         api = getattr(edge, "provenance").source_api  # noqa: B009
         return f"{kind}: {self.name(src)} -> {self.name(dst)} [{api}]"
+
+    def fic_source(self, fic: FederatedCredential) -> str:
+        return (
+            f"federatedIdentityCredential: {fic.name} on {self.name(fic.owner)} "
+            f"[{fic.provenance.source_api}]"
+        )
 
     def graph_role_value(self, edge: HasAppRole) -> str | None:
         if edge.app_role_value:
@@ -573,6 +592,41 @@ def _rule_managed_identity(c: Closure) -> Iterator[_Candidate]:
                     )
 
 
+def _rule_federated_credential(c: Closure) -> Iterator[_Candidate]:
+    """A managed identity an application's federated credential trusts signs in as it.
+
+    Issuer ``https://login.microsoftonline.com/<this tenant>/v2.0``, subject the
+    managed identity's object ID, audience ``api://AzureADTokenExchange``
+    (Microsoft Learn, "Configure an application to trust a managed identity", read
+    2026-11-28). Only user-assigned managed identities can be a credential; a
+    subject that is not a managed identity in the snapshot adds nothing. Another
+    audience is left open (uncertain), not assumed either way.
+    """
+    ix = c.index
+    for p in c.controlled():
+        if ix.type_of(p) != "managedIdentity":
+            continue
+        for fic, _trust in ix.trusted_by.get(p, ()):
+            if federation.TOKEN_EXCHANGE_AUDIENCE not in fic.audiences:
+                c.uncertain.add(
+                    f"{ix.name(fic.owner)}'s federated credential {fic.name} trusts "
+                    f"{ix.name(p)} for audiences {', '.join(fic.audiences) or 'none'} "
+                    "(not modeled)"
+                )
+                continue
+            for sp, extra in _sps_of(ix, fic.owner):
+                if sp == p:
+                    continue
+                yield _Candidate(
+                    controls(sp),
+                    "federated-credential",
+                    (controls(p),),
+                    (ix.fic_source(fic), *extra),
+                    f"{ix.name(fic.owner)}'s federated credential {fic.name} trusts "
+                    f"{ix.name(p)}: it exchanges its token and signs in as {ix.name(sp)}",
+                )
+
+
 RULES: Final[tuple[Rule, ...]] = (
     _rule_member_of,
     _rule_owner_adds_credential,
@@ -582,4 +636,5 @@ RULES: Final[tuple[Rule, ...]] = (
     _rule_rolemanagement_write,
     _rule_rbac_write,
     _rule_managed_identity,
+    _rule_federated_credential,
 )

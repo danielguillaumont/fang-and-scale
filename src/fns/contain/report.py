@@ -73,6 +73,7 @@ def build_report(
         tool_version=tool_version,
         findings=tuple(findings),
         paths=tuple(paths),
+        front_doors=evaluation.front_doors,
         summary=ReportSummary(
             critical=s.critical,
             max_critical_reachable=s.max_critical,

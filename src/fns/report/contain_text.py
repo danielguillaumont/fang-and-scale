@@ -94,6 +94,21 @@ def render_contain(report: ContainReport, out: Printer, *, max_alternatives: int
         for reason in [r for r in f.reasons[1:] if " resolved to " not in r][:3]:
             out.print(f"      {reason}", style="fns.muted", markup=False)
 
+    if report.front_doors:
+        out.print(
+            "Front doors (outside parties that can sign in as an identity above; "
+            "modeled, not validated live)",
+            style="fns.brand",
+        )
+    for d in report.front_doors:
+        who = d.identity_name or d.identity
+        out.print(f"  {d.severity:<8} {who}: {d.party}", markup=False)
+        out.print(
+            f"           credential {d.credential}, {d.kind}", style="fns.muted", markup=False
+        )
+        for reason in d.reasons:
+            out.print(f"           {reason}", style="fns.muted", markup=False)
+
     s = report.summary
     out.print(
         f"critical reachable: {s.critical}/{s.max_critical_reachable} max  "

@@ -60,6 +60,17 @@ CREDENTIAL_KEY_FIELDS: Final = (
 CREDENTIAL_PASSWORD_FIELDS: Final = ("keyId", "displayName", "startDateTime", "endDateTime")
 """The only fields of ``keyCredential`` / ``passwordCredential`` the parser reads."""
 
+OP_APP_FICS: Final = "graph:GET /applications/{id}/federatedIdentityCredentials"
+FIC_OPERATIONS: Final = (OP_APP_FICS,)
+"""Federated identity credentials of applications (2026-11-28, pending review).
+
+Optional like :data:`CREDENTIAL_OPERATIONS`. Application.Read.All is the
+least-privileged application permission (Microsoft Learn, "List
+federatedIdentityCredentials", read 2026-11-28). No ``$select``: the list page
+does not document it. The parser keeps id, name, issuer, subject and audiences;
+``description`` (free text) is dropped. User-assigned managed identities keep
+their federated credentials in ARM, which this does not read."""
+
 PIM_PLAN_IDS: Final = frozenset({"eec0eb4f-6444-4f95-aba0-50c24d67f998"})
 """Service plans known to carry PIM: AAD_PREMIUM_P2 (Microsoft Entra ID P2).
 
@@ -173,6 +184,10 @@ def sp_credentials_request(sp_id: str) -> ApiRequest:
     return _req(
         OP_SERVICE_PRINCIPAL, f"/servicePrincipals/{_guid(sp_id)}?$select={CREDENTIAL_SELECT}"
     )
+
+
+def app_fics_request(app_id: str) -> ApiRequest:
+    return _req(OP_APP_FICS, f"/applications/{_guid(app_id)}/federatedIdentityCredentials")
 
 
 def sp_app_role_assignments_request(sp_id: str) -> ApiRequest:
@@ -376,6 +391,31 @@ def parse_credentials(
             except (ParseError, ValueError):
                 errors.append("bad-item")
     return count, errors
+
+
+def parse_federated_credentials(
+    b: SnapshotBuilder, owner: str, items: list[dict[str, Any]], prov: Provenance
+) -> list[str]:
+    errors: list[str] = []
+    for item in items:
+        try:
+            audiences = item.get("audiences")
+            if not isinstance(audiences, list) or not all(isinstance(a, str) for a in audiences):
+                raise ParseError("audiences must be a list of strings")
+            b.federated_credential(
+                {
+                    "owner": owner,
+                    "id": _guid(item.get("id")),
+                    "name": item.get("name"),
+                    "issuer": item.get("issuer"),
+                    "subject": _opt_str(item.get("subject")),
+                    "audiences": tuple(audiences),
+                },
+                prov,
+            )
+        except (ParseError, ValueError):
+            errors.append("bad-item")
+    return errors
 
 
 def parse_app_role_assignments(
