@@ -64,11 +64,8 @@ First batch:
 
 ### Needs Daniel
 
-- **Two new rows pending review in DECISIONS**: how D-6 and D-7 are built (#84),
-  and how the named inconclusive budget is built (#85). The conservative choice
-  was taken each time, for example: naming any item with `on_inconclusive: warn`
-  is refused, and the strike fixture `fixtures/strike-demo` keeps its recorded
-  D-1 to D-5.
+- ~~Two rows pending review in DECISIONS~~: how D-6 and D-7 are built (#84) and
+  how the named inconclusive budget is built (#85). **Both approved 2026-11-27.**
 - **Tag and publish v0.1.0** (nothing is tagged or published). The tag goes on
   the merge commit of #86, the last PR of this session, which is `main` as it is
   now. These commands work in PowerShell and in bash:
