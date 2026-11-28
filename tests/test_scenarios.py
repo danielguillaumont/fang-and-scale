@@ -148,7 +148,7 @@ def test_each_page_says_fixture_and_shows_the_demo_command(slug: str) -> None:
     assert f"uv run fns demo contain --fixture docs/scenarios/{slug}/tenant" in page
     for heading in ("**Story.**", "**Contract**", "**Expected**", "**Fix:**", "**Why the rule"):
         assert heading in page, heading
-    assert "learn.microsoft.com" in page
+    assert re.search(r"\]\(https://learn\.microsoft\.com/", page), "cite Microsoft Learn"
 
 
 def test_the_index_links_every_scenario_and_the_readme_links_the_index() -> None:
