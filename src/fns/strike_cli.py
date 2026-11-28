@@ -226,7 +226,9 @@ def plan(
 
         wanted = tuple(x.strip() for x in strikes.split(",") if x.strip())
         if not wanted:
-            raise _UsageError("--strikes needs at least one strike, like S1,S2,S3 or D-1,...,D-5")
+            raise _UsageError(
+                "--strikes needs at least one strike, like S1,S2,S3,S4 or D-1,...,D-7"
+            )
         s = (
             _fixture_session(fixture, wanted, "plan")
             if fixture

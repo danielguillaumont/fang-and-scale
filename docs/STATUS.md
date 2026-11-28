@@ -16,8 +16,16 @@ as `poe lab-check`, fixtures and mocked transports only, PRs with required CI.
 | --- | --- | --- | --- |
 | 1 | Mark the four front-page rows approved; the wheel check is required | done | #91 |
 | 2a | `docs/runbooks/m4-preflight.md`: the checklist before session A | done | #92 |
-| 2b | Cross-check `m4-live-run.md` against the code, fix drift with tests | queued | |
+| 2b | Cross-check `m4-live-run.md` against the code, fix drift with tests | done | #93 |
 | 2c | Split the runbook into per-session copy-paste blocks with "expect" lines | queued | |
+
+**Runbook cross-check (#93).** Ten drifts fixed, each with a test; the ones that
+would have stopped a live session: B1's export check wrote a file named
+`--check` instead of checking; D7's `prove --record` would refuse
+`fixtures/lab-run-5` (D4 did not record it); nothing renewed the 7-day scope; B4
+expected a `source: recorded` item the lab contract makes impossible; Teardown
+would carry D3's uncommitted diff onto `main`. `fns scope check` now prints the
+strike window and the escalation (display only). Two rows pending review.
 
 **Preflight (#92).** `docs/runbooks/m4-preflight.md` is the page to go through
 before session A (and briefly before B, C and D). One new row pending review in

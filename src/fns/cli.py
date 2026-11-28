@@ -160,7 +160,7 @@ _AGENT_OPT = typer.Option(help="Live: Azure CLI config dir signed in as sp-billi
 
 @strike_app.command("plan")
 def strike_plan(
-    strikes: Annotated[str, typer.Option(help="S1,S2,S3 before harden; D-1,...,D-5 after.")],
+    strikes: Annotated[str, typer.Option(help="S1,S2,S3,S4 before harden; D-1,...,D-7 after.")],
     fixture: Annotated[Path | None, _FIXTURE_OPT] = None,
     scope: Annotated[Path, _SCOPE_OPT] = Path("scope.lab.yaml"),
     scout_config: Annotated[Path | None, _SCOUT_OPT] = None,
@@ -762,6 +762,28 @@ def scope_check(
         con.print(f"data objects {len(m.data_objects)} (prove reads only these)")
         for obj in m.data_objects:
             con.print(f"  {obj.operation} on {obj.resource}", markup=False)
+    counts = ", ".join(f"{verb} {len(ops)}" for verb, ops in sorted(m.allowed_operations.items()))
+    con.print(f"operations    {counts or 'none'}", markup=False)
+    if m.strike is not None:
+        # The gate refuses every strike write after this instant (M4 runbook C1, D5).
+        s = m.strike
+        left = (s.expires_at - now).total_seconds()
+        state = f"{_human(left)} left" if left > 0 else "expired: every strike write is refused"
+        con.print(
+            f"strike        expires {s.expires_at.isoformat()} ({state}), "
+            f"{len(s.targets)} target(s)",
+            markup=False,
+        )
+        for t in s.targets:
+            name = f" {t.display_name}" if t.display_name else ""
+            con.print(f"  {t.kind} {t.id}{name}", markup=False)
+        esc = s.escalation
+        if esc is not None:
+            con.print(
+                f"escalation    service principal {esc.service_principal}, "
+                f"marker role {esc.marker_role_id}",
+                markup=False,
+            )
 
     table = Table(title="allowed operations", show_lines=False)
     table.add_column("verb")

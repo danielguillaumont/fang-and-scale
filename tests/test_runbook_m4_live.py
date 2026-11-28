@@ -421,3 +421,170 @@ def test_the_strike_cli_points_here_and_the_plans_link_it() -> None:
     assert "docs/runbooks/m4-live-run.md" in cli
     for doc in ("docs/milestones/M4-plan.md", "docs/milestones/M4-strikes-plan.md", "README.md"):
         assert "docs/runbooks/m4-live-run.md" in (ROOT / doc).read_text(encoding="utf-8"), doc
+
+
+# --- drift checks against the code (2026-11-27 cross-check) ---------------------------
+
+
+def _flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def test_every_fns_command_parses_with_its_option_values() -> None:
+    """Parse each line as the CLI would. An option that takes a value must get one:
+    ``--terraform --check`` once wrote a file named ``--check``."""
+    for line in _fns_lines():
+        argv = shlex.split(line.removeprefix("uv run fns "), posix=False)
+        cmd, rest = _resolve(argv)
+        ctx = cmd.make_context(cmd.name, list(rest), resilient_parsing=True)
+        for name, value in ctx.params.items():
+            values = value if isinstance(value, list | tuple) else [value]
+            for v in values:
+                assert not str(v).startswith("-"), (line, name, v)
+
+
+def test_prove_records_into_a_scout_recording_made_earlier() -> None:
+    scouts = [c for c in _fns_lines() if c.startswith("uv run fns scout ")]
+    for i, line in enumerate(COMMANDS):
+        m = re.search(r"uv run fns prove .*--record (\S+)", line)
+        if not m:
+            continue
+        earlier = [c for c in COMMANDS[:i] if c in scouts and f"--record {m[1]}" in c]
+        assert earlier, f"no fns scout --record {m[1]} before {line}"
+    from fns.prove import live
+
+    assert "has no scout recording" in Path(live.__file__).read_text(encoding="utf-8")
+
+
+def test_no_json_array_is_counted_inside_a_subexpression() -> None:
+    """Windows PowerShell 5.1's ConvertFrom-Json writes an array as one object, so
+    ``@(az ... | ConvertFrom-Json).Count`` is 1 for any number of rows."""
+    assert not re.search(r"@\(az [^\n]*\| ConvertFrom-Json\)", TEXT)
+
+
+def test_the_scope_is_checked_each_session_and_renewed_alone() -> None:
+    variables = (ROOT / "lab" / "variables.tf").read_text(encoding="utf-8")
+    days = re.search(r'variable "scope_valid_days" \{.*?default\s+=\s+(\d+)', variables, re.S)
+    assert days is not None
+    start = _section("## Start of every session")
+    assert "uv run fns scope check scope.lab.yaml" in start
+    assert f"valid for {days[1]} days from A2" in _flat(start)
+    renew = _section("### Renew the scope")
+    assert 'terraform -chdir=lab apply "-replace=time_offset.scope_expiry"' in renew
+    assert "**2 to add, 0 to change, 2 to destroy**" in _flat(renew)
+    assert "Never between a strike plan and its run" in _flat(renew)
+    scope_tf = (ROOT / "lab" / "scope.tf").read_text(encoding="utf-8")
+    assert '"-replace=time_offset.scope_expiry"' in scope_tf
+
+
+def _locals_list(name: str) -> list[str]:
+    text = (ROOT / "lab" / "scope.tf").read_text(encoding="utf-8")
+    m = re.search(rf"^  {name} = \[\n(.*?)^  \]", text, re.M | re.S)
+    assert m is not None, name
+    return [x for x in m[1].splitlines() if x.strip() and not x.strip().startswith("#")]
+
+
+def test_scope_check_counts_match_lab_scope_tf() -> None:
+    scout = len(_locals_list("scout_operations"))
+    prove = len(_locals_list("prove_operations"))
+    strike = len(_locals_list("strike_operations"))
+    extra = len(_locals_list("strike_scout_operations"))
+    targets = len(_locals_list("strike_arm_targets")) + len(_locals_list("strike_app_targets")) + 1
+    a2 = _flat(_section("### A2."))
+    assert f"`operations prove {prove}, scout {scout}` (no `strike`)" in a2
+    c1 = _flat(_section("### C1."))
+    assert f"`operations prove {prove}, scout {scout + extra}, strike {strike}`" in c1
+    assert f"and {targets} targets" in c1 and "`escalation` line" in c1
+
+
+def test_record_expects_what_the_lab_contract_already_declares(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    names = {
+        "agent": "sp-billing-agent",
+        "vault": "kv-crown-ab12cd",
+        "payroll": "stpayrollab12cd",
+        "invoices": "stinvoicesab12cd",
+        "verifier": "id-verifier",
+        "scout": "sp-fns-scout",
+    }
+    template = (ROOT / "lab" / "contract.lab.fns.yaml.tftpl").read_text(encoding="utf-8")
+    contract = tmp_path / "contract.yaml"
+    contract.write_text(re.sub(r"\$\{(\w+)\}", lambda m: names[m[1]], template), "utf-8")
+    oid = "00000000-0000-4000-8000-000000000100"
+    rows = [
+        {
+            "Type": "StorageBlobLogs",
+            "OperationName": op,
+            "AccountName": names["invoices"],
+            "RequesterObjectId": oid,
+            "StatusCode": status,
+        }
+        for op, status in (
+            ("GetBlob", "200"),
+            ("PutBlob", "201"),
+            ("GetContainerProperties", "200"),
+        )
+    ]
+    blob, activity = tmp_path / "blob.json", tmp_path / "activity.json"
+    blob.write_text(json.dumps(rows), "utf-8")
+    activity.write_text("[]", "utf-8")
+    out = tmp_path / "recorded.fns.yaml"
+    result = CliRunner().invoke(
+        app,
+        [
+            "record",
+            str(blob),
+            str(activity),
+            "--identity",
+            oid,
+            "--contract",
+            str(contract),
+            "--out",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    b4 = _section("### B4.")
+    for line in result.output.splitlines():
+        if line.startswith("  already declared "):
+            shown = line.replace(names["invoices"], "stinvoices<suffix>")
+            assert shown in b4, shown
+    assert "2 recorded resource operation(s), 0 failed" in result.output
+    assert "2 recorded resource operation(s), 0 failed" in b4
+    assert "added" not in result.output and "source: recorded" not in out.read_text("utf-8")
+    assert "`resource: st-invoices`" not in b4
+
+
+def test_teardown_destroys_everything_the_sessions_added() -> None:
+    logcheck = (ROOT / "docs" / "runbooks" / "m4-log-path-check.md").read_text(encoding="utf-8")
+    base = re.search(r"\*\*(\d+) to add, 0 to change, 0 to destroy\*\*", logcheck)
+    monitoring = re.search(
+        r"\*\*The plan must be (\d+) to add, 0 to change, 0 to destroy\*\*", TEXT
+    )
+    assert base and monitoring
+    strikes, harden = 2, 2  # C1: the expiry and the marker; D3: the two grants
+    total = int(base[1]) + int(monitoring[1]) + strikes - harden
+    teardown = _session("Teardown")
+    assert f"**{total} to destroy** with the defaults" in _flat(teardown)
+    assert f"({base[1]} + {monitoring[1]} + {strikes} - {harden};" in _flat(teardown)
+    # D3's git apply is never committed: undo it before switching back to main.
+    assert "git restore lab/identities.tf lab/resources.tf" in teardown
+
+
+def test_strike_help_names_s4_and_the_listkeys_d_steps() -> None:
+    from typer.testing import CliRunner
+
+    out = CliRunner().invoke(app, ["strike", "plan", "--help"], env={"COLUMNS": "200"}).output
+    assert "S1,S2,S3,S4" in out and "D-1,...,D-7" in out
+
+
+def test_emergency_cleanup_works_from_a_new_window() -> None:
+    step1 = _section("### 1. Let the tool undo")
+    assert "first, and set `$hash` again" in _flat(step1)
+    assert ".plan_hash" in step1 and "strike-run.json" in step1
+
+
+def test_report_back_asks_for_ids_to_be_replaced() -> None:
+    report = _session("Report back")
+    assert "Replace every GUID" in report and "m4-preflight.md" in report
