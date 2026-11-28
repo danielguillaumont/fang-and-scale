@@ -14,7 +14,7 @@ read back through the GitHub API the same day:
 | Dependabot security updates | enabled |
 | Private vulnerability reporting | enabled |
 | Code scanning default setup | not configured (correct: `codeql.yml` is the advanced setup) |
-| Branch protection on `main` | classic rule: force pushes blocked, deletion blocked, and the three `ci` checks required (strict), applied by the owner by 2026-11-27: see "Require CI to pass" below. No required reviews (one maintainer) |
+| Branch protection on `main` | classic rule: force pushes blocked, deletion blocked, and the four `ci` checks required (strict), applied by the owner by 2026-11-27 (the wheel check added the same day): see "Require CI to pass" below. No required reviews (one maintainer) |
 | Workflow token | read-only; cannot approve pull requests |
 | Fork PR workflows | approval required for first-time contributors |
 | Automatically delete head branches | off (settings step 4, optional) |
@@ -40,10 +40,10 @@ Since then:
 
 ## Require CI to pass (applied)
 
-Branch protection on `main` requires the three `ci` checks below (read back from
-the protection rule on 2026-11-27). A fourth `ci` job, `wheel (install + bundled
-demo)`, was added after v0.1.0; it is required only once the command below is run
-again. This section stays as the record of how it was set, and the command to set
+Branch protection on `main` requires the four `ci` checks below (read back from
+the protection rule on 2026-11-27). The fourth, `wheel (install + bundled demo)`,
+was added after v0.1.0 and has been required since the owner ran the command below
+again, the same day. This section stays as the record of how it was set, and the command to set
 it. These are the
 checks that run on every pull request, with the names GitHub uses for them
 (read from the check runs of #51):
@@ -53,7 +53,7 @@ checks that run on every pull request, with the names GitHub uses for them
 | `check (ubuntu-latest)` | `ci` | GitHub Actions (app 15368) | **yes**: ruff, mypy, import boundaries, schema drift, pytest |
 | `check (windows-latest)` | `ci` | GitHub Actions | **yes**: the same on Windows (about 5 minutes) |
 | `lab (terraform fmt + validate)` | `ci` | GitHub Actions | **yes**: the lab Terraform, no credentials |
-| `wheel (install + bundled demo)` | `ci` | GitHub Actions | **yes, once the command is run again**: the built wheel, installed in a clean venv outside the checkout, runs `fns demo contain --bundled` |
+| `wheel (install + bundled demo)` | `ci` | GitHub Actions | **yes**: the built wheel, installed in a clean venv outside the checkout, runs `fns demo contain --bundled` |
 | `codeql (python)`, `codeql (actions)` | `codeql` | GitHub Actions | optional: they pass even when they raise an alert. Use a code scanning merge rule to gate on alerts instead |
 | `CodeQL` | code scanning results | GitHub Advanced Security (app 57789) | no: it is the alert summary, not a job |
 | `blast radius (fixture)` | `blast-radius` | GitHub Actions | no: it reports and is meant not to gate. Its comment step fails on fork PRs (read-only token) |

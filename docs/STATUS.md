@@ -7,6 +7,23 @@ release. The GitHub release shows 2026-11-28 01:26 UTC. Its build provenance
 attestations verify. `CHANGELOG.md` has a new, empty "Unreleased" section, and
 #87 (DECISIONS only) is the first entry in it.
 
+### M4 readiness session (2026-11-27)
+
+Same hard rules: no Azure, Graph or Log Analytics call, no `az`, Terraform only
+as `poe lab-check`, fixtures and mocked transports only, PRs with required CI.
+
+| # | Item | State | PR |
+| --- | --- | --- | --- |
+| 1 | Mark the four front-page rows approved; the wheel check is required | done | #91 |
+| 2a | `docs/runbooks/m4-preflight.md`: the checklist before session A | queued | |
+| 2b | Cross-check `m4-live-run.md` against the code, fix drift with tests | queued | |
+| 2c | Split the runbook into per-session copy-paste blocks with "expect" lines | queued | |
+
+**The wheel check is now required on `main`.** The protection rule, read back on
+2026-11-27, requires all four `ci` checks (strict): `check (ubuntu-latest)`,
+`check (windows-latest)`, `lab (terraform fmt + validate)` and `wheel (install +
+bundled demo)`. `docs/PUBLIC-READINESS.md` says so.
+
 ### Front-page session (2026-11-27)
 
 Same hard rules: no Azure, no tags, PRs with required CI, STATUS current.
@@ -27,11 +44,10 @@ for the README.
 - **Upload the social preview**: `docs/social-preview.png` (1280x640), under
   Settings, General, "Social preview". It is a repository setting, so I left it
   to you.
-- **Make the wheel check required** (optional): run the command in
-  `docs/PUBLIC-READINESS.md`, "Require CI to pass". It now lists four checks;
-  until it is run again, `wheel (install + bundled demo)` runs on every pull
-  request but does not block a merge.
-- **Four new rows pending review in DECISIONS** (the front-page choices).
+- ~~Make the wheel check required~~: **done**, all four `ci` checks are
+  required on `main` (read back 2026-11-27).
+- ~~Four new rows pending review in DECISIONS~~ (the front-page choices):
+  **approved 2026-11-27**.
 
 ## Owner-decision session (2026-11-27)
 
