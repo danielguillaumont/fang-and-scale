@@ -8,11 +8,23 @@ branding:
 
 inputs:
   contract:
-    description: Contract file (*.fns.yaml).
-    required: true
+    description: >-
+      Contract file (*.fns.yaml). Required, unless `fixture` is set: then the
+      fixture set's own contract.fns.yaml is the default.
+    default: ""
   snapshot:
-    description: Snapshot JSON written by `fns scout` (or `fns demo scout` for fixtures).
-    required: true
+    description: >-
+      Snapshot JSON written by `fns scout` (or `fns demo scout` for fixtures).
+      Set this or `fixture`, not both.
+    default: ""
+  fixture:
+    description: >-
+      Try the action without a tenant: `bundled` (the demo set shipped in the
+      package) or a recorded fixture set inside the action's own checkout, e.g.
+      `docs/scenarios/02-contributor-key-vault-flip/tenant`. The action replays it
+      with `fns demo scout` and uses the snapshot; everything it reports is
+      labelled FIXTURE.
+    default: ""
   probes:
     description: >-
       Probe results to replay with `fns prove` (FIXTURE only; live probes are not
@@ -41,6 +53,9 @@ outputs:
   comment-file:
     description: The Markdown comment.
     value: ${{ steps.run.outputs.comment-file }}
+  contain-json:
+    description: The contain report JSON (verdicts, evidence rungs, coverage).
+    value: ${{ steps.run.outputs.contain-json }}
 
 runs:
   using: composite
@@ -60,12 +75,33 @@ runs:
         FNS_PROBES: ${{ inputs.probes }}
         FNS_LAB: ${{ inputs.lab }}
         FNS_BASELINE: ${{ inputs.baseline }}
+        FNS_FIXTURE: ${{ inputs.fixture }}
       run: |
         # Read-only: contain, prove (replayed probes), mutate (model only), comment.
         set -euo pipefail
         out="${RUNNER_TEMP:-/tmp}/fns-action"
         rm -rf "$out" && mkdir -p "$out"
         fns() { uv run --frozen --no-dev --project "$GITHUB_ACTION_PATH" fns "$@"; }
+        usage() { echo "$1" >&2; exit 2; }
+        if [ -n "$FNS_FIXTURE" ]; then
+          [ -z "$FNS_SNAPSHOT" ] || usage "set snapshot or fixture, not both"
+          if [ "$FNS_FIXTURE" = "bundled" ]; then
+            fixture="$GITHUB_ACTION_PATH/src/fns/fixtures/data/demo-scout"
+            from=(--bundled)
+          else
+            case "$FNS_FIXTURE" in
+              /*|*..*|*\\*|*:*) usage "fixture must be 'bundled' or a relative path inside the action" ;;
+            esac
+            fixture="$GITHUB_ACTION_PATH/$FNS_FIXTURE"
+            [ -f "$fixture/manifest.json" ] || usage "no recorded fixture set at $FNS_FIXTURE"
+            from=(--fixture "$fixture")
+          fi
+          fns demo scout "${from[@]}" --out "$out/scout"
+          FNS_SNAPSHOT="$(find "$out/scout/snapshots" -name '*.json' | head -n 1)"
+          [ -n "$FNS_CONTRACT" ] || FNS_CONTRACT="$fixture/contract.fns.yaml"
+        fi
+        [ -n "$FNS_CONTRACT" ] || usage "contract is required (or set fixture)"
+        [ -n "$FNS_SNAPSHOT" ] || usage "snapshot is required (or set fixture)"
         verdict() { # 0, 1 and 3 are verdicts; 2, 4 and 5 are errors and end the step with that code
           local code=$1 file=$2
           case "$code" in
@@ -115,6 +151,7 @@ runs:
         {
           echo "exit-code=$code"
           echo "comment-file=$out/comment.md"
+          echo "contain-json=$out/contain.json"
         } >> "${GITHUB_OUTPUT:-/dev/null}"
     - name: Comment on the pull request
       if: inputs.comment == 'true' && github.event_name == 'pull_request'

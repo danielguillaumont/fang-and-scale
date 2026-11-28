@@ -24,6 +24,12 @@ version may change file formats; each change is listed here.
 
 ### Added
 
+- The GitHub Action for other repositories (#101): a `fixture` input (`bundled`
+  or a recorded set inside the action) to try it without a tenant, a
+  `contain-json` output, `docs/ACTION.md` (inputs, outputs, the sticky comment,
+  pinning) and `docs/examples/blast-radius.yml`, which CI runs as the
+  `action example (bundled fixture)` job. `contract` and `snapshot` are
+  checked by the script now, so `required: true` is gone from them.
 - CI job `wheel (install + bundled demo)` (#89): it builds the wheel, installs it
   in a clean venv outside the checkout, and runs `fns demo contain --bundled`,
   which must exit 1 (the demo contract fails on purpose) with every line
