@@ -34,6 +34,32 @@ OP_SUBSCRIBED_SKUS: Final = "graph:GET /subscribedSkus"
 PIM_OPERATIONS: Final = (OP_DIR_ROLE_ELIGIBILITY, OP_SUBSCRIBED_SKUS)
 """Entra PIM eligibility and the licences that show whether PIM exists (M3 E1)."""
 
+OP_APPLICATION: Final = "graph:GET /applications/{id}"
+OP_SERVICE_PRINCIPAL: Final = "graph:GET /servicePrincipals/{id}"
+CREDENTIAL_OPERATIONS: Final = (OP_APPLICATION, OP_SERVICE_PRINCIPAL)
+"""Per-object reads for key and password credential metadata (2026-11-28, pending review).
+
+Optional, like PIM: the collector runs only for the ones a scope lists, so scopes
+and recordings made before they existed replay unchanged. Application.Read.All
+(already granted to the scout) is the least-privileged application permission for
+both (Microsoft Learn, "Get application" and "Get servicePrincipal", read
+2026-11-28). The lab scope does not list them yet."""
+CREDENTIAL_SELECT: Final = "id,keyCredentials,passwordCredentials"
+"""A list never returns ``keyCredentials`` (only a single-object read with ``$select``
+does), and that read also returns ``key``, the public certificate data. The parser
+keeps metadata only; :mod:`fns.fixtures.sanitize` redacts ``key``,
+``customKeyIdentifier`` and ``hint`` in recordings."""
+CREDENTIAL_KEY_FIELDS: Final = (
+    "keyId",
+    "displayName",
+    "type",
+    "usage",
+    "startDateTime",
+    "endDateTime",
+)
+CREDENTIAL_PASSWORD_FIELDS: Final = ("keyId", "displayName", "startDateTime", "endDateTime")
+"""The only fields of ``keyCredential`` / ``passwordCredential`` the parser reads."""
+
 PIM_PLAN_IDS: Final = frozenset({"eec0eb4f-6444-4f95-aba0-50c24d67f998"})
 """Service plans known to carry PIM: AAD_PREMIUM_P2 (Microsoft Entra ID P2).
 
@@ -137,6 +163,16 @@ def sp_owners_request(sp_id: str) -> ApiRequest:
 
 def app_owners_request(app_id: str) -> ApiRequest:
     return _req(OP_APP_OWNERS, f"/applications/{_guid(app_id)}/owners?$select=id,displayName")
+
+
+def application_credentials_request(app_id: str) -> ApiRequest:
+    return _req(OP_APPLICATION, f"/applications/{_guid(app_id)}?$select={CREDENTIAL_SELECT}")
+
+
+def sp_credentials_request(sp_id: str) -> ApiRequest:
+    return _req(
+        OP_SERVICE_PRINCIPAL, f"/servicePrincipals/{_guid(sp_id)}?$select={CREDENTIAL_SELECT}"
+    )
 
 
 def sp_app_role_assignments_request(sp_id: str) -> ApiRequest:
@@ -288,6 +324,58 @@ def parse_member_of(
         except ParseError:
             errors.append("bad-item")
     return errors
+
+
+def _opt_str(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def parse_credentials(
+    b: SnapshotBuilder, owner: str, body: dict[str, Any], prov: Provenance
+) -> tuple[int, list[str]]:
+    """Add key/password credential **metadata** of one object. Returns (count, errors).
+
+    Reads only :data:`CREDENTIAL_KEY_FIELDS` and :data:`CREDENTIAL_PASSWORD_FIELDS`:
+    ``key``, ``customKeyIdentifier``, ``hint`` and ``secretText`` are never read, so
+    no value can reach the snapshot whatever the response holds.
+    """
+    if _guid(body.get("id")) != _guid(owner):
+        raise ParseError("credential response is for another object")
+    count = 0
+    errors: list[str] = []
+    for kind, prop, fields in (
+        ("key", "keyCredentials", CREDENTIAL_KEY_FIELDS),
+        ("password", "passwordCredentials", CREDENTIAL_PASSWORD_FIELDS),
+    ):
+        rows = body.get(prop)
+        if rows is None:
+            errors.append(f"no-{prop}")
+            continue
+        if not isinstance(rows, list):
+            raise ParseError(f"{prop} must be a list")
+        for row in rows:
+            if not isinstance(row, dict):
+                errors.append("bad-item")
+                continue
+            meta = {f: row.get(f) for f in fields}
+            try:
+                b.credential(
+                    {
+                        "owner": owner,
+                        "kind": kind,
+                        "key_id": _guid(meta["keyId"]),
+                        "display_name": _opt_str(meta["displayName"]),
+                        "key_type": _opt_str(meta.get("type")),
+                        "usage": _opt_str(meta.get("usage")),
+                        "start": _opt_str(meta["startDateTime"]),
+                        "end": _opt_str(meta["endDateTime"]),
+                    },
+                    prov,
+                )
+                count += 1
+            except (ParseError, ValueError):
+                errors.append("bad-item")
+    return count, errors
 
 
 def parse_app_role_assignments(

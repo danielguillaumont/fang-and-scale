@@ -13,6 +13,12 @@ Per-object Graph calls (owners, app role assignments, memberships) are made
 only for tenant-owned service principals and managed identities, so a tenant
 with hundreds of Microsoft first-party service principals stays within budget.
 
+Credential metadata (``graph.credentials``) runs only when the scope lists the
+per-object reads in ``graph.CREDENTIAL_OPERATIONS``; it reads every application
+and the in-scope service principals, and keeps metadata only (never a value).
+The ``app-credentials`` surface closes only when both reads are allowed, every
+request succeeded and no service principal was left out.
+
 PIM eligibility (M3 E1) runs only when the scope allows its reads. The surface
 ``pim-eligibility`` then ends in one of three states:
 
@@ -56,6 +62,8 @@ MAX_BACKOFF_SECONDS: Final = 60.0
 KV_ACCESS_POLICIES: Final = "key-vault-access-policies"
 PIM_ELIGIBILITY: Final = "pim-eligibility"
 PIM_COLLECTOR: Final = "pim.eligibility"
+APP_CREDENTIALS: Final = "app-credentials"
+CREDENTIALS_COLLECTOR: Final = "graph.credentials"
 NOT_COLLECTED: Final = (
     NotCollected(surface=PIM_ELIGIBILITY, reason="eligible assignments not collected in M1"),
     NotCollected(surface="conditional-access", reason="not collected in M1"),
@@ -64,7 +72,7 @@ NOT_COLLECTED: Final = (
         reason="vault access policies (non-RBAC) not collected in M1",
     ),
     NotCollected(
-        surface="app-credentials", reason="key/password credential metadata not collected in M1"
+        surface=APP_CREDENTIALS, reason="key/password credential metadata not collected in M1"
     ),
     NotCollected(surface="federated-identity-credentials", reason="not collected in M1"),
     NotCollected(
@@ -434,6 +442,14 @@ class Collector:
             self._attempt(t, app_owners)
         t.ended = self.clock.monotonic()
 
+        cred_ops = allowed & set(graph.CREDENTIAL_OPERATIONS)
+        if cred_ops:
+            t = collector(CREDENTIALS_COLLECTOR, sps_t, apps_t)
+            gap = self._credentials(b, t, cred_ops, app_ids, in_scope_sps, len(sp_rows))
+            not_collected = [n for n in not_collected if n.surface != APP_CREDENTIALS]
+            if gap is not None:
+                not_collected.append(gap)
+
         t = collector("graph.app-role-assignments", sps_t)
         for sp in in_scope_sps:
 
@@ -494,6 +510,50 @@ class Collector:
             collector_version=f"fns {__version__}",
             coverage=coverage,
         )
+
+    # -- credential metadata -------------------------------------------------------------
+
+    def _credentials(
+        self,
+        b: SnapshotBuilder,
+        t: _Tally,
+        ops: set[str],
+        app_ids: list[str],
+        sps: list[str],
+        listed_sps: int,
+    ) -> NotCollected | None:
+        """Collect key/password metadata. None means the surface is closed."""
+        targets: list[tuple[str, Callable[[str], ApiRequest]]] = []
+        if graph.OP_APPLICATION in ops:
+            targets.extend((a, graph.application_credentials_request) for a in app_ids)
+        if graph.OP_SERVICE_PRINCIPAL in ops:
+            targets.extend((sp, graph.sp_credentials_request) for sp in sps)
+        for oid, make in targets:
+
+            def read(oid: str = oid, make: Callable[[str], ApiRequest] = make) -> int:
+                req = make(oid)
+                resp = self._exchange(req, None)
+                count, errs = graph.parse_credentials(b, oid, resp.body, self._prov(req, resp))
+                t.errors.update(errs)
+                return count
+
+            self._attempt(t, read)
+        t.ended = self.clock.monotonic()
+
+        why = [
+            f"{op.removeprefix('graph:')} is not in the scope"
+            for op in graph.CREDENTIAL_OPERATIONS
+            if op not in ops
+        ]
+        run = t.run()
+        if run.status != "complete":
+            why.append(f"collector {t.name} is {run.status}")
+        skipped = listed_sps - len(sps)
+        if graph.OP_SERVICE_PRINCIPAL in ops and skipped > 0:
+            why.append(f"{skipped} service principal(s) of other tenants' applications not read")
+        if not why:
+            return None
+        return NotCollected(surface=APP_CREDENTIALS, reason="metadata only; " + "; ".join(why))
 
     # -- PIM eligibility (M3 E1) -----------------------------------------------------------
 

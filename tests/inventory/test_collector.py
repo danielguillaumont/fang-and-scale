@@ -291,7 +291,12 @@ def test_request_catalogue_matches_demo_scope() -> None:
     assert ops == set(arm.ARM_OPERATIONS) | set(graph.GRAPH_OPERATIONS)
 
 
-@pytest.mark.parametrize("op", sorted(set(arm.ARM_OPERATIONS) | set(graph.GRAPH_OPERATIONS)))
+@pytest.mark.parametrize(
+    "op",
+    sorted(
+        set(arm.ARM_OPERATIONS) | set(graph.GRAPH_OPERATIONS) | set(graph.CREDENTIAL_OPERATIONS)
+    ),
+)
 def test_catalogue_is_read_only(op: str) -> None:
     from fns.models.operations import parse_operation
 

@@ -8,7 +8,8 @@ order never changes the snapshot:
   stubs inferred from a principal type); ties break on canonical JSON;
 - edges: identical identity keys collapse to the canonically smallest;
 - edges whose endpoints were never collected are dropped and reported in
-  coverage instead of failing the snapshot.
+  coverage instead of failing the snapshot;
+- credentials (metadata only) collapse on (owner, kind, keyId) like edges.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from typing import Any, Final
 from pydantic import TypeAdapter
 
 from fns.models.snapshot import (
+    Credential,
     Edge,
     Entity,
     EntityType,
@@ -40,6 +42,7 @@ class SnapshotBuilder:
         self._entities: dict[str, tuple[int, str, Entity]] = {}
         self._edges: dict[tuple[str, ...], tuple[str, Edge]] = {}
         self._annotations: dict[str, dict[str, Any]] = {}
+        self._credentials: dict[tuple[str, ...], tuple[str, Credential]] = {}
 
     def entity(
         self,
@@ -79,6 +82,14 @@ class SnapshotBuilder:
         if cur is None or text < cur[0]:
             self._edges[key] = (text, edge)
 
+    def credential(self, data: dict[str, Any], provenance: Provenance) -> None:
+        cred = Credential.model_validate({**data, "provenance": provenance})
+        key = cred.sort_key()
+        text = cred.canonical_json(for_digest=True)
+        cur = self._credentials.get(key)
+        if cur is None or text < cur[0]:
+            self._credentials[key] = (text, cred)
+
     def _annotated(self, entity: Entity) -> Entity:
         extra = self._annotations.get(entity.id)
         if not extra:
@@ -108,6 +119,17 @@ class SnapshotBuilder:
             else:
                 dropped += 1
         not_collected = list(coverage.not_collected)
+        creds = [c for _, c in self._credentials.values() if c.owner in known]
+        if len(creds) < len(self._credentials):
+            not_collected.append(
+                NotCollected(
+                    surface="app-credentials",
+                    reason=(
+                        f"{len(self._credentials) - len(creds)} credential(s) dropped: "
+                        "the owner was not collected"
+                    ),
+                )
+            )
         if dropped:
             not_collected.append(
                 NotCollected(
@@ -124,6 +146,7 @@ class SnapshotBuilder:
                 "collector_version": collector_version,
                 "entities": [self._annotated(e) for _, _, e in self._entities.values()],
                 "edges": edges,
+                "credentials": creds,
                 "coverage": SnapshotCoverage(
                     collectors=coverage.collectors,
                     not_collected=tuple(not_collected),

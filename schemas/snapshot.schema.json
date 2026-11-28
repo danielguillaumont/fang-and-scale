@@ -87,6 +87,109 @@
       "title": "Contains",
       "type": "object"
     },
+    "Credential": {
+      "additionalProperties": false,
+      "description": "Metadata of one key or password credential on an application or service principal.\n\nNever a value: Graph's ``key`` (certificate data), ``customKeyIdentifier``\n(thumbprint), ``hint`` (the first three characters of a password) and\n``secretText`` have no field here, and ``extra=\"forbid\"`` rejects them.",
+      "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        },
+        "key_id": {
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "key_type": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "``keyCredential.type``, e.g. ``AsymmetricX509Cert``; None for passwords.",
+          "title": "Key Type"
+        },
+        "kind": {
+          "enum": [
+            "key",
+            "password"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "owner": {
+          "description": "Object ID of the application or service principal that holds the credential.",
+          "minLength": 1,
+          "title": "Owner",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "``keyCredential.usage`` (``Verify`` or ``Sign``); None for passwords.",
+          "title": "Usage"
+        }
+      },
+      "required": [
+        "owner",
+        "kind",
+        "key_id",
+        "provenance"
+      ],
+      "title": "Credential",
+      "type": "object"
+    },
     "DenyAssignment": {
       "additionalProperties": false,
       "description": "principal (or the all-zeros Everyone principal) -> scope entity.",
@@ -813,6 +916,15 @@
         "not_applicable": [],
         "not_collected": []
       }
+    },
+    "credentials": {
+      "default": [],
+      "description": "Key and password credential metadata (collected only when the scope allows the\nper-object reads; see ``graph.CREDENTIAL_OPERATIONS``).",
+      "items": {
+        "$ref": "#/$defs/Credential"
+      },
+      "title": "Credentials",
+      "type": "array"
     },
     "edges": {
       "default": [],
