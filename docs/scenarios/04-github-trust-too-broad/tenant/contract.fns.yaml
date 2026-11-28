@@ -1,0 +1,16 @@
+# Scenario gallery contract (FIXTURE). `fns demo contain` evaluates it.
+version: 1
+contract: deployer-blast-radius
+assume_compromised: sp:sp-deployer
+
+must_not_reach:
+  - resource: kv-crown
+    operations: [secrets/get]
+must_still_do:
+  - resource: kv-deploy
+    operations: [secrets/get]
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 2
+on_inconclusive: fail

@@ -1,0 +1,17 @@
+$ uv run fns demo contain --fixture docs/scenarios/01-owner-of-privileged-app/fixed
+FIXTURE Replaying fixture 'docs/scenarios/01-owner-of-privileged-app/fixed'; no network calls are made.
+FIXTURE contract report-agent-blast-radius  compromised sp-report-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:a6b66be5a233dbb466bc02c856ac7c8656d4990f7f47b184fd1c85a449c5a3ea  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: not-assessed=1
+FIXTURE Findings
+FIXTURE   inconclusive not-reach -        not-assessed  kv-crown secrets/get
+FIXTURE Inconclusive
+FIXTURE   resource:kv-crown secrets/get: not reachable in the collected model, but it is incomplete
+FIXTURE       key-vault-access-policies not collected: vault access policies (non-RBAC) not collected in M1
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE critical reachable: 0/0 max  must_still_do failed: 0  inconclusive: 1/1 max (on_inconclusive: fail)
+FIXTURE contract WITHIN BUDGET (exit 0)
+FIXTURE report sha256:74d3fe5df0cd8db694d696973e143d5124615ee676726578f9a96cc945b83416
+FIXTURE wrote <report>.FIXTURE.json
+(exit 0)

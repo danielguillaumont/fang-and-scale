@@ -1,0 +1,16 @@
+# Scenario gallery contract (FIXTURE). `fns demo contain` evaluates it.
+version: 1
+contract: batch-agent-blast-radius
+assume_compromised: sp:sp-batch-agent
+
+must_not_reach:
+  - resource: kv-crown
+    operations: [secrets/get, secrets/list]
+must_still_do:
+  - resource: stbatch
+    operations: [blob/write]
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 3
+on_inconclusive: fail

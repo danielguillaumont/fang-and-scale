@@ -1,0 +1,33 @@
+$ uv run fns demo contain --fixture docs/scenarios/02-contributor-key-vault-flip/tenant
+FIXTURE Replaying fixture 'docs/scenarios/02-contributor-key-vault-flip/tenant'; no network calls are made.
+FIXTURE contract batch-agent-blast-radius  compromised sp-batch-agent 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:db9950b8fcef0f3410be169df524d244101035eaa01caaff21500daec571e9ea  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=3
+FIXTURE Findings
+FIXTURE   fail         not-reach modeled  modeled-only  kv-crown secrets/get
+FIXTURE   fail         not-reach modeled  modeled-only  kv-crown secrets/list
+FIXTURE   inconclusive still-do  modeled  modeled-only  stbatch blob/write
+FIXTURE Escalation paths
+FIXTURE FAIL resource:kv-crown secrets/get  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-batch-agent is compromised
+FIXTURE   2. [snapshot] sp-batch-agent has Contributor at resource group rg-app
+FIXTURE        from hasRbacRole: sp-batch-agent -> /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-app [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   3. [kv-control-to-data] Contributor allows Microsoft.KeyVault/vaults/write on kv-crown (secrets/get)
+FIXTURE      assumes: vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe
+FIXTURE FAIL resource:kv-crown secrets/list  modeled / modeled-only
+FIXTURE   1. [assume-compromised] assume sp-batch-agent is compromised
+FIXTURE   2. [snapshot] sp-batch-agent has Contributor at resource group rg-app
+FIXTURE        from hasRbacRole: sp-batch-agent -> /subscriptions/00000000-0000-4000-8000-000000000010/resourcegroups/rg-app [arm:Microsoft.Authorization/roleAssignments/read]
+FIXTURE   3. [kv-control-to-data] Contributor allows Microsoft.KeyVault/vaults/write on kv-crown (secrets/list)
+FIXTURE      assumes: vaults/write can switch the vault to access-policy mode or add an access policy; whether newer API versions also demand roleAssignments/write for the switch is an M3 probe
+FIXTURE Inconclusive
+FIXTURE   resource:stbatch blob/write: allowed in the model; needs an observed success (M3)
+FIXTURE       1 path(s); shortest: assume-compromised -> listkeys-data
+FIXTURE       allowSharedKeyAccess was not collected; assumes Azure's default (shared key allowed)
+FIXTURE       the account key grants full data-plane access
+FIXTURE critical reachable: 2/0 max  must_still_do failed: 0  inconclusive: 1/3 max (on_inconclusive: fail)
+FIXTURE contract FAILED (exit 1)
+FIXTURE report sha256:81330715f0c5afa804fe83b5d14dc12593500a95d30cf251d0c124392db186c3
+FIXTURE wrote <report>.FIXTURE.json
+(exit 1)

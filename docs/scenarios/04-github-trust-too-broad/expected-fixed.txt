@@ -1,0 +1,26 @@
+$ uv run fns demo contain --fixture docs/scenarios/04-github-trust-too-broad/fixed
+FIXTURE Replaying fixture 'docs/scenarios/04-github-trust-too-broad/fixed'; no network calls are made.
+FIXTURE contract deployer-blast-radius  compromised sp-deployer 00000000-0000-4000-8000-000000000100
+FIXTURE snapshot sha256:5aa2ad2e2f04d1db77190c79b7ff4fca68471879aad5a97159bb5fe46ba042d7  FIXTURE  semantics v2
+FIXTURE evidence: rung 1 (modeled) only; nothing here was observed
+FIXTURE coverage: modeled-only=1  not-assessed=1
+FIXTURE Findings
+FIXTURE   inconclusive not-reach -        not-assessed  kv-crown secrets/get
+FIXTURE   inconclusive still-do  modeled  modeled-only  kv-deploy secrets/get
+FIXTURE Inconclusive
+FIXTURE   resource:kv-crown secrets/get: not reachable in the collected model, but it is incomplete
+FIXTURE       key-vault-access-policies not collected: vault access policies (non-RBAC) not collected in M1
+FIXTURE       pim-eligibility not collected: eligible assignments not collected in M1
+FIXTURE   resource:kv-deploy secrets/get: allowed in the model; needs an observed success (M3)
+FIXTURE       1 path(s); shortest: assume-compromised -> rbac-data-action
+FIXTURE       the vault's permission model was not collected; assumes either
+FIXTURE       data actions apply only to vaults in RBAC mode
+FIXTURE Front doors (outside parties that can sign in as an identity above; modeled, not validated live)
+FIXTURE   medium   sp-deployer: any job in contoso/billing that references environment production
+FIXTURE            credential github-1, github-environment
+FIXTURE            environment protection rules (reviewers, branch filters) decide who; they are GitHub configuration the snapshot does not hold
+FIXTURE critical reachable: 0/0 max  must_still_do failed: 0  inconclusive: 2/2 max (on_inconclusive: fail)
+FIXTURE contract WITHIN BUDGET (exit 0)
+FIXTURE report sha256:fd59382a19f1b3128ff008938a3b6efc863e6dd02b8fe23e598127919f95fd64
+FIXTURE wrote <report>.FIXTURE.json
+(exit 0)

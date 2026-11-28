@@ -1,0 +1,13 @@
+# Scenario gallery contract (FIXTURE). `fns demo contain` evaluates it.
+version: 1
+contract: report-agent-blast-radius
+assume_compromised: sp:sp-report-agent
+
+must_not_reach:
+  - resource: kv-crown
+    operations: [secrets/get]
+
+budget:
+  max_critical_reachable: 0
+  max_inconclusive: 1
+on_inconclusive: fail
