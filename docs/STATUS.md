@@ -1,12 +1,30 @@
 # Status
 
+## v0.1.0 is released (2026-11-27)
+
+Daniel tagged `v0.1.0` on #86's merge commit (`0ddfa34`) and published the
+release. The GitHub release shows 2026-11-28 01:26 UTC. Its build provenance
+attestations verify. `CHANGELOG.md` has a new, empty "Unreleased" section, and
+#87 (DECISIONS only) is the first entry in it.
+
+### Front-page session (2026-11-27)
+
+Same hard rules: no Azure, no tags, PRs with required CI, STATUS current.
+
+| # | Item | State | PR |
+| --- | --- | --- | --- |
+| 1 | Post-release housekeeping: "Unreleased" with #87, STATUS | in review | this PR |
+| 2 | CI: install the built wheel in a clean venv and run `fns demo contain --bundled` | to do | |
+| 3 | README rework, with generated demo output and a sample FIXTURE report | to do | |
+| 4 | `docs/social-preview.png` (1280x640) | to do | |
+
 ## Owner-decision session (2026-11-27)
 
 Working through Daniel's decisions of 2026-11-27, one focused PR per item. Same
 hard rules as before: no Azure, Graph or Log Analytics call, no `az`, Terraform
 only as `poe lab-check`, fixtures and mocked transports only. CI (three checks)
-is required on `main`. **Nothing is tagged or published.** Stopped here, as
-asked.
+is required on `main`. Nothing was tagged in this session; Daniel tagged and
+published v0.1.0 afterwards (above).
 
 ### Queue
 
@@ -66,41 +84,6 @@ First batch:
 
 - ~~Two rows pending review in DECISIONS~~: how D-6 and D-7 are built (#84) and
   how the named inconclusive budget is built (#85). **Both approved 2026-11-27.**
-- **Tag and publish v0.1.0** (nothing is tagged or published). The tag goes on
-  the merge commit of #86, the last PR of this session, which is `main` as it is
-  now. These commands work in PowerShell and in bash:
-
-  ```
-  git switch main
-  git pull --ff-only
-  git log -1 --format="%H %s"
-  uv run poe release-check
-  git tag v0.1.0
-  git push origin v0.1.0
-  gh run list --workflow release.yml --limit 1
-  gh run watch <run id from the line above> --exit-status
-  gh release view v0.1.0
-  gh release download v0.1.0 --dir v0.1.0-files
-  gh attestation verify v0.1.0-files/fang_and_scale-0.1.0-py3-none-any.whl --repo danielguillaumont/fang-and-scale
-  gh release edit v0.1.0 --draft=false
-  ```
-
-  - `git log -1` must print `Merge pull request #86 from
-    danielguillaumont/docs/fold-0.1.0`. If it prints something newer, stop and
-    tell me: the changelog may need that change folded in too.
-  - `release-check` must print `release check: ok` before you tag.
-  - A tag runs the `release.yml` of the commit it names, so v0.1.0 uses #83's
-    split: only the `attest` job can mint the signing token.
-  - The workflow runs the full check, builds, writes the SBOM and
-    `SHA256SUMS`, attests every file and creates a **draft**. `gh run watch`
-    exits non-zero if any step fails. If it does, delete nothing: tell me, and
-    the fix goes in a new PR and a new patch version.
-  - `gh release view` lists the draft's files: the wheel, the sdist,
-    `sbom.cdx.json` and `SHA256SUMS`.
-  - `gh attestation verify` must show the file was built by `release.yml` at
-    `refs/tags/v0.1.0`. Run it for any other file the same way.
-  - The last line publishes the draft. You can do the same in the GitHub UI
-    instead.
 - **M4 sessions A to D** have still not run live: `docs/runbooks/m4-live-run.md`.
   Session D now runs D-1 to D-7.
 
