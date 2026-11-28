@@ -14,7 +14,7 @@ as `poe lab-check`, fixtures and mocked transports only, PRs with required CI.
 
 | # | Item | State | PR |
 | --- | --- | --- | --- |
-| 1 | Mark the four front-page rows approved; the wheel check is required | done | this PR |
+| 1 | Mark the four front-page rows approved; the wheel check is required | done | #91 |
 | 2a | `docs/runbooks/m4-preflight.md`: the checklist before session A | queued | |
 | 2b | Cross-check `m4-live-run.md` against the code, fix drift with tests | queued | |
 | 2c | Split the runbook into per-session copy-paste blocks with "expect" lines | queued | |
