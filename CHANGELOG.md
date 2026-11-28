@@ -11,6 +11,16 @@ version may change file formats; each change is listed here.
 
 - `docs/DECISIONS.md`: the build choices for D-6/D-7 and for the named
   inconclusive budget are approved (#87). Docs only.
+- The README is a front page now (#90): why, the loop, real output of
+  `fns demo contain --bundled`, what ran live, the evidence ladder, a sample
+  report, installing and verifying the release, and the safety model. The long
+  detail moved to `docs/GUIDE.md`.
+
+### Fixed
+
+- `fns prove --help` and `fns demo prove --help`: `--after-strike` no longer says
+  a strike result can never pass a finding. Since option B, a LIVE 403 on the
+  item's exact operation and object counts like a probe denial (#90).
 
 ### Added
 
@@ -18,6 +28,10 @@ version may change file formats; each change is listed here.
   in a clean venv outside the checkout, and runs `fns demo contain --bundled`,
   which must exit 1 (the demo contract fails on purpose) with every line
   labelled `FIXTURE`. A wheel that leaves out a package file fails it.
+- `docs/sample-report/`: `fns demo report` on the recorded M3 lab run (FIXTURE)
+  and a screenshot of it, and `docs/social-preview.png` (1280x640) (#90).
+  `scripts/render_images.py` regenerates them and the README's demo block; a
+  test fails if the report or the demo block drifts.
 
 ## [0.1.0] - 2026-11-27
 

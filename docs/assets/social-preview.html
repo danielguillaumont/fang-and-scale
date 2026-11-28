@@ -1,0 +1,66 @@
+<!doctype html>
+<!-- Source of docs/social-preview.png (1280x640). Regenerate: uv run python scripts/render_images.py -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fang &amp; Scale social preview</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #18202a;
+    --line: #2c3a4a;
+    --text: #e8edf2;
+    --muted: #9fb0c0;
+    --accent: #e0a14a;
+    --ok: #7cc67c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: radial-gradient(1200px 500px at 85% -10%, #1d2a38 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    padding: 64px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .brand { font-size: 22px; letter-spacing: 0.32em; font-weight: 700; color: var(--accent); }
+  h1 { font-size: 92px; line-height: 1; font-weight: 800; margin-top: 18px; letter-spacing: -0.01em; }
+  .tagline { font-size: 38px; color: var(--text); margin-top: 18px; font-weight: 600; }
+  .sub { font-size: 25px; color: var(--muted); margin-top: 10px; }
+  .loop { display: flex; align-items: center; margin-top: 58px; }
+  .step {
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 20px;
+    min-width: 172px;
+    text-align: center;
+  }
+  .step b { display: block; font-family: "Cascadia Code", Consolas, "SFMono-Regular", monospace; font-size: 27px; color: var(--accent); }
+  .step span { display: block; font-size: 18px; color: var(--muted); margin-top: 4px; }
+  .arrow { font-size: 34px; color: var(--muted); padding: 0 12px; }
+  .back { font-size: 19px; color: var(--muted); margin-top: 14px; margin-left: 4px; }
+  .back em { color: var(--ok); font-style: normal; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="brand">OPEN SOURCE &middot; APACHE-2.0 &middot; PYTHON 3.12</div>
+  <h1>Fang &amp; Scale</h1>
+  <div class="tagline">Unit tests for breach blast radius</div>
+  <div class="sub">for workload and agent identities in Microsoft Entra and Azure</div>
+  <div class="loop">
+    <div class="step"><b>scout</b><span>read-only snapshot</span></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><b>contain</b><span>model the reach</span></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><b>prove</b><span>signed evidence</span></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><b>strike</b><span>lab-only attempts</span></div>
+    <div class="arrow">&rarr;</div>
+    <div class="step"><b>harden</b><span>smallest fix</span></div>
+  </div>
+  <div class="back">&#8634; then prove the fix again, and fail CI if it regresses. <em>Unproven is inconclusive, never a pass.</em></div>
+</body>
+</html>

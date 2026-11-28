@@ -20,7 +20,7 @@ Or with [uv](https://docs.astral.sh/uv/):
 uv tool install --python 3.12 "git+https://github.com/danielguillaumont/fang-and-scale@v0.1.0"
 ```
 
-Until the `v0.1.0` tag exists, use `@main` instead. Then, in any empty directory:
+Then, in any empty directory:
 
 ```
 fns --version                     # fns 0.1.0
