@@ -216,6 +216,10 @@ class Closure:
         self.index = index
         self.compromised = compromised
         self.derivations: dict[Fact, Derivation] = {}
+        self._of_kind: dict[FactKind, list[Fact]] = {}
+        self._of_principal: dict[tuple[FactKind, str], list[Fact]] = {}
+        """Indexes over ``derivations``, kept in step by ``_add`` (the only writer), so
+        the queries below need not scan every fact (docs/PERFORMANCE.md)."""
         self.uncertain: set[str] = set()
         """Things that could add reach but the model cannot decide (conditions,
         missing role definitions, unresolved app role IDs)."""
@@ -278,12 +282,10 @@ class Closure:
         return fact in self.derivations
 
     def controlled(self) -> list[str]:
-        return sorted(f.principal for f in self.derivations if f.kind == "controls")
+        return sorted(f.principal for f in self._of_kind.get("controls", ()))
 
     def effective(self, principal: str) -> frozenset[str]:
-        groups = {
-            f.args[0] for f in self.derivations if f.kind == "member" and f.principal == principal
-        }
+        groups = {f.args[0] for f in self._of_principal.get(("member", principal), ())}
         return frozenset({principal, *groups})
 
     def membership(self, principal: str, holder: str) -> tuple[Fact, ...]:
@@ -293,12 +295,10 @@ class Closure:
         return (Fact("member", principal, (holder,)),)
 
     def facts_of(self, kind: FactKind, principals: frozenset[str]) -> list[Fact]:
-        return sorted(f for f in self.derivations if f.kind == kind and f.principal in principals)
+        return sorted(f for p in principals for f in self._of_principal.get((kind, p), ()))
 
     def app_perms(self, principal: str) -> set[str]:
-        return {
-            f.args[0] for f in self.derivations if f.kind == "app-perm" and f.principal == principal
-        }
+        return {f.args[0] for f in self._of_principal.get(("app-perm", principal), ())}
 
     def role(self, grant: Fact) -> rbac.RoleDefinition | None:
         role_id = grant.args[1]
@@ -309,7 +309,10 @@ class Closure:
     # -- seeding -----------------------------------------------------------
 
     def _add(self, c: _Candidate, depth: int) -> None:
-        self.derivations[c.fact] = Derivation(c.fact, c.rule, c.premises, c.sources, c.text, depth)
+        f = c.fact
+        self.derivations[f] = Derivation(f, c.rule, c.premises, c.sources, c.text, depth)
+        self._of_kind.setdefault(f.kind, []).append(f)
+        self._of_principal.setdefault((f.kind, f.principal), []).append(f)
 
     def _seed(self) -> None:
         ix = self.index

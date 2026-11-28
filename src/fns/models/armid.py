@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Literal
+from typing import Final, Literal
 
 ArmLevel = Literal["tenant", "managementGroup", "subscription", "resourceGroup", "resource"]
 
@@ -32,6 +32,19 @@ _SEGMENT_RE = re.compile(r"^[A-Za-z0-9_\-.()$~]+$")
 _NAMESPACE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)+$")
 _TYPE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 _MAX_LEN = 2048
+
+ASCII_WHITESPACE: Final = "".join(chr(i) for i in range(128) if chr(i).isspace())
+r"""Every ASCII character ``str.isspace`` accepts, ``\x1c`` to ``\x1f`` included."""
+
+
+def has_ascii_whitespace(value: str) -> bool:
+    """``any(c.isspace() for c in value)`` for an ASCII ``value``, as C substring scans.
+
+    Same answer on ASCII input (``tests/models/test_armid_whitespace.py``); about
+    a tenth of scout replay's parsing time at 10,000 service principals
+    (``docs/PERFORMANCE.md``). Callers check ``isascii()`` first.
+    """
+    return any(ch in value for ch in ASCII_WHITESPACE)
 
 
 class ArmIdError(ValueError):
@@ -131,7 +144,7 @@ def parse_arm_id(value: object) -> ArmPath:
         raise ArmIdError("ARM ID must be a string")
     if not value or len(value) > _MAX_LEN:
         raise ArmIdError("ARM ID is empty or too long")
-    if not value.isascii() or any(c.isspace() for c in value) or "%" in value:
+    if not value.isascii() or has_ascii_whitespace(value) or "%" in value:
         raise ArmIdError("ARM ID contains non-ASCII, whitespace or percent-encoding")
     if not value.startswith("/") or value.endswith("/"):
         raise ArmIdError("ARM ID must start with '/' and must not end with '/'")

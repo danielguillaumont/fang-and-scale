@@ -665,10 +665,14 @@ def evaluate(contract: Contract, snapshot: Snapshot) -> Evaluation:
 def _front_doors(closure: Closure) -> tuple[FrontDoor, ...]:
     """Federated credentials an outside party can satisfy, on every controlled identity."""
     ix = closure.index
+    instances: dict[str, list[str]] = {}
+    for e in ix.snapshot.edges:
+        if e.type == "instanceOf":
+            instances.setdefault(e.src, []).append(e.dst)
     out: dict[tuple[str, str], FrontDoor] = {}
     for p in closure.controlled():
         apps = [p] if ix.type_of(p) == "application" else []
-        apps += [e.dst for e in ix.snapshot.edges if e.type == "instanceOf" and e.src == p]
+        apps += instances.get(p, [])
         for app in apps:
             for fic, trust in ix.fics_of.get(app, ()):
                 if trust.kind == "entra-principal":
