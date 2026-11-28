@@ -462,21 +462,6 @@ def test_no_json_array_is_counted_inside_a_subexpression() -> None:
     assert not re.search(r"@\(az [^\n]*\| ConvertFrom-Json\)", TEXT)
 
 
-def test_the_scope_is_checked_each_session_and_renewed_alone() -> None:
-    variables = (ROOT / "lab" / "variables.tf").read_text(encoding="utf-8")
-    days = re.search(r'variable "scope_valid_days" \{.*?default\s+=\s+(\d+)', variables, re.S)
-    assert days is not None
-    start = _section("## Start of every session")
-    assert "uv run fns scope check scope.lab.yaml" in start
-    assert f"valid for {days[1]} days from A2" in _flat(start)
-    renew = _section("### Renew the scope")
-    assert 'terraform -chdir=lab apply "-replace=time_offset.scope_expiry"' in renew
-    assert "**2 to add, 0 to change, 2 to destroy**" in _flat(renew)
-    assert "Never between a strike plan and its run" in _flat(renew)
-    scope_tf = (ROOT / "lab" / "scope.tf").read_text(encoding="utf-8")
-    assert '"-replace=time_offset.scope_expiry"' in scope_tf
-
-
 def _locals_list(name: str) -> list[str]:
     text = (ROOT / "lab" / "scope.tf").read_text(encoding="utf-8")
     m = re.search(rf"^  {name} = \[\n(.*?)^  \]", text, re.M | re.S)
@@ -588,3 +573,95 @@ def test_emergency_cleanup_works_from_a_new_window() -> None:
 def test_report_back_asks_for_ids_to_be_replaced() -> None:
     report = _session("Report back")
     assert "Replace every GUID" in report and "m4-preflight.md" in report
+
+
+# --- per-session copy-paste blocks ----------------------------------------------------
+
+BLOCK_HEADING = re.compile(r"^#### ([A-DTE])(\d+)([a-z]?)\b(.*)$", re.M)
+FENCE = re.compile(r"```powershell\n(.*?)```\n", re.S)
+SESSION_ORDER = "ABCDTE"  # sessions A to D, Teardown, Emergency cleanup
+
+
+def _blocks() -> list[tuple[str, str, str]]:
+    """``(id, heading text after the id, code)`` for every PowerShell block, in order."""
+    out = []
+    for m in FENCE.finditer(TEXT):
+        heads = list(BLOCK_HEADING.finditer(TEXT, 0, m.start()))
+        assert heads, TEXT[m.start() : m.start() + 80]
+        h = heads[-1]
+        assert "```powershell" not in TEXT[h.end() : m.start()], f"{h[0]}: two blocks"
+        out.append((f"{h[1]}{h[2]}{h[3]}", h[4], m[1]))
+    return out
+
+
+def test_every_block_has_one_id_and_an_expect_line_after_it() -> None:
+    ids = [i for i, _, _ in _blocks()]
+    assert len(ids) == len(BLOCKS)
+    assert len(ids) == len(set(ids)), sorted(i for i in ids if ids.count(i) > 1)
+    for m in FENCE.finditer(TEXT):
+        after = TEXT[m.end() :].lstrip("\n")
+        assert after.startswith("**Expect"), TEXT[m.start() : m.start() + 80]
+
+
+def test_block_ids_run_in_order() -> None:
+    keys = []
+    for m in BLOCK_HEADING.finditer(TEXT):
+        keys.append((SESSION_ORDER.index(m[1]), int(m[2]), m[3]))
+    assert keys == sorted(keys), keys
+
+
+def test_blocks_that_prompt_are_marked_alone_and_hold_one_line() -> None:
+    for block_id, heading, code in _blocks():
+        lines = [_code(ln) for ln in code.splitlines() if _code(ln)]
+        prompts = any(PROMPTS.search(ln) or ln.startswith("az login --tenant") for ln in lines)
+        assert prompts == ("· alone" in heading), block_id
+        if prompts:
+            assert len(lines) == 1, block_id
+
+
+def test_each_session_starts_with_the_same_blocks() -> None:
+    code = {i: c for i, _, c in _blocks()}
+    assert code["A0a"].strip() == "az login --tenant <TENANT_ID>"
+    for s in "BCD":
+        assert code[f"{s}0a"] == code["A0a"]
+        assert code[f"{s}0b"] == code["B0b"] and code[f"{s}0c"] == code["B0c"]
+    assert code["B0b"].startswith(code["A0b"])  # B to D also read the lab's outputs
+    last = [_code(ln) for ln in code["B0b"].splitlines() if _code(ln)][-1]
+    assert last == "uv run fns scope check scope.lab.yaml"
+
+
+def test_the_scope_is_checked_each_session_and_renewed_alone() -> None:
+    variables = (ROOT / "lab" / "variables.tf").read_text(encoding="utf-8")
+    days = re.search(r'variable "scope_valid_days" \{.*?default\s+=\s+(\d+)', variables, re.S)
+    assert days is not None
+    start = _flat(_section("## Start of every session"))
+    assert f"valid for {days[1]} days from A2" in start
+    assert "Never run 0c between a strike plan and its run" in start
+    code = {i: c for i, _, c in _blocks()}
+    for s in "BCD":
+        assert "uv run fns scope check scope.lab.yaml" in code[f"{s}0b"]
+        assert code[f"{s}0c"].strip() == (
+            'terraform -chdir=lab apply "-replace=time_offset.scope_expiry"'
+        )
+    renew = _flat(_section("#### B0c"))
+    assert "**2 to add, 0 to change, 2 to destroy**" in renew
+    scope_tf = (ROOT / "lab" / "scope.tf").read_text(encoding="utf-8")
+    assert '"-replace=time_offset.scope_expiry"' in scope_tf
+
+
+def test_each_session_ends_with_what_to_paste_back() -> None:
+    for heading in (
+        "### A5. Paste back",
+        "### B5. Paste back",
+        "### C7. Paste back",
+        "### D9. Paste back",
+    ):
+        assert heading in TEXT, heading
+    report = _session("Report back")
+    for anchor in (
+        "#a5-paste-back-session-a",
+        "#b5-paste-back-session-b",
+        "#c7-paste-back-session-c",
+        "#d9-paste-back-session-d",
+    ):
+        assert anchor in report, anchor

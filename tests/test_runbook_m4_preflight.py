@@ -75,3 +75,16 @@ def test_stop_and_emergency_triggers_match_the_runbook() -> None:
         assert trigger in PREFLIGHT, trigger
     for word in ("`verify FAIL`", "`needs-emergency-cleanup`", "`unexpected-success`"):
         assert word in runbook, word
+
+
+def test_every_alone_block_that_applies_terraform_is_named() -> None:
+    from tests.test_runbook_m4_live import TEXT
+
+    alone = re.findall(r"^#### ([A-DTE]\d+[a-z]?) · alone", TEXT, re.M)
+    assert alone
+    table = PREFLIGHT[PREFLIGHT.index("## 4.") : PREFLIGHT.index("## 5.")]
+    for block_id in alone:
+        if block_id.endswith("0a"):  # az login, named in the paragraph below the table
+            assert "each session's 0a block" in table
+            continue
+        assert re.search(rf"\b{block_id}\b", table), block_id

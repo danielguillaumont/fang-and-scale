@@ -17,7 +17,26 @@ as `poe lab-check`, fixtures and mocked transports only, PRs with required CI.
 | 1 | Mark the four front-page rows approved; the wheel check is required | done | #91 |
 | 2a | `docs/runbooks/m4-preflight.md`: the checklist before session A | done | #92 |
 | 2b | Cross-check `m4-live-run.md` against the code, fix drift with tests | done | #93 |
-| 2c | Split the runbook into per-session copy-paste blocks with "expect" lines | queued | |
+| 2c | Split the runbook into per-session copy-paste blocks with "expect" lines | done | #94 |
+
+**Per-session blocks (#94).** Every PowerShell block in `m4-live-run.md` has an
+ID (A0a ... D8a, T1, T2, E1a ... E4) and an **Expect** line; prompting blocks
+are marked **alone** (now including `az login --tenant`); each session starts
+with its own 0a to 0c blocks and ends with a "Paste back" list. Same commands as
+before (checked line for line). One row pending review.
+
+#### Needs Daniel (M4 readiness)
+
+- **Four rows pending review in DECISIONS:** the preflight's thresholds and
+  Claude Code rule (#92); `scope check`'s new strike and escalation lines (#93);
+  the cross-check fixes (#93); the block layout (#94).
+- **Before session A:** `docs/runbooks/m4-preflight.md`, then
+  `docs/runbooks/m4-live-run.md` from A0a. Sessions A to D have still not run
+  live.
+- Not verified offline (a live session will tell): the `az login` subscription
+  prompt, the alert loop on your PowerShell version (I could not run
+  PowerShell here), and that every `Expect` line for an `az` command matches its
+  live output. Send any difference as the block's output.
 
 **Runbook cross-check (#93).** Ten drifts fixed, each with a test; the ones that
 would have stopped a live session: B1's export check wrote a file named
