@@ -194,6 +194,12 @@ edit an object in the tenant.*
   instead of sending them to the terminal. Rich's own colours are unaffected.
 - **Paging.** A `nextLink` is checked by the gate like any URL. If it is denied,
   the collector fails and discards the earlier pages.
+- **Malformed objects.** One object with a field of the wrong type (a list as a
+  `displayName`, say) is counted as `bad-item` and its collector becomes
+  `partial`, so the findings it feeds stay open; it does not abort the scout.
+  Before 2026-11-28 a pydantic error from such an object escaped the Graph list
+  parsers (found by a property test). Credential reads never take a value
+  field, whatever the response holds.
 - **The model as a reader only.** No language model reads tenant data in
   0.1.0, except through the MCP server, if an operator connects one. That server
   is read-only and every tool description marks tenant strings as data. When the
@@ -202,7 +208,7 @@ edit an object in the tenant.*
 
 Tests: `tests/test_report_html.py`, `tests/test_report_strikes.py`,
 `tests/test_action.py`, `tests/scope/test_gate_fuzz.py`,
-`tests/test_console_controls.py`.
+`tests/test_console_controls.py`, `tests/inventory/test_new_collectors_properties.py`.
 
 **What does not:**
 - **Showing an escape is not hiding it.** A name full of `\x1b[...` is now

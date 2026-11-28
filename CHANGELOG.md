@@ -21,12 +21,27 @@ version may change file formats; each change is listed here.
 
 ### Fixed
 
+- A Graph object with a wrongly typed field (e.g. a list as `displayName`) no
+  longer aborts the scout: it is a `bad-item` and its collector is `partial`
+  (#103, found by a property test).
 - `fns prove --help` and `fns demo prove --help`: `--after-strike` no longer says
   a strike result can never pass a finding. Since option B, a LIVE 403 on the
   item's exact operation and object counts like a probe denial (#90).
 
 ### Added
 
+- Optional scout reads, each used only when a scope lists its operation, so
+  existing scopes, recordings and digests are unchanged; fixture-only, not
+  validated live (`docs/runbooks/live-validation-backlog.md`):
+  - key and password credential **metadata** of applications and service
+    principals, never values (#96);
+  - federated identity credentials, with the `federated-credential` reach rule
+    and "Front doors" in `fns contain` for outside parties that can sign in;
+    no verdict change (#97);
+  - transitive group memberships with `isAssignableToRole`, and the
+    `group-membership-write` rule (#98).
+- `docs/proposals/conditional-access.md`: design only, pending review (#99).
+- `docs/scenarios/`: five FIXTURE tenants with golden tests (#100).
 - Scale test (#102): `scripts/scale_test.py` and the opt-in `poe scale` run a
   synthetic 10,000-SP FIXTURE tenant (51,350 edges) through scout replay and
   contain; `docs/PERFORMANCE.md` has the numbers. `tests/test_scale.py` runs a
