@@ -20,7 +20,7 @@ Tests at the start: 2139 passed, 1 skipped (Windows).
 | 5 | Scenario gallery: 5 FIXTURE tenants with golden tests | done (fixture only) | #100 |
 | 6 | Reusable GitHub Action for other repos | done (fixture only) | #101 |
 | 7 | Scale test + `docs/PERFORMANCE.md` | done (fixture only) | #102 |
-| 8 | Hardening/property tests, README/GUIDE coverage | todo | |
+| 8 | Hardening/property tests, README/GUIDE coverage | done | #103 |
 
 **Item 1 (#96).** `graph.credentials` reads key/password credential metadata
 through two optional per-object GETs; never values. Not in the lab scope yet.
@@ -59,6 +59,12 @@ replay about 13 min as shipped (journal fsync per write; about 6 min without),
 442 MiB; contain 3.1 s, wide agent 3.3 s (was 8.8 s), 225 MiB. Closure indexes
 and a faster whitespace check; every digest unchanged. The journal is the
 bottleneck and stays as approved (Needs Daniel, if replay speed matters).
+
+**Item 8 (#103).** Property tests for the new parsers and `classify`. They
+found a real bug, pre-existing in two parsers and new in one: a Graph object
+with a wrongly typed field aborted the scout. All nine Graph per-item handlers
+now record `bad-item` (collector `partial`). GUIDE "Real vs. fixture",
+THREAT-MODEL and CHANGELOG cover the session's work.
 
 **Crash recovery (2026-11-28).** The laptop crashed during item 3's `poe check`.
 The uncommitted item 3 work was intact; one `poe check` alone passed (2207,

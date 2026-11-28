@@ -297,7 +297,7 @@ def parse_service_principals(
                 },
                 priority=PRIORITY_PRIMARY,
             )
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return roles, errors
 
@@ -319,7 +319,7 @@ def parse_applications(
             sp = sp_by_app_id.get(app_id)
             if sp is not None:
                 b.edge({"type": "instanceOf", "src": sp, "dst": app_obj}, prov)
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -348,7 +348,7 @@ def parse_owners(
                 errors.append("unknown-object-type")
                 continue
             b.edge({"type": "owns", "src": owner, "dst": owned_id}, prov)
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -364,7 +364,7 @@ def parse_member_of(
             group = _directory_object(b, item)
             if group is not None:
                 b.edge({"type": "memberOf", "src": member_id, "dst": group}, prov)
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -464,7 +464,7 @@ def parse_transitive_groups(
             if isinstance(assignable, bool):
                 b.annotate(group, {GROUP_ROLE_ASSIGNABLE: assignable})
             b.edge({"type": "memberOf", "src": member_id, "dst": group}, prov)
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -499,7 +499,7 @@ def parse_app_role_assignments(
                 },
                 prov,
             )
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -515,7 +515,7 @@ def parse_directory_role_definitions(b: SnapshotBuilder, items: list[dict[str, A
                 properties={"isBuiltIn": bool(item.get("isBuiltIn"))},
                 priority=PRIORITY_PRIMARY,
             )
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -536,7 +536,7 @@ def parse_directory_role_assignments(
                 },
                 prov,
             )
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return errors
 
@@ -571,7 +571,7 @@ def parse_directory_role_eligibility(
                 },
                 prov,
             )
-        except ParseError:
+        except (ParseError, ValueError):  # ValueError: pydantic rejected a field
             errors.append("bad-item")
     return skipped, errors
 
