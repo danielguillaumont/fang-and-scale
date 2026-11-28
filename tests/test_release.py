@@ -203,10 +203,19 @@ def test_the_changelog_says_what_did_not_run_live() -> None:
         assert attribution not in CHANGELOG
 
 
+LAST_PR_IN_0_1_0 = 86
+"""v0.1.0 was tagged on #86's merge commit (2026-11-27)."""
+
+
 def test_everything_built_is_in_the_release_the_tag_ships() -> None:
-    """Approved 2026-11-27: the tag goes on ``main``, so "Unreleased" is folded in."""
+    """Approved 2026-11-27: the tag went on ``main``, so everything up to #86 was folded
+    into 0.1.0, and "Unreleased" holds only what merged after the tag."""
     unreleased = CHANGELOG[CHANGELOG.index("## [Unreleased]") : CHANGELOG.index(f"## [{VERSION}]")]
-    assert unreleased.strip() == "## [Unreleased]"
+    entries = [e for e in re.split(r"\n(?=- )", unreleased) if e.startswith("- ")]
+    assert entries, "the first post-release entry is #87"
+    for entry in entries:
+        prs = [int(n) for n in re.findall(r"#(\d+)", entry)]
+        assert prs and min(prs) > LAST_PR_IN_0_1_0, entry
     section = CHANGELOG[CHANGELOG.index(f"## [{VERSION}]") :]
     for needed in ("option B", "D-6 and D-7", "accepted_inconclusive", "in its own job"):
         assert needed in section, needed
