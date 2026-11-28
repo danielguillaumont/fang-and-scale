@@ -16,7 +16,7 @@ Tests at the start: 2139 passed, 1 skipped (Windows).
 | 1 | Collector: key/password credential metadata (never values) | done (fixture only) | #96 |
 | 2 | Collector: federated identity credentials + "outside party can sign in" rule | done (fixture only) | #97 |
 | 3 | Collector: group memberships for in-scope paths + group-derived reach | done (fixture only) | #98 |
-| 4 | Conditional access: design only (`docs/proposals/conditional-access.md`) | todo | |
+| 4 | Conditional access: design only (`docs/proposals/conditional-access.md`) | done (design, pending review) | #99 |
 | 5 | Scenario gallery: 5 FIXTURE tenants with golden tests | todo | |
 | 6 | Reusable GitHub Action for other repos | todo | |
 | 7 | Scale test + `docs/PERFORMANCE.md` | todo | |
@@ -36,6 +36,15 @@ an in-scope service principal is in, nested included, with `isAssignableToRole`;
 rule `group-membership-write` for GroupMember/Group.ReadWrite.All plus
 Application.ReadWrite.All (role-assignable groups need RoleManagement too;
 unknown ones stay open). No existing report changes.
+
+**Item 4 (#99).** Design only: `docs/proposals/conditional-access.md`
+(options A keep / B `Policy.Read.All` / C licence-only `not-applicable`;
+recommends C). Nothing built; the surface stays not collected.
+
+**Crash recovery (2026-11-28).** The laptop crashed during item 3's `poe check`.
+The uncommitted item 3 work was intact; one `poe check` alone passed (2207,
+5 min instead of 14 with parallel runs) and #98 merged. From here: one test run
+at a time, nothing heavy alongside it.
 
 **To resume (`continue`):** take the first row that is not done, on a new
 branch from `main`; read its notes below and the pending-review rows dated
