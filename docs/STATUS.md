@@ -15,8 +15,23 @@ Same hard rules: no Azure, no tags, PRs with required CI, STATUS current.
 | --- | --- | --- | --- |
 | 1 | Post-release housekeeping: "Unreleased" with #87, STATUS | done | #88 |
 | 2 | CI: install the built wheel in a clean venv and run `fns demo contain --bundled` | done | #89 |
-| 3 | README rework, with generated demo output and a sample FIXTURE report | to do | |
-| 4 | `docs/social-preview.png` (1280x640) | to do | |
+| 3 | README rework, with generated demo output and a sample FIXTURE report | done | #90 |
+| 4 | `docs/social-preview.png` (1280x640) | done | #90 (made by the same script as the screenshot) |
+
+Also fixed on the way (#90): `--after-strike`'s help text still said a strike
+could never pass a finding, which option B changed. Found by reading the help
+for the README.
+
+#### Needs Daniel
+
+- **Upload the social preview**: `docs/social-preview.png` (1280x640), under
+  Settings, General, "Social preview". It is a repository setting, so I left it
+  to you.
+- **Make the wheel check required** (optional): run the command in
+  `docs/PUBLIC-READINESS.md`, "Require CI to pass". It now lists four checks;
+  until it is run again, `wheel (install + bundled demo)` runs on every pull
+  request but does not block a merge.
+- **Four new rows pending review in DECISIONS** (the front-page choices).
 
 ## Owner-decision session (2026-11-27)
 
